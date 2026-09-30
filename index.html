@@ -1,120 +1,344 @@
 <!doctype html>
 <html lang="fr">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>BruceOS — une usine à créer des SaaS</title>
-    <meta
-      name="description"
-      content="BruceOS transforme une idée en produit : découvrir, concevoir, construire, tester, livrer. Découvrez la Factory en douze scènes."
-    />
-    <meta name="theme-color" content="#08090b" />
-    <link rel="icon" href="/favicon.ico" sizes="any" />
-    <style>
-      :root {
-        color-scheme: dark;
-        --bg: #08090b;
-        --fg: #f4f4f5;
-        --muted: #9ca3af;
-        --line: #1f2126;
-        --accent: #e4a24a;
-      }
-      * { box-sizing: border-box; }
-      html, body { margin: 0; padding: 0; }
-      body {
-        background: var(--bg);
-        color: var(--fg);
-        font-family: ui-monospace, SFMono-Regular, "IBM Plex Mono", Menlo, Consolas, monospace;
-        line-height: 1.6;
-        -webkit-font-smoothing: antialiased;
-      }
-      main {
-        max-width: 44rem;
-        margin: 0 auto;
-        padding: clamp(2.5rem, 8vh, 6rem) 1.5rem clamp(3rem, 10vh, 7rem);
-      }
-      .eyebrow {
-        font-size: 0.75rem;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-        color: var(--muted);
-      }
-      h1 {
-        font-size: clamp(2rem, 6vw, 3rem);
-        line-height: 1.1;
-        margin: 1rem 0 0.75rem;
-        font-weight: 600;
-      }
-      p { margin: 0 0 1rem; color: #d4d4d8; }
-      .lede { font-size: 1.05rem; color: var(--fg); }
-      .steps {
-        margin: 2rem 0;
-        padding: 1.25rem 1.5rem;
-        border: 1px solid var(--line);
-        border-radius: 0.75rem;
-        color: var(--muted);
-        font-size: 0.92rem;
-      }
-      .steps strong { color: #d4d4d8; font-weight: 500; }
-      .cta { margin: 2.5rem 0 0; }
-      a.button {
-        display: inline-block;
-        padding: 0.85rem 1.4rem;
-        border: 1px solid var(--accent);
-        border-radius: 0.5rem;
-        color: var(--accent);
-        text-decoration: none;
-        font-size: 0.95rem;
-        transition: background-color 0.15s ease, color 0.15s ease;
-      }
-      a.button:hover, a.button:focus-visible {
-        background: var(--accent);
-        color: #08090b;
-      }
-      hr { border: 0; border-top: 1px solid var(--line); margin: 3rem 0 1.5rem; }
-      footer { font-size: 0.85rem; color: var(--muted); }
-      footer a { color: var(--accent); text-decoration: none; }
-      footer a:hover { text-decoration: underline; }
-    </style>
-  </head>
-  <body>
-    <main>
-      <p class="eyebrow">BruceOS</p>
-      <h1>Une usine à créer des SaaS</h1>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Un outil sur mesure, livré en quelques jours</title>
+<meta name="description" content="Vous perdez des heures chaque semaine sur une tâche répétitive. On la transforme en outil qui tourne : prototype en 2 à 3 jours, outil complet en 2 à 3 semaines.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://mybruceos.github.io/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2308090b'/%3E%3Ctext x='16' y='23' font-family='monospace' font-size='20' fill='%23e4a24a' text-anchor='middle'%3E%3E%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#08090b">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Un outil sur mesure, livré en quelques jours">
+<meta property="og:description" content="On transforme une tâche répétitive en outil qui tourne : du cadrage à la mise en ligne, dans un délai annoncé à l'avance.">
+<meta property="og:url" content="https://mybruceos.github.io/">
+<meta name="twitter:card" content="summary">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"ProfessionalService","name":"Atelier logiciel","description":"Conception et livraison d'outils sur mesure, du cadrage à la mise en ligne.","email":"madzimba.os@gmail.com","url":"https://mybruceos.github.io/","priceRange":"2400€-6900€"}
+</script>
+<style>
+:root{
+  --bg:#08090b;
+  --fg:#f4f3ef;
+  --muted:rgba(244,243,239,.68);
+  --faint:rgba(244,243,239,.58);
+  --accent:#e4a24a;
+  --line:rgba(244,243,239,.14);
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--fg);
+  font-family:var(--sans);
+  font-size:16px;
+  line-height:24px;
+  -webkit-font-smoothing:antialiased;
+}
+.skip-link{
+  position:absolute;
+  left:-999px;
+  top:0;
+  background:var(--accent);
+  color:var(--bg);
+  padding:.75em 1em;
+  font-family:var(--mono);
+  font-size:14px;
+  z-index:10;
+}
+.skip-link:focus{left:1rem;top:1rem}
+main{max-width:680px;margin:0 auto;padding:0 1.25rem}
+header.hero{padding:4.5rem 0 3rem}
+.wordmark{
+  display:block;
+  font-family:var(--mono);
+  font-size:13px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  color:var(--faint);
+  margin-bottom:1.75rem;
+}
+h1{
+  font-family:var(--sans);
+  font-size:clamp(28px,5.5vw,40px);
+  line-height:1.2;
+  font-weight:600;
+  margin:0 0 1.1rem;
+  letter-spacing:-.01em;
+}
+h1 .mark{color:var(--accent)}
+.positioning{
+  font-size:18px;
+  line-height:1.6;
+  color:var(--muted);
+  max-width:34rem;
+  margin:0 0 2rem;
+}
+.cta{
+  display:inline-flex;
+  align-items:baseline;
+  gap:.6rem;
+  border:1px solid var(--accent);
+  color:var(--accent);
+  text-decoration:none;
+  font-family:var(--mono);
+  font-size:14px;
+  padding:.85em 1.3em;
+  transition:background-color .15s ease;
+}
+.cta:hover,.cta:focus-visible{background:rgba(228,162,74,.12)}
+.cta .risk{color:var(--faint);font-size:12px}
+.cta-row{margin-top:.5rem}
+section{
+  padding:2.75rem 0;
+  border-top:1px solid var(--line);
+}
+.kicker{
+  display:block;
+  font-family:var(--mono);
+  font-size:12px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  color:var(--accent);
+  margin-bottom:1rem;
+}
+h2{
+  font-size:22px;
+  line-height:1.35;
+  font-weight:600;
+  margin:0 0 1rem;
+}
+p{margin:0 0 1rem}
+section > p:last-child{margin-bottom:0}
+.lede{font-size:17px;color:var(--fg)}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:1.75rem}
+.steps li{display:grid;grid-template-columns:2.75rem 1fr;gap:1rem}
+.steps .tag{font-family:var(--mono);font-size:13px;color:var(--accent);padding-top:.15rem}
+.steps h3{font-size:16px;font-weight:600;margin:0 0 .35rem}
+.steps p{color:var(--muted);margin:0;font-size:15px}
+.grid{display:grid;gap:1.5rem;margin-bottom:2.25rem}
+.tier{border:1px solid var(--line);padding:1.5rem}
+.tier-head{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;margin-bottom:.6rem;flex-wrap:wrap}
+.tier-name{font-family:var(--mono);font-size:13px;letter-spacing:.1em;color:var(--faint)}
+.tier-name .num{color:var(--accent)}
+.tier-price{font-family:var(--mono);font-size:16px;color:var(--fg);white-space:nowrap}
+.tier-duration{font-family:var(--mono);font-size:12px;color:var(--faint);display:block;margin-top:.15rem}
+.tier p{color:var(--muted);font-size:15px;margin:.75rem 0 0}
+.launch{border:1px solid var(--accent);padding:1.5rem}
+.launch .tier-name{color:var(--accent)}
+.proof-link{
+  display:inline-block;
+  color:var(--accent);
+  font-family:var(--mono);
+  font-size:14px;
+  text-decoration:none;
+  border-bottom:1px solid rgba(228,162,74,.4);
+  padding-bottom:.15rem;
+  margin:.25rem 0 1.25rem;
+}
+.proof-link:hover,.proof-link:focus-visible{border-bottom-color:var(--accent)}
+.qa{border-top:1px solid var(--line);padding:1.1rem 0}
+.qa:first-of-type{border-top:none;padding-top:0}
+.qa summary{
+  cursor:pointer;
+  font-size:16px;
+  font-weight:600;
+  list-style:none;
+  padding-right:1.5rem;
+  position:relative;
+}
+.qa summary::-webkit-details-marker{display:none}
+.qa summary::after{
+  content:"+";
+  position:absolute;
+  right:0;
+  top:0;
+  color:var(--accent);
+  font-family:var(--mono);
+}
+.qa[open] summary::after{content:"–"}
+.qa p{margin-top:.85rem;color:var(--muted);font-size:15px}
+.contact-fields{
+  font-family:var(--mono);
+  font-size:13px;
+  color:var(--faint);
+  border:1px solid var(--line);
+  padding:1rem 1.25rem;
+  margin:0 0 1.5rem;
+  line-height:1.9;
+}
+.promise{color:var(--muted);font-size:14px;margin-top:1.25rem}
+footer{padding:2.5rem 0 4rem;border-top:1px solid var(--line)}
+footer p{color:var(--faint);font-size:13px;font-family:var(--mono);margin:0}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:480px){
+  header.hero{padding:3rem 0 2.25rem}
+  section{padding:2.25rem 0}
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#contenu">Aller au contenu principal</a>
+<main id="contenu">
 
-      <p class="lede">
-        On ne vend pas de promesses : on construit. BruceOS prend une
-        opportunité, la confronte au réel, puis en sort un produit fini —
-        testé et livré.
-      </p>
+<header class="hero">
+  <span class="wordmark">Atelier logiciel</span>
+  <h1>Un outil sur mesure, livré <span class="mark">en quelques jours</span>.</h1>
+  <p class="positioning">On prend une tâche répétitive et on la transforme en logiciel qui tourne : du cadrage à la mise en ligne, dans un délai annoncé avant de commencer.</p>
+  <p class="cta-row">
+    <a class="cta" href="mailto:madzimba.os@gmail.com?subject=Demande%20de%20cadrage&body=Bonjour%2C%0A%0ALe%20probl%C3%A8me%20que%20je%20veux%20faire%20dispara%C3%AEtre%20%3A%0A%0ALe%20temps%20que%20%C3%A7a%20me%20co%C3%BBte%20chaque%20semaine%20%3A%0A%0ACe%20que%20j%27utilise%20aujourd%27hui%20pour%20le%20faire%20%3A%0A">Réserver un cadrage gratuit <span class="risk">— 20 min, sans engagement</span></a>
+  </p>
+</header>
 
-      <div class="steps">
-        <p>
-          <strong>Une idée entre, un produit en sort.</strong>
-          Cinq stations, toujours dans le même ordre : découvrir, concevoir,
-          construire, tester, livrer.
-        </p>
-        <p style="margin-bottom: 0">
-          Pas de démonstration montée de toutes pièces, pas de chiffre inventé :
-          ce qui est annoncé ici est ce qui a été exécuté.
-        </p>
+<section aria-labelledby="probleme-h">
+  <span class="kicker">Le problème</span>
+  <h2 id="probleme-h">Une tâche qui vous coûte du temps chaque semaine</h2>
+  <p class="lede">Un tableau à recopier, une donnée à croiser, un rapport à assembler à la main : quelques heures perdues chaque semaine, qui ne reviennent jamais. Ce temps continue de coûter, même quand personne ne le compte.</p>
+</section>
+
+<section aria-labelledby="livre-h">
+  <span class="kicker">Ce qu'on livre</span>
+  <h2 id="livre-h">Un outil qui tourne, dès la livraison</h2>
+  <p>Un logiciel qui fonctionne, déployé en ligne et documenté. Votre équipe l'utilise dès la livraison, avec une explication claire de ce qu'il fait et comment s'en servir — sans jargon technique à traduire.</p>
+</section>
+
+<section aria-labelledby="deroule-h">
+  <span class="kicker">Comment ça se passe</span>
+  <h2 id="deroule-h">Trois étapes, un délai connu d'avance</h2>
+  <ol class="steps">
+    <li>
+      <span class="tag">01</span>
+      <div>
+        <h3>Cadrage — 20 minutes, gratuit</h3>
+        <p>On reformule le problème ensemble, on regarde ce qui est faisable et ce que ça demande.</p>
       </div>
+    </li>
+    <li>
+      <span class="tag">02</span>
+      <div>
+        <h3>Prototype — 2 à 3 jours</h3>
+        <p>Le flux le plus critique prend forme : déployé, testé, utilisable.</p>
+      </div>
+    </li>
+    <li>
+      <span class="tag">03</span>
+      <div>
+        <h3>Outil complet — 2 à 3 semaines</h3>
+        <p>L'ensemble est construit, intégré à ce que vous utilisez déjà, documenté et mis en ligne.</p>
+      </div>
+    </li>
+  </ol>
+</section>
 
-      <p class="cta">
-        <a class="button" href="/experience/">Découvrir l'expérience&nbsp;→</a>
-      </p>
+<section aria-labelledby="grille-h">
+  <span class="kicker">La grille</span>
+  <h2 id="grille-h">Prix et durées, sans détour</h2>
+  <div class="grid">
+    <div class="tier">
+      <div class="tier-head">
+        <span class="tier-name"><span class="num">01</span> CADRAGE</span>
+        <span class="tier-price">gratuit<span class="tier-duration">20 min</span></span>
+      </div>
+      <p>Une conversation pour reformuler le problème, dire si c'est faisable, ce que ça demande et ce que ça coûte.</p>
+    </div>
+    <div class="tier">
+      <div class="tier-head">
+        <span class="tier-name"><span class="num">02</span> PROTOTYPE</span>
+        <span class="tier-price">2 400 €<span class="tier-duration">2 à 3 jours</span></span>
+      </div>
+      <p>Le flux le plus critique, déployé et testé.</p>
+    </div>
+    <div class="tier">
+      <div class="tier-head">
+        <span class="tier-name"><span class="num">03</span> OUTIL COMPLET</span>
+        <span class="tier-price">à partir de 6 900 €<span class="tier-duration">2 à 3 semaines</span></span>
+      </div>
+      <p>Plusieurs flux, intégrations avec l'existant, documentation et mise en ligne.</p>
+    </div>
+    <div class="tier">
+      <div class="tier-head">
+        <span class="tier-name"><span class="num">04</span> SUIVI</span>
+        <span class="tier-price">190 €/mois<span class="tier-duration">mensuel</span></span>
+      </div>
+      <p>Évolutions, corrections et veille de bon fonctionnement, résiliable à tout moment.</p>
+    </div>
+  </div>
+  <div class="launch">
+    <div class="tier-head">
+      <span class="tier-name">PROGRAMME DE LANCEMENT — 3 places</span>
+      <span class="tier-price">4 900 €<span class="tier-duration">outil complet</span></span>
+    </div>
+    <p>Tarif de lancement sur un outil complet, en échange d'un retour d'usage détaillé et d'un calendrier un peu plus souple.</p>
+  </div>
+</section>
 
-      <hr />
+<section aria-labelledby="preuve-h">
+  <span class="kicker">La preuve</span>
+  <h2 id="preuve-h">Ce qu'on a construit, en vrai</h2>
+  <p>La meilleure preuve, c'est le produit lui-même. Cette page en est une aussi : moins de 15 Ko, une seule requête, sans police téléchargée et sans JavaScript requis pour la lire.</p>
+  <a class="proof-link" href="/experience/">Voir la démonstration →</a>
+</section>
 
-      <footer>
-        <p>
-          Une question, un problème à faire disparaître ?
-          <a href="mailto:madzimba.os@gmail.com?subject=BruceOS%20%E2%80%94%20demande%20de%20construction">madzimba.os@gmail.com</a>
-        </p>
-        <p style="margin-bottom: 0">
-          Contact direct. Réponse attendue en moins de 24&nbsp;h ouvrées.
-        </p>
-      </footer>
-    </main>
-  </body>
+<section aria-labelledby="questions-h">
+  <span class="kicker">Questions réelles</span>
+  <h2 id="questions-h">Ce qu'on nous demande le plus</h2>
+
+  <details class="qa">
+    <summary>Combien ça coûte, et comment je suis facturé ?</summary>
+    <p>Le cadrage est gratuit. Ensuite, un prix fixe par étape — prototype ou outil complet — annoncé avant de commencer, jamais au temps passé. Le suivi mensuel est optionnel et résiliable à tout moment.</p>
+  </details>
+
+  <details class="qa">
+    <summary>Qu'est-ce qui est vraiment livré ?</summary>
+    <p>Un outil en ligne déployé et accessible, prêt à l'emploi, avec une documentation écrite pour l'utiliser au quotidien.</p>
+  </details>
+
+  <details class="qa">
+    <summary>Comment se passent les 2 à 3 jours ou les 2 à 3 semaines ?</summary>
+    <p>Après le cadrage, vous recevez une date de livraison. Le prototype couvre le flux le plus critique ; l'outil complet couvre l'ensemble, avec des points d'avancement réguliers jusqu'à la mise en ligne.</p>
+  </details>
+
+  <details class="qa">
+    <summary>Je n'y connais rien en code, ça pose un problème ?</summary>
+    <p>Non. Le cadrage se fait dans vos mots, sur votre problème. La documentation livrée est écrite pour quelqu'un qui utilise l'outil, pas pour quelqu'un qui le programme.</p>
+  </details>
+
+  <details class="qa">
+    <summary>Qui construit concrètement l'outil ?</summary>
+    <p>Le développement est mené avec des outils d'intelligence artificielle, sous supervision directe à chaque étape — cadrage, construction, tests et mise en ligne compris. C'est ce qui rend possible un délai de quelques jours plutôt que quelques mois.</p>
+  </details>
+
+  <details class="qa">
+    <summary>Comment est-ce qu'on commence ?</summary>
+    <p>Vous écrivez trois lignes par e-mail : le problème, le temps qu'il vous coûte chaque semaine, l'outil que vous utilisez aujourd'hui pour le faire. Réponse en moins de 24 h, puis un premier échange de 20 minutes, sans engagement.</p>
+  </details>
+</section>
+
+<section aria-labelledby="contact-h">
+  <span class="kicker">Contact</span>
+  <h2 id="contact-h">Parlons de votre problème</h2>
+  <p>Écrivez à <a href="mailto:madzimba.os@gmail.com">madzimba.os@gmail.com</a> avec trois lignes :</p>
+  <p class="contact-fields">
+    Le problème que vous voulez faire disparaître<br>
+    Le temps que ça vous coûte chaque semaine<br>
+    Ce que vous utilisez aujourd'hui pour le faire
+  </p>
+  <p class="cta-row">
+    <a class="cta" href="mailto:madzimba.os@gmail.com?subject=Demande%20de%20cadrage&body=Bonjour%2C%0A%0ALe%20probl%C3%A8me%20que%20je%20veux%20faire%20dispara%C3%AEtre%20%3A%0A%0ALe%20temps%20que%20%C3%A7a%20me%20co%C3%BBte%20chaque%20semaine%20%3A%0A%0ACe%20que%20j%27utilise%20aujourd%27hui%20pour%20le%20faire%20%3A%0A">Écrire maintenant <span class="risk">— réponse en moins de 24 h</span></a>
+  </p>
+  <p class="promise">Premier échange de 20 minutes, sans engagement.</p>
+</section>
+
+</main>
+<footer>
+  <div style="max-width:680px;margin:0 auto;padding:0 1.25rem">
+    <p>madzimba.os@gmail.com</p>
+  </div>
+</footer>
+</body>
 </html>
