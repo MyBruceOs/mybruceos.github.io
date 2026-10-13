@@ -1,0 +1,9 @@
+node_modules/
+.remotion/
+*.log
+# renders: keep only the final films and their posters
+out/*
+!out/trendly-16x9.mp4
+!out/trendly-9x16.mp4
+!out/trendly-16x9-poster.jpg
+!out/trendly-9x16-poster.jpg

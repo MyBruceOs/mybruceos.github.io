@@ -1,0 +1,26 @@
+{
+  "name": "trendly-motion",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TRENDLY — 15s motion design launch film (Remotion). 16:9 landing + 9:16 TikTok.",
+  "scripts": {
+    "studio": "remotion studio",
+    "render:16x9": "remotion render Trendly-16x9 out/trendly-16x9.mp4",
+    "render:9x16": "remotion render Trendly-9x16 out/trendly-9x16.mp4",
+    "render": "npm run render:16x9 && npm run render:9x16",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fontsource/inter": "5.3.0",
+    "@fontsource/montserrat": "5.3.0",
+    "@fontsource/noto-color-emoji": "5.3.2",
+    "@remotion/cli": "4.0.535",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "remotion": "4.0.535"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.18",
+    "typescript": "5.9.3"
+  }
+}
