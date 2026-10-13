@@ -7,7 +7,9 @@
     "studio": "remotion studio",
     "render:16x9": "remotion render Trendly-16x9 out/raw/trendly-16x9.mp4 && bash scripts/finalize.sh 16x9",
     "render:9x16": "remotion render Trendly-9x16 out/raw/trendly-9x16.mp4 && bash scripts/finalize.sh 9x16",
-    "render": "npm run render:16x9 && npm run render:9x16",
+    "render:vendeurs:16x9": "remotion render Trendly-Vendeurs-16x9 out/raw/trendly-vendeurs-16x9.mp4 && bash scripts/finalize.sh 16x9 vendeurs",
+    "render:vendeurs:9x16": "remotion render Trendly-Vendeurs-9x16 out/raw/trendly-vendeurs-9x16.mp4 && bash scripts/finalize.sh 9x16 vendeurs",
+    "render": "npm run render:16x9 && npm run render:9x16 && npm run render:vendeurs:16x9 && npm run render:vendeurs:9x16",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

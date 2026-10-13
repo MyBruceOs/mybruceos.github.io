@@ -2,16 +2,20 @@
 
 A minimal 120 BPM bed (pad, pulsing bass, hats) plus sound effects placed on
 the exact frames of src/timeline.ts (60 fps). Re-run after changing the
-timeline:  python scripts/sound_design.py   (needs numpy, scipy)
-Writes public/audio/trendly-sound.wav (48 kHz, 16-bit, stereo, 15.000 s).
+timeline:  python scripts/sound_design.py [vendeurs]   (needs numpy, scipy)
+Writes public/audio/trendly-sound.wav, or trendly-sound-vendeurs.wav for the
+seller cut (adds a cue when the « Demande » row lights up).
+48 kHz, 16-bit, stereo, 15.000 s.
 """
 
+import sys
 from pathlib import Path
 
 import numpy as np
 from scipy.io import wavfile
 from scipy.signal import butter, fftconvolve, lfilter, sosfilt
 
+VARIANT = sys.argv[1] if len(sys.argv) > 1 else "original"
 SR = 48_000
 DUR = 15.0
 N = int(SR * DUR)
@@ -24,7 +28,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 T = dict(
     hookText2=60, matchCut=132, swipe=176, viralPop=206, statusIn=252, curve=(258, 342),
     statusExit=356, tapAnalysis=398, push=406, ring=(436, 498), tiles=452, explode=(440, 522),
-    scroll=540, reasons=552, scrollBack=616, tapSave=642, fly=(652, 702), morph=(752, 778),
+    scroll=540, reasons=552, demand=562, scrollBack=616, tapSave=642, fly=(652, 702), morph=(752, 778),
     ignite=(786, 798), arm=(796, 812), hit=814, word=800, tagline=822,
 )
 
@@ -364,6 +368,10 @@ whoosh(sec(T["explode"][1]), 0.4, 6000, 1500, 0.14, 0.3, -0.3, q=2)
 whoosh(sec(T["scroll"]), 0.5, 800, 2400, 0.18, 0, 0, q=1.6)
 for i in range(4):
     tick(sec(T["reasons"] + i * 6), 2200, 0.1, pan=-0.2 + i * 0.13)
+if VARIANT == "vendeurs":  # the « Demande » row lights up
+    chime(sec(T["demand"]) + 0.07, 1567.98, 0.2, 1.6, 0.2)
+    pop(sec(T["demand"]) + 0.07, 784, 0.22, 0.2)
+    sparkle(sec(T["demand"]) + 0.07, 0.4, 0.09, 10, 6)
 # 5. Save
 whoosh(sec(T["scrollBack"]), 0.35, 2400, 800, 0.15, 0, 0, q=1.6)
 tap(sec(T["tapSave"]))
@@ -424,5 +432,6 @@ mix[:, -tail:] *= np.linspace(1, 0, tail) ** 2
 mix[:, : int(0.002 * SR)] *= np.linspace(0, 1, int(0.002 * SR))
 
 rms_db = 20 * np.log10(np.sqrt((mix ** 2).mean()))
-wavfile.write(OUT / "trendly-sound.wav", SR, (mix.T * 32767).astype(np.int16))
-print(f"wrote public/audio/trendly-sound.wav  {DUR}s  RMS {rms_db:.1f} dBFS  status hits {STATUS_HITS}")
+name = "trendly-sound.wav" if VARIANT == "original" else f"trendly-sound-{VARIANT}.wav"
+wavfile.write(OUT / name, SR, (mix.T * 32767).astype(np.int16))
+print(f"wrote public/audio/{name}  {DUR}s  RMS {rms_db:.1f} dBFS  status hits {STATUS_HITS}")

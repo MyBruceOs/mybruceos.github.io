@@ -1,6 +1,6 @@
 import React from 'react';
 import {AbsoluteFill, Html5Audio, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
-import {COPY} from './data';
+import {Variant} from './data';
 import {Background, Flare, Grain, Particles, Vignette} from './fx/Fx';
 import {Caption, KineticText} from './fx/KineticText';
 import {ease, kf, prog, pulse, win} from './lib/anim';
@@ -9,80 +9,97 @@ import {Hook} from './scenes/Hook';
 import {PhoneStory} from './scenes/PhoneStory';
 import {statusHit, Statuses} from './scenes/Statuses';
 import {Fmt, T, useFmt} from './timeline';
+import {useCopy, VariantContext} from './variant';
 
-const accent = (text: string) => ({text, accent: true});
+/** Font size that keeps a one-line text inside maxW (Inter 800, tight). */
+const fit = (text: string, base: number, maxW: number) => Math.min(base, Math.floor(maxW / (text.length * 0.53)));
+
+/** Two captions sharing one slot (the second replaces the first). */
+const CaptionSlot: React.FC<{
+	frame: number;
+	first: string;
+	second?: string;
+	start: number;
+	switchAt: number;
+	exit: number;
+	size: number;
+	land: boolean;
+}> = ({frame, first, second, start, switchAt, exit, size, land}) => (
+	<div style={{position: 'relative', width: land ? 780 : 1080, height: size * 1.45, marginTop: 18}}>
+		<Caption
+			text={first}
+			frame={frame}
+			start={start}
+			exit={second ? switchAt - 10 : exit}
+			size={size}
+			align={land ? 'left' : 'center'}
+			style={{left: 0, right: 0, top: 0}}
+		/>
+		{second && (
+			<Caption
+				text={second}
+				frame={frame}
+				start={switchAt}
+				exit={exit}
+				size={size}
+				color="#ff8fbd"
+				weight={600}
+				align={land ? 'left' : 'center'}
+				style={{left: 0, right: 0, top: 0}}
+			/>
+		)}
+	</div>
+);
 
 /** Headlines of each beat, placed per format. */
 const Texts: React.FC<{frame: number; fmt: Fmt; W: number; H: number}> = ({frame, fmt}) => {
+	const copy = useCopy();
 	const land = fmt === 'landscape';
 	const left: React.CSSProperties = {left: 150, top: '50%', transform: 'translateY(-50%)'};
 	const right: React.CSSProperties = {left: 1050, top: '50%', transform: 'translateY(-50%)'};
 	const top: React.CSSProperties = {left: 0, right: 0, top: 230};
 	const block = (pos: React.CSSProperties, children: React.ReactNode) => <div style={{position: 'absolute', ...pos}}>{children}</div>;
-	const H1 = land ? 104 : 112;
+	const align = land ? 'left' : 'center';
+	const longest = (lines: {text: string}[]) => lines.reduce((a, l) => (l.text.length > a.length ? l.text : a), '');
+	const H1 = (lines: {text: string}[]) => fit(longest(lines), land ? 104 : 112, land ? 960 : 960);
 	return (
 		<>
 			{/* 1. Hook */}
 			{block(
 				land ? left : top,
-				<>
-					<KineticText
-						lines={COPY.hookA.map((t) => ({text: t}))}
-						frame={frame}
-						start={T.hookText1}
-						exit={T.hookText1Exit}
-						size={H1}
-						align={land ? 'left' : 'center'}
-						style={{position: 'relative'}}
-					/>
-				</>,
+				<KineticText lines={copy.hookA} frame={frame} start={T.hookText1} exit={T.hookText1Exit} size={H1(copy.hookA)} align={align} style={{position: 'relative'}} />,
 			)}
 			{block(
 				land ? left : top,
-				<KineticText
-					lines={[{text: COPY.hookB[0]}, accent(COPY.hookB[1])]}
-					frame={frame}
-					start={T.hookText2}
-					exit={T.hookText2Exit}
-					size={H1}
-					align={land ? 'left' : 'center'}
-					style={{position: 'relative'}}
-				/>,
+				<KineticText lines={copy.hookB} frame={frame} start={T.hookText2} exit={T.hookText2Exit} size={H1(copy.hookB)} align={align} style={{position: 'relative'}} />,
 			)}
 			{/* 2. Feed */}
 			{block(
 				land ? left : {...top, top: 170},
 				<div style={{display: 'flex', flexDirection: 'column', alignItems: land ? 'flex-start' : 'center'}}>
 					<KineticText
-						lines={[{text: COPY.feed[0]}, accent(COPY.feed[1])]}
+						lines={copy.feed}
 						frame={frame}
 						start={T.feedText}
 						exit={T.feedExit}
 						size={land ? 100 : 104}
-						align={land ? 'left' : 'center'}
+						align={align}
 						style={{position: 'relative'}}
 					/>
-					<Caption
-						text={COPY.feedSub}
-						frame={frame}
-						start={T.feedText + 22}
-						exit={T.feedExit}
-						size={land ? 40 : 42}
-						style={{position: 'relative', marginTop: 18}}
-					/>
+					<Caption text={copy.feedSub} frame={frame} start={T.feedText + 22} exit={T.feedExit} size={land ? 40 : 42} style={{position: 'relative', marginTop: 18}} />
 				</div>,
 			)}
 			{/* 3. Statuses */}
 			{block(
 				land ? {left: 150, top: 120} : {left: 0, right: 0, top: 170},
 				<KineticText
-					lines={[{text: COPY.status, size: land ? 64 : 62, weight: 800}]}
+					lines={[{text: copy.status}]}
 					frame={frame}
 					start={T.statusText}
 					exit={T.statusExit}
-					size={land ? 64 : 62}
+					size={fit(copy.status, land ? 64 : 62, land ? 1020 : 980)}
 					stagger={0.55}
-					align={land ? 'left' : 'center'}
+					align={align}
 					style={{position: 'relative'}}
 				/>,
 			)}
@@ -91,42 +108,42 @@ const Texts: React.FC<{frame: number; fmt: Fmt; W: number; H: number}> = ({frame
 				land ? {...right, left: 1110} : {...top, top: 130},
 				<div style={{display: 'flex', flexDirection: 'column', alignItems: land ? 'flex-start' : 'center'}}>
 					<KineticText
-						lines={[{text: COPY.analysis[0]}, accent(COPY.analysis[1])]}
+						lines={copy.analysis}
 						frame={frame}
 						start={T.analysisText}
 						exit={T.analysisExit}
 						size={land ? 104 : 96}
-						align={land ? 'left' : 'center'}
+						align={align}
 						style={{position: 'relative'}}
 					/>
-					<Caption
-						text={COPY.analysisSub}
+					<CaptionSlot
 						frame={frame}
+						first={copy.analysisSub}
+						second={copy.analysisSub2}
 						start={T.analysisText + 26}
+						switchAt={T.demand}
 						exit={T.analysisExit}
 						size={land ? 38 : 42}
-						style={{position: 'relative', marginTop: 18}}
+						land={land}
 					/>
 				</div>,
 			)}
 			{/* 5. Save */}
 			{block(
 				land ? right : {...top, top: 170},
-				<KineticText
-					lines={[{text: COPY.save[0]}, accent(COPY.save[1])]}
-					frame={frame}
-					start={T.saveText}
-					exit={T.saveExit}
-					size={land ? 84 : 94}
-					align={land ? 'left' : 'center'}
-					style={{position: 'relative'}}
-				/>,
+				<KineticText lines={copy.save} frame={frame} start={T.saveText} exit={T.saveExit} size={land ? 84 : 94} align={align} style={{position: 'relative'}} />,
 			)}
 		</>
 	);
 };
 
-export const Film: React.FC = () => {
+export const Film: React.FC<{variant?: Variant}> = ({variant = 'original'}) => (
+	<VariantContext.Provider value={variant}>
+		<FilmBody variant={variant} />
+	</VariantContext.Provider>
+);
+
+const FilmBody: React.FC<{variant: Variant}> = ({variant}) => {
 	const frame = useCurrentFrame();
 	const {width: W, height: H} = useVideoConfig();
 	const fmt = useFmt();
@@ -183,7 +200,7 @@ export const Film: React.FC = () => {
 			<Vignette strength={0.7} />
 			<Grain frame={frame} opacity={0.07} />
 			{/* synthesised by scripts/sound_design.py, cued on the same frames */}
-			<Html5Audio src={staticFile('audio/trendly-sound.wav')} />
+			<Html5Audio src={staticFile(variant === 'original' ? 'audio/trendly-sound.wav' : `audio/trendly-sound-${variant}.wav`)} />
 		</AbsoluteFill>
 	);
 };

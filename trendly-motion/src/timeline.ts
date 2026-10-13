@@ -31,7 +31,8 @@ export const T = {
 	analysisText: 432,
 	scroll: [540, 580] as const,
 	reasons: 552,
-	analysisExit: 604,
+	demand: 562, // seller cut: the « Demande » row lights up, second caption
+	analysisExit: 610,
 	// 5. Save (10.1 - 12.5 s)
 	scrollBack: [616, 636] as const,
 	tapSave: 642,

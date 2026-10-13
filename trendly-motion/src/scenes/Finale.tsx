@@ -1,5 +1,6 @@
 import React from 'react';
-import {COPY, NEW_TILE, SAVED} from '../data';
+import {NEW_TILE, SAVED} from '../data';
+import {useCopy} from '../variant';
 import {clamp, ease, kf, lerp, prog, pulse, springAt} from '../lib/anim';
 import {FONT, SCREEN} from '../theme';
 import {Fmt, phoneAt, T} from '../timeline';
@@ -19,6 +20,7 @@ const CONVERGE = T.morph[1];
 
 /** Saved opportunities implode into the app icon; neon glyph; wordmark; tagline. */
 export const Finale: React.FC<{frame: number; fmt: Fmt; W: number; H: number}> = ({frame, fmt, W, H}) => {
+	const copy = useCopy();
 	if (frame < T.morph[0]) return null;
 	const L = LAYOUT[fmt];
 	const cam = phoneAt(fmt, T.morph[0]);
@@ -221,7 +223,7 @@ export const Finale: React.FC<{frame: number; fmt: Fmt; W: number; H: number}> =
 							opacity: prog(frame, T.tagline, T.tagline + 10),
 						}}
 					>
-						{COPY.tagline}
+						{copy.tagline}
 					</div>
 				</div>
 			</div>

@@ -9,6 +9,7 @@ import {Phone} from '../ui/Phone';
 import {GRID, SavedScreen, SavedTile, slotRect} from '../ui/Saved';
 import {IconPlay} from '../ui/icons';
 import {Shockwave, Sparks} from '../fx/Fx';
+import {useCopy} from '../variant';
 
 // --- State of the app over time -------------------------------------------
 
@@ -41,6 +42,7 @@ const touchAt = (f: number) => {
 // --- Screen content ----------------------------------------------------------
 
 const Screen: React.FC<{frame: number}> = ({frame: f}) => {
+	const copy = useCopy();
 	const scroll = feedScroll(f);
 	const vel = Math.abs(feedScroll(f + 0.5) - feedScroll(f - 0.5)) * 768;
 	const feed = (
@@ -72,6 +74,7 @@ const Screen: React.FC<{frame: number}> = ({frame: f}) => {
 			savePress={pulse(f, T.tapSave, 3)}
 			saved={clamp(springAt(f, T.tapSave + 1, 12, 220), 0, 1.3)}
 			hide={{score: hidePop, tiles: hidePop, thumb: hidePop || f >= T.fly[0]}}
+			demandGlow={copy.highlightDemand ? prog(f, T.demand + 4, T.demand + 16, ease.out) * (1 - prog(f, T.scrollBack[0], T.scrollBack[0] + 10)) : 0}
 		/>
 	);
 	const t = touchAt(f);

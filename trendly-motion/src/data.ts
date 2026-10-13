@@ -46,6 +46,8 @@ export const FEED: FeedItem[] = [
 	},
 ];
 
+export type Reason = {title: string; detail: string; pts: number; max: number; ok: boolean};
+
 // Analysis sheet - values from the MVP screenshot.
 export const ANALYSIS = {
 	score: 75,
@@ -66,8 +68,9 @@ export const ANALYSIS = {
 		{title: 'Engagement', detail: '23.9% d’interactions par vue', pts: 28, max: 35, ok: true},
 		{title: 'Conversation', detail: '1557 commentaires', pts: 15, max: 15, ok: true},
 		{title: 'Demande', detail: '2 signal(aux) d’achat/recherche sur 49 commentaire(s) analysé(s)', pts: 3, max: 20, ok: false},
-	],
+	] as Reason[],
 };
+export type Analysis = typeof ANALYSIS;
 
 // "Sauvegardées" grid (3 columns): tiles already saved before the film's save.
 export type Tile = {media: MediaKey; status: Status; views: string; zoom: number; focus: [number, number]; mirror?: boolean};
@@ -86,16 +89,67 @@ export const SAVED: Tile[] = [
 // The analysed video, saved during the film (lands in the first slot).
 export const NEW_TILE: Tile = {media: 'gold', status: 'viral', views: '6 M', zoom: 1, focus: [0.5, 0.42]};
 
-export const COPY = {
-	hookA: ['Des milliers', 'de vidéos mode.'],
-	hookB: ['Lesquelles', 'décollent ?'],
-	feed: ['Un feed', '100 % mode.'],
-	feedSub: 'Swipez. Repérez.',
-	status: 'Chaque vidéo a son statut.',
-	analysis: ['Le score', 'TRENDLY.'],
-	analysisSub: 'Toutes les métriques. Et pourquoi.',
-	save: ['Sauvegardez', 'vos opportunités.'],
-	tagline: 'Repérez les vidéos mode qui décollent.',
+// --- Variants -------------------------------------------------------------
+// original : the launch film (features first).
+// vendeurs : the same film aimed at fashion sellers (boutiques, e-shops,
+//            brands, resellers), built around the « Demande » criterion.
+export type Variant = 'original' | 'vendeurs';
+export type Line = {text: string; accent?: boolean};
+export type Copy = {
+	hookA: Line[];
+	hookB: Line[];
+	feed: Line[];
+	feedSub: string;
+	status: string;
+	analysis: Line[];
+	analysisSub: string;
+	/** Optional second caption when the « Pourquoi ce score ? » card shows */
+	analysisSub2?: string;
+	save: Line[];
+	tagline: string;
+	/** Light up the « Demande » row of the analysis */
+	highlightDemand?: boolean;
+};
+
+export const COPIES: Record<Variant, Copy> = {
+	original: {
+		hookA: [{text: 'Des milliers'}, {text: 'de vidéos mode.'}],
+		hookB: [{text: 'Lesquelles'}, {text: 'décollent ?', accent: true}],
+		feed: [{text: 'Un feed'}, {text: '100 % mode.', accent: true}],
+		feedSub: 'Swipez. Repérez.',
+		status: 'Chaque vidéo a son statut.',
+		analysis: [{text: 'Le score'}, {text: 'TRENDLY.', accent: true}],
+		analysisSub: 'Toutes les métriques. Et pourquoi.',
+		save: [{text: 'Sauvegardez'}, {text: 'vos opportunités.', accent: true}],
+		tagline: 'Repérez les vidéos mode qui décollent.',
+	},
+	vendeurs: {
+		hookA: [{text: 'Vous vendez'}, {text: 'de la mode ?', accent: true}],
+		hookB: [{text: 'Vos prochains'}, {text: 'best-sellers'}, {text: 'sont sur TikTok.', accent: true}],
+		feed: [{text: 'Un feed'}, {text: '100 % mode.', accent: true}],
+		feedSub: 'Swipez les tendances TikTok.',
+		status: 'Repérez-les dès qu’elles émergent.',
+		analysis: [{text: 'Le score'}, {text: 'TRENDLY.', accent: true}],
+		analysisSub: 'Portée, engagement, conversation…',
+		analysisSub2: '… et la vraie demande d’achat.',
+		save: [{text: 'Sauvegardez'}, {text: 'vos opportunités.', accent: true}],
+		tagline: 'Vendez la tendance avant les autres.',
+		highlightDemand: true,
+	},
+};
+
+// Demo data of the seller cut: a viral video whose comments show strong
+// purchase intent (the score is the sum of the four criteria).
+export const ANALYSES: Record<Variant, Analysis> = {
+	original: ANALYSIS,
+	vendeurs: {
+		...ANALYSIS,
+		score: 89,
+		reasons: [
+			...ANALYSIS.reasons.slice(0, 3),
+			{title: 'Demande', detail: '21 signal(aux) d’achat/recherche sur 49 commentaire(s) analysé(s)', pts: 16, max: 20, ok: true},
+		],
+	},
 };
 
 /** French compact number formatting, as in the app: 6 M, 1,3 M, 43,8 k. */

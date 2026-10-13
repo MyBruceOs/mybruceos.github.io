@@ -1,12 +1,20 @@
 # TRENDLY — film motion design (15 s)
 
 Film de lancement de 15 secondes pour TRENDLY, codé en React avec
-[Remotion](https://www.remotion.dev/). Deux formats sortent du même code :
+[Remotion](https://www.remotion.dev/). Deux montages et deux formats sortent du
+même code :
+
+- **Original** : le film de lancement, centré sur les fonctionnalités.
+- **Vendeurs** : le même film adressé aux vendeurs de mode (boutiques, e-shops,
+  marques, revendeurs). Il dit à qui sert l'app et met en avant le critère
+  « Demande » (intentions d'achat détectées dans les commentaires).
 
 | Composition     | Format      | Usage                    | Fichiers rendus                                              |
 | --------------- | ----------- | ------------------------ | ------------------------------------------------------------ |
 | `Trendly-16x9`  | 1920 × 1080 | landing page             | `out/trendly-16x9.mp4` (master), `out/trendly-16x9-web.mp4` (≈ 6 Mo), `out/trendly-16x9-poster.jpg` |
 | `Trendly-9x16`  | 1080 × 1920 | TikTok / Reels / Shorts  | `out/trendly-9x16.mp4`, `out/trendly-9x16-poster.jpg`        |
+| `Trendly-Vendeurs-16x9` | 1920 × 1080 | landing page     | `out/trendly-vendeurs-16x9.mp4`, `-web.mp4`, `-poster.jpg`   |
+| `Trendly-Vendeurs-9x16` | 1080 × 1920 | TikTok / Reels   | `out/trendly-vendeurs-9x16.mp4`, `-poster.jpg`               |
 
 60 i/s, 900 images, 15,000 s exactement (vidéo, audio et conteneur), H.264
 yuv420p BT.709 + AAC 256 kb/s, bande-son à environ −14 LUFS.
@@ -21,6 +29,22 @@ yuv420p BT.709 + AAC 256 kb/s, bande-son à environ −14 LUFS.
 | 6,3 – 10,1 s | Tap sur « Voir l'analyse », puis la fiche s'ouvre : score TRENDLY 75/100, métriques en vue éclatée 3D, « Pourquoi ce score ? ». |
 | 10,1 – 12,5 s| « Sauvegarder » : la vidéo s'envole vers la grille « Sauvegardées ».                   |
 | 12,5 – 15 s  | Les vignettes s'engouffrent en vortex dans l'icône, le T s'allume façon néon, la flèche jaillit, puis le wordmark et la signature apparaissent. |
+
+### Textes du montage « Vendeurs »
+
+| Temps        | Texte à l'écran                                                         |
+| ------------ | ----------------------------------------------------------------------- |
+| 0 – 2,2 s    | « Vous vendez de la mode ? » puis « Vos prochains best-sellers sont sur TikTok. » |
+| 2,2 – 4,2 s  | « Un feed 100 % mode. » / « Swipez les tendances TikTok. »             |
+| 4,2 – 6,3 s  | « Repérez-les dès qu'elles émergent. »                                  |
+| 6,3 – 10,1 s | « Le score TRENDLY. » / « Portée, engagement, conversation… » puis « … et la vraie demande d'achat. », pendant que la ligne « Demande » s'allume. |
+| 10,1 – 12,5 s| « Sauvegardez vos opportunités. »                                       |
+| 12,5 – 15 s  | TRENDLY, avec la signature « Vendez la tendance avant les autres. »    |
+
+Données de démo propres à ce montage : critère Demande à 16/20 (21 signaux
+d'achat/recherche sur 49 commentaires), soit un score de 89/100, somme des
+quatre critères. Le montage original garde les valeurs de la capture du MVP
+(Demande 3/20, score 75).
 
 Toutes les interfaces sont reconstruites en React (et non en captures) à partir
 des écrans du MVP : feed, pastilles de statut, fiche analyse, onglet
@@ -45,8 +69,10 @@ lectures avec le son. Le poster est la dernière image (logo + signature).
 ```bash
 npm install
 npm run studio          # prévisualisation interactive (Remotion Studio)
-npm run render:16x9     # → out/trendly-16x9.mp4 (+ -web.mp4, poster)
-npm run render:9x16     # → out/trendly-9x16.mp4 (+ poster)
+npm run render:16x9            # → out/trendly-16x9.mp4 (+ -web.mp4, poster)
+npm run render:9x16            # → out/trendly-9x16.mp4 (+ poster)
+npm run render:vendeurs:16x9   # → out/trendly-vendeurs-16x9.mp4 (+ -web.mp4, poster)
+npm run render:vendeurs:9x16   # → out/trendly-vendeurs-9x16.mp4 (+ poster)
 ```
 
 Chaque commande rend d'abord avec Remotion dans `out/raw/`, puis
@@ -62,13 +88,13 @@ Images clés pour la revue : `node scripts/stills.mjs Trendly-16x9 out/stills 0 
 
 | Je veux changer…                        | Fichier                                                         |
 | --------------------------------------- | --------------------------------------------------------------- |
-| Les textes, chiffres, pseudos, la grille | `src/data.ts`                                                  |
+| Les textes, chiffres, pseudos, la grille | `src/data.ts` (`COPIES` et `ANALYSES` par montage)            |
 | Le minutage d'une scène                 | `src/timeline.ts` (`T` + trajectoires caméra du téléphone)       |
 | Les couleurs, polices                   | `src/theme.ts`                                                  |
 | Une scène                               | `src/scenes/*.tsx` (`Hook`, `PhoneStory`, `Statuses`, `Finale`) |
 | Un écran de l'app                       | `src/ui/*.tsx` (`Feed`, `Analysis`, `Saved`, `Phone`, `LogoIcon`) |
 | Les visuels mode                        | `public/media/*.jpg` (mêmes noms), ou `scripts/prepare_assets.py` |
-| La bande-son                            | `scripts/sound_design.py` (régénère `public/audio/trendly-sound.wav`) |
+| La bande-son                            | `scripts/sound_design.py [vendeurs]` (régénère `public/audio/trendly-sound*.wav`) |
 
 Si vous changez le minutage dans `src/timeline.ts`, reportez les mêmes images
 dans le dict `T` en tête de `scripts/sound_design.py`, puis relancez-le : les

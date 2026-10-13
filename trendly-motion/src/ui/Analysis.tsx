@@ -1,6 +1,7 @@
 import React from 'react';
 import {C, FONT, SCREEN} from '../theme';
-import {ANALYSIS, formatCount, formatPercent} from '../data';
+import {formatCount, formatPercent} from '../data';
+import {useAnalysis} from '../variant';
 import {clamp} from '../lib/anim';
 import {Media, StatusPill, Wordmark} from './Brand';
 import {Emoji, IconArrowLeft, IconArrowUpRight, IconBookmark, IconBookmarkSolid, IconCircle, IconPlay} from './icons';
@@ -79,6 +80,7 @@ export const ScoreBlock: React.FC<{ring: number; pillPop: number; glow?: number;
 	glow = 0,
 	part = 'all',
 }) => {
+	const ANALYSIS = useAnalysis();
 	const r = 54;
 	const circ = 2 * Math.PI * r;
 	const value = ANALYSIS.score / 100;
@@ -184,7 +186,7 @@ export const ScoreBlock: React.FC<{ring: number; pillPop: number; glow?: number;
 
 /** One metric tile. `t` = entrance progress (0..1, may overshoot). */
 const Tile: React.FC<{i: number; t: number; count: number}> = ({i, t, count}) => {
-	const m = ANALYSIS.metrics[i];
+	const m = useAnalysis().metrics[i];
 	const {x, y, w, gap, h1, h2} = AN.tiles;
 	const col = i % 3;
 	const row = Math.floor(i / 3);
@@ -222,15 +224,15 @@ export const MetricTiles: React.FC<{
 	wrap?: (i: number, node: React.ReactNode) => React.ReactNode;
 }> = ({tiles, count, wrap}) => (
 	<>
-		{ANALYSIS.metrics.map((_, i) => {
+		{useAnalysis().metrics.map((_, i) => {
 			const node = <Tile key={i} i={i} t={tiles(i)} count={count} />;
 			return wrap ? <React.Fragment key={i}>{wrap(i, node)}</React.Fragment> : node;
 		})}
 	</>
 );
 
-const Reason: React.FC<{i: number; y: number; t: number; count: number}> = ({i, y, t, count}) => {
-	const r = ANALYSIS.reasons[i];
+const Reason: React.FC<{i: number; y: number; t: number; count: number; glow?: number}> = ({i, y, t, count, glow = 0}) => {
+	const r = useAnalysis().reasons[i];
 	return (
 		<div
 			style={{
@@ -242,9 +244,24 @@ const Reason: React.FC<{i: number; y: number; t: number; count: number}> = ({i, 
 				borderTop: '1px solid rgba(255,255,255,0.08)',
 				fontFamily: FONT.ui,
 				opacity: clamp(t * 2),
-				transform: `translateX(${(1 - t) * 24}px)`,
+				transform: `translateX(${(1 - t) * 24}px) scale(${1 + 0.035 * glow})`,
 			}}
 		>
+			{glow > 0 && (
+				<div
+					style={{
+						position: 'absolute',
+						left: -9,
+						right: -9,
+						top: 3,
+						bottom: 1,
+						borderRadius: 13,
+						background: `rgba(255,79,154,${0.12 * glow})`,
+						border: `1px solid rgba(255,130,190,${0.75 * glow})`,
+						boxShadow: `0 0 ${26 * glow}px rgba(255,79,154,${0.5 * glow}), inset 0 0 ${16 * glow}px rgba(255,79,154,${0.25 * glow})`,
+					}}
+				/>
+			)}
 			<div
 				style={{
 					position: 'absolute',
@@ -269,18 +286,19 @@ const Reason: React.FC<{i: number; y: number; t: number; count: number}> = ({i, 
 				style={{
 					position: 'absolute',
 					right: 14,
-					top: 19,
+					top: i === 3 ? 9 : 19, // the 2-line « Demande » detail runs under a centred pill
 					height: 24,
 					padding: '0 10px',
 					borderRadius: 12,
-					border: '1px solid rgba(255,255,255,0.18)',
+					border: `1px solid ${glow > 0.5 ? 'rgba(255,140,195,0.9)' : 'rgba(255,255,255,0.18)'}`,
+					background: glow > 0 ? `rgba(255,79,154,${0.35 * glow})` : undefined,
 					display: 'flex',
 					alignItems: 'center',
 					fontSize: 11.5,
-					fontWeight: 500,
-					color: '#d2d0d8',
+					fontWeight: glow > 0.5 ? 700 : 500,
+					color: glow > 0.5 ? '#fff' : '#d2d0d8',
 					fontVariantNumeric: 'tabular-nums',
-					boxShadow: r.ok && count > 0.98 ? `0 0 12px rgba(255,79,154,0.25)` : undefined,
+					boxShadow: glow > 0 ? `0 0 ${18 * glow}px rgba(255,79,154,${0.7 * glow})` : r.ok && count > 0.98 ? `0 0 12px rgba(255,79,154,0.25)` : undefined,
 				}}
 			>
 				{Math.round(r.pts * count)} / {r.max} pts
@@ -289,7 +307,12 @@ const Reason: React.FC<{i: number; y: number; t: number; count: number}> = ({i, 
 	);
 };
 
-export const ReasonsCard: React.FC<{reasons: (i: number) => number; count: number; y?: number}> = ({reasons, count, y = AN.card2.y}) => (
+export const ReasonsCard: React.FC<{reasons: (i: number) => number; count: number; y?: number; demandGlow?: number}> = ({
+	reasons,
+	count,
+	y = AN.card2.y,
+	demandGlow = 0,
+}) => (
 	<div
 		style={{
 			position: 'absolute',
@@ -308,7 +331,7 @@ export const ReasonsCard: React.FC<{reasons: (i: number) => number; count: numbe
 		</div>
 		<div style={{position: 'absolute', left: 17, right: 17, top: 62, bottom: 0}}>
 			{[0, 64, 128, 192].map((y2, i) => (
-				<Reason key={i} i={i} y={y2} t={reasons(i)} count={count} />
+				<Reason key={i} i={i} y={y2} t={reasons(i)} count={count} glow={i === 3 ? demandGlow : 0} />
 			))}
 		</div>
 	</div>
@@ -352,7 +375,9 @@ export const AnalysisScreen: React.FC<{
 	saved?: number;
 	hide?: {score?: boolean; tiles?: boolean; thumb?: boolean};
 	ringGlow?: number;
-}> = ({frame, ring, count, tiles, reasons, reasonsCount = 1, pillPop, scroll = 0, savePress = 0, saved = 0, hide = {}, ringGlow = 0}) => {
+	demandGlow?: number;
+}> = ({frame, ring, count, tiles, reasons, reasonsCount = 1, pillPop, scroll = 0, savePress = 0, saved = 0, hide = {}, ringGlow = 0, demandGlow = 0}) => {
+	const ANALYSIS = useAnalysis();
 	const {card1} = AN;
 	return (
 		<div style={{position: 'absolute', inset: 0, background: C.ink, overflow: 'hidden'}}>
@@ -411,7 +436,7 @@ export const AnalysisScreen: React.FC<{
 				>
 					{ANALYSIS.note}
 				</div>
-				<ReasonsCard reasons={reasons} count={reasonsCount} />
+				<ReasonsCard reasons={reasons} count={reasonsCount} demandGlow={demandGlow} />
 			</div>
 			{/* Fixed header */}
 			<div
