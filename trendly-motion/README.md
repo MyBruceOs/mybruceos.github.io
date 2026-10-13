@@ -3,12 +3,13 @@
 Film de lancement de 15 secondes pour TRENDLY, codé en React avec
 [Remotion](https://www.remotion.dev/). Deux formats sortent du même code :
 
-| Composition     | Format      | Usage                    | Fichier rendu            |
-| --------------- | ----------- | ------------------------ | ------------------------ |
-| `Trendly-16x9`  | 1920 × 1080 | landing page             | `out/trendly-16x9.mp4`   |
-| `Trendly-9x16`  | 1080 × 1920 | TikTok / Reels / Shorts  | `out/trendly-9x16.mp4`   |
+| Composition     | Format      | Usage                    | Fichiers rendus                                              |
+| --------------- | ----------- | ------------------------ | ------------------------------------------------------------ |
+| `Trendly-16x9`  | 1920 × 1080 | landing page             | `out/trendly-16x9.mp4` (master), `out/trendly-16x9-web.mp4` (≈ 6 Mo), `out/trendly-16x9-poster.jpg` |
+| `Trendly-9x16`  | 1080 × 1920 | TikTok / Reels / Shorts  | `out/trendly-9x16.mp4`, `out/trendly-9x16-poster.jpg`        |
 
-60 i/s, 900 images, 15,000 s, H.264 + AAC, bande-son à environ −14 LUFS.
+60 i/s, 900 images, 15,000 s exactement (vidéo, audio et conteneur), H.264
+yuv420p BT.709 + AAC 256 kb/s, bande-son à environ −14 LUFS.
 
 ## Déroulé
 
@@ -29,7 +30,7 @@ Sauvegardées. Le texte reste net à toutes les tailles.
 
 ```html
 <video
-  src="trendly-16x9.mp4"
+  src="trendly-16x9-web.mp4"
   poster="trendly-16x9-poster.jpg"
   autoplay muted loop playsinline preload="metadata"
   style="width:100%;height:auto;border-radius:24px;background:#060608">
@@ -44,9 +45,15 @@ lectures avec le son. Le poster est la dernière image (logo + signature).
 ```bash
 npm install
 npm run studio          # prévisualisation interactive (Remotion Studio)
-npm run render:16x9     # → out/trendly-16x9.mp4
-npm run render:9x16     # → out/trendly-9x16.mp4
+npm run render:16x9     # → out/trendly-16x9.mp4 (+ -web.mp4, poster)
+npm run render:9x16     # → out/trendly-9x16.mp4 (+ poster)
 ```
+
+Chaque commande rend d'abord avec Remotion dans `out/raw/`, puis
+`scripts/finalize.sh` (ffmpeg) produit les fichiers livrés : conversion en
+BT.709 plage limitée (Remotion écrit en BT.601 plage pleine), audio
+réencodé depuis le WAV et coupé à 15,000 s, `faststart` pour le web, version
+web allégée et poster.
 
 Planche de contrôle de l'UI : `npx remotion still UiSheet out/uisheet.png`.
 Images clés pour la revue : `node scripts/stills.mjs Trendly-16x9 out/stills 0 132 300 …`.

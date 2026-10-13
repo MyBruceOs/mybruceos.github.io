@@ -5,8 +5,8 @@
   "description": "TRENDLY — 15s motion design launch film (Remotion). 16:9 landing + 9:16 TikTok.",
   "scripts": {
     "studio": "remotion studio",
-    "render:16x9": "remotion render Trendly-16x9 out/trendly-16x9.mp4",
-    "render:9x16": "remotion render Trendly-9x16 out/trendly-9x16.mp4",
+    "render:16x9": "remotion render Trendly-16x9 out/raw/trendly-16x9.mp4 && bash scripts/finalize.sh 16x9",
+    "render:9x16": "remotion render Trendly-9x16 out/raw/trendly-9x16.mp4 && bash scripts/finalize.sh 9x16",
     "render": "npm run render:16x9 && npm run render:9x16",
     "typecheck": "tsc --noEmit"
   },
