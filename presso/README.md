@@ -22,7 +22,9 @@ Le site est statique (HTML, CSS, JavaScript), sans étape de compilation. GitHub
 
 ## Brancher la base Supabase
 
-1. Créer un projet Supabase (région Paris).
+La base de production est déjà branchée (`assets/config.js`). Les étapes ci-dessous servent à en installer une nouvelle.
+
+1. Créer un projet Supabase (région européenne).
 2. Dans l'éditeur SQL, exécuter `supabase/schema.sql` puis `supabase/seed.sql`.
 3. Créer un code d'activation (il ne sert qu'une fois, ne pas le versionner) :
    ```sql
@@ -32,7 +34,9 @@ Le site est statique (HTML, CSS, JavaScript), sans étape de compilation. GitHub
    ```
 4. Dans **Authentication → URL Configuration**, mettre l'adresse de `gestion.html` en Site URL et dans les Redirect URLs, par exemple `https://mybruceos.github.io/presso/gestion.html`. Les liens de confirmation et de mot de passe oublié y renverront.
 5. Copier l'URL du projet et la clé *publishable* dans `assets/config.js`. Cette clé est publique par conception : la sécurité repose sur les règles RLS.
-6. Le gérant ouvre `gestion.html`, crée son compte, confirme son e-mail, se connecte et saisit le code d'activation.
+6. Créer le compte du gérant dans **Authentication → Users → Add user → Create new user**, avec « Auto Confirm User » coché. Le gérant ouvre ensuite `gestion.html`, se connecte et saisit le code d'activation.
+
+Le bouton « Créer mon compte » de `gestion.html` fonctionne aussi, mais il dépend de l'e-mail de confirmation. Le service d'e-mail intégré de Supabase est très limité : pour s'en servir en production (confirmation, mot de passe oublié), brancher un SMTP dans **Authentication → Emails**.
 
 ## Sécurité
 
