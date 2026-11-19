@@ -243,7 +243,7 @@
   /* ------------------------------------------------------------------
      Règles d'agenda et de capacité
      - une séance occupe 1 botte par personne, plus 5 min de rotation ;
-     - à domicile, en club, en événement ou indisponible : Chris est pris
+     - à domicile, en club, en événement ou indisponible : le praticien est pris
        entièrement (trajet compris pour le domicile).
      ------------------------------------------------------------------ */
   PC.isActive = (b) => b.status === 'demande' || b.status === 'confirmee';
@@ -360,7 +360,7 @@
   };
 
   PC.publicSubset = function (s, capacity) {
-    const keys = ['business_name', 'owner_name', 'phone', 'email', 'city', 'base_location', 'hours', 'slot_step', 'rotation_min', 'travel_min', 'min_notice_hours', 'max_days_ahead', 'services', 'packs', 'club_plans', 'club_options', 'season_discount'];
+    const keys = ['business_name', 'phone', 'email', 'city', 'base_location', 'hours', 'slot_step', 'rotation_min', 'travel_min', 'min_notice_hours', 'max_days_ahead', 'services', 'packs', 'club_plans', 'club_options', 'season_discount'];
     const o = {};
     keys.forEach((k) => (o[k] = s[k]));
     o.capacity = capacity;
@@ -496,14 +496,14 @@
 
     const P = (name, kind, sport, status, extra) => Object.assign({ id: PC.uid(), name, kind, sport, contact_name: '', phone: '', email: '', location: '', status, plan: null, monthly_price: null, season_commitment: false, pilot_start: null, pilot_end: null, slot_info: '', notes: '', created_at: iso() }, extra || {});
     const partners = [
-      P('JC Touraine', 'club', 'Judo', 'contrat', { plan: 'club', monthly_price: 450, slot_info: 'Vendredi 19h00, dojo', notes: 'Mon club. Pilote validé puis passage au forfait Club.' }),
+      P('JC Touraine', 'club', 'Judo', 'contrat', { plan: 'club', monthly_price: 450, slot_info: 'Vendredi 19h00, dojo', notes: 'Club partenaire historique. Test pilote validé puis passage au forfait Club.' }),
       P('ASAP Run Crew', 'communaute', 'Course à pied', 'pilote', { pilot_start: PC.ymd(PC.addDays(now, -10)), pilot_end: PC.ymd(PC.addDays(now, 11)), slot_info: 'Dimanche après la sortie longue', notes: 'Séance de test proposée à la communauté.' }),
       P('Change by Aida', 'coach', 'Sport-santé, suivi à domicile', 'accord', { notes: 'Intérêt confirmé, démarrage visé en janvier 2027.' }),
       P('Réseau de coachs (4 à 5)', 'coach', 'Préparation physique', 'accord', { notes: 'Accord de collaboration, tarifs préférentiels pour leurs groupes.' }),
       P('Coach indépendant, salle MyGym', 'coach', 'Musculation', 'prospect', { notes: "Partenariat envisagé dès l'ouverture d'un espace d'accueil." }),
-      P('Club de football de Saint-Avertin', 'club', 'Football', 'discussion', { notes: 'Prospection via mon réseau.' }),
-      P('Club de football de La Riche', 'club', 'Football', 'prospect', { notes: 'Prospection via mon réseau.' }),
-      P('Club de football de Chambray-lès-Tours', 'club', 'Football', 'prospect', { notes: 'Prospection via mon réseau.' }),
+      P('Club de football de Saint-Avertin', 'club', 'Football', 'discussion', { notes: 'Prospection via le réseau.' }),
+      P('Club de football de La Riche', 'club', 'Football', 'prospect', { notes: 'Prospection via le réseau.' }),
+      P('Club de football de Chambray-lès-Tours', 'club', 'Football', 'prospect', { notes: 'Prospection via le réseau.' }),
       P('Club de football de Saint-Cyr-sur-Loire', 'club', 'Football', 'demande', { contact_name: 'Responsable U17', phone: '06 00 00 00 01', notes: 'Demande de test pilote reçue depuis le site.' })
     ];
     const jc = partners[0], asap = partners[1];

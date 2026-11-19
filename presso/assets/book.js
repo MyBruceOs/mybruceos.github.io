@@ -88,10 +88,10 @@
         '<span class="stepper"><button type="button" class="btn icon sm soft" data-people="-1" aria-label="Une personne de moins">−</button><output aria-live="polite">' + st.people + '</output><button type="button" class="btn icon sm soft" data-people="1" aria-label="Une personne de plus">+</button></span></div>';
     }
     if (st.svc && st.svc.kind === 'domicile') {
-      html += '<div class="alert info" style="margin-top:12px">' + PC.icon('pin') + '<span>Chris vient chez toi avec le matériel, dans Tours Métropole. Prévois un canapé ou un lit pour t\'allonger.</span></div>';
+      html += '<div class="alert info" style="margin-top:12px">' + PC.icon('pin') + '<span>On vient chez toi avec le matériel, dans Tours Métropole. Prévois un canapé ou un lit pour t\'allonger.</span></div>';
     }
     if ((info.packs || []).length) {
-      html += '<div class="packs">' + info.packs.map((p) => '<span><b>' + esc(p.name) + ' : ' + PC.eur(p.price) + '</b> · ' + esc(p.desc) + '</span>').join('') + '<span>À demander à Chris lors d\'une séance.</span></div>';
+      html += '<div class="packs">' + info.packs.map((p) => '<span><b>' + esc(p.name) + ' : ' + PC.eur(p.price) + '</b> · ' + esc(p.desc) + '</span>').join('') + '<span>Disponibles sur demande lors d\'une séance.</span></div>';
     }
     html += '</section>';
 
@@ -100,9 +100,9 @@
       const ds = days();
       html += '<section class="card" id="step-when"><div class="step-title"><span class="step-num">2</span><div><h2>Choisis ton jour et ton heure</h2><p>' + esc(whereText()) + '</p></div></div>';
       if (!info.capacity) {
-        html += '<div class="empty">Le matériel n\'est pas disponible en ce moment. Écris à Chris pour convenir d\'un créneau.</div>';
+        html += '<div class="empty">Le matériel n\'est pas disponible en ce moment. Contacte-nous pour convenir d\'un créneau.</div>';
       } else if (!ds.length) {
-        html += '<div class="empty">Aucun créneau ouvert pour le moment. Écris à Chris pour convenir d\'un créneau.</div>';
+        html += '<div class="empty">Aucun créneau ouvert pour le moment. Contacte-nous pour convenir d\'un créneau.</div>';
       } else {
         html += '<div class="days" role="group" aria-label="Jours">';
         ds.forEach((d) => {
@@ -138,7 +138,7 @@
     if (st.svc && st.slot) {
       const me = remember.get();
       const end = PC.addMinutes(st.slot, st.svc.duration);
-      html += '<section class="card" id="step-who"><div class="step-title"><span class="step-num">3</span><div><h2>Tes coordonnées</h2><p>Chris te confirme la séance par SMS ou WhatsApp.</p></div></div>';
+      html += '<section class="card" id="step-who"><div class="step-title"><span class="step-num">3</span><div><h2>Tes coordonnées</h2><p>On te confirme la séance par SMS ou WhatsApp.</p></div></div>';
       html += '<form id="book-form" class="stack" novalidate>';
       html += '<div class="grid-2"><label class="field"><span>Prénom et nom</span><input name="name" autocomplete="name" required value="' + esc(me.name || '') + '"></label>' +
         '<label class="field"><span>Téléphone</span><input name="phone" type="tel" autocomplete="tel" inputmode="tel" required value="' + esc(me.phone || '') + '"></label></div>';
@@ -147,7 +147,7 @@
       if (st.svc.kind === 'domicile') {
         html += '<label class="field"><span>Adresse de la séance</span><input name="address" autocomplete="street-address" required placeholder="Numéro, rue, commune"></label>';
       }
-      html += '<label class="field"><span>Un mot pour Chris <span class="muted">(facultatif)</span></span><textarea name="notes" rows="2" placeholder="Compétition ce week-end, douleur aux mollets…"></textarea></label>';
+      html += '<label class="field"><span>Message <span class="muted">(facultatif)</span></span><textarea name="notes" rows="2" placeholder="Compétition ce week-end, douleur aux mollets…"></textarea></label>';
       html += '<label class="check"><input type="checkbox" name="is_minor" id="is-minor"><span>J\'ai moins de 18 ans</span></label>';
       html += '<div id="guardian" class="hide"><label class="field"><span>Nom du parent ou tuteur</span><input name="guardian_name" autocomplete="off"></label>' +
         '<label class="check" style="margin-top:10px"><input type="checkbox" name="guardian_ok"><span>Mon parent ou tuteur autorise cette séance.</span></label></div>';
@@ -157,7 +157,7 @@
       html += '<div class="summary"><div class="row between"><span>' + esc(st.svc.name) + (st.svc.per_person ? ' × ' + st.people : '') + '</span><span class="tnum">' + PC.durationLabel(st.svc.duration) + '</span></div>' +
         '<div class="row between"><span>' + esc(PC.capitalize(PC.fmtDayLong(st.slot))) + '</span><span class="tnum">' + PC.fmtTime(st.slot) + ' – ' + PC.fmtTime(end) + '</span></div>' +
         '<div class="row between"><span class="tot">À régler sur place</span><span class="tot tnum">' + PC.eur(priceOf()) + '</span></div>' +
-        '<span class="small muted">Carte bancaire, espèces, Lydia ou Wero. Annulation gratuite en prévenant Chris au moins 12 h avant.</span></div>';
+        '<span class="small muted">Carte bancaire, espèces, Lydia ou Wero. Annulation gratuite en nous prévenant au moins 12 h avant.</span></div>';
       if (st.error) html += '<p class="form-error" role="alert">' + esc(st.error) + '</p>';
       html += '<button class="btn gold block" type="submit" style="min-height:50px;font-size:16px"' + (st.sending ? ' disabled' : '') + '>' + (st.sending ? 'Envoi…' : 'Envoyer ma demande') + '</button>';
       html += '</form></section>';
@@ -170,7 +170,7 @@
 
   function whereText() {
     if (!st.svc) return '';
-    if (st.svc.kind === 'domicile') return 'Chris se déplace chez toi. Durée : ' + PC.durationLabel(st.svc.duration) + '.';
+    if (st.svc.kind === 'domicile') return 'On se déplace chez toi. Durée : ' + PC.durationLabel(st.svc.duration) + '.';
     return 'Durée : ' + PC.durationLabel(st.svc.duration) + '. ' + (st.info.base_location || '');
   }
 
@@ -179,16 +179,16 @@
     const svc = st.svc;
     const end = PC.addMinutes(start, svc.duration);
     const phone = st.info.phone;
-    const msg = 'Bonjour ' + (st.info.owner_name || 'Chris') + ', je viens de réserver « ' + svc.name + ' » le ' + PC.fmtDayLong(start) + ' à ' + PC.fmtTime(start) + ' (réf. ' + res.ref + '). ' + payload.name;
+    const msg = 'Bonjour, je viens de réserver « ' + svc.name + ' » le ' + PC.fmtDayLong(start) + ' à ' + PC.fmtTime(start) + ' (réf. ' + res.ref + '). ' + payload.name;
     let html = '<section class="card"><div class="confirm-box">' +
       '<div class="ok-ic">' + PC.icon('check') + '</div>' +
       '<h2 style="font-size:24px">Demande envoyée</h2>' +
       '<span class="ref">' + esc(res.ref) + '</span>' +
       '<p style="margin-top:12px;font-size:16px"><b>' + esc(svc.name) + '</b>' + (svc.per_person ? ' × ' + st.people : '') + '<br>' + esc(PC.capitalize(PC.fmtDayLong(start))) + ', ' + PC.fmtTime(start) + ' – ' + PC.fmtTime(end) + '<br>' + PC.eur(res.price) + ' à régler sur place</p>' +
-      '<p class="muted" style="margin-top:12px">Chris te confirme ta séance par SMS ou WhatsApp. Garde ta référence.</p>' +
+      '<p class="muted" style="margin-top:12px">On te confirme ta séance par SMS ou WhatsApp. Conserve ta référence.</p>' +
       '<div class="row wrap" style="justify-content:center;margin-top:20px">' +
       '<button type="button" class="btn ghost" id="ics">' + PC.icon('calendar') + 'Ajouter à mon agenda</button>' +
-      (phone ? '<a class="btn" href="' + esc(PC.waLink(phone, msg)) + '" target="_blank" rel="noopener">' + PC.icon('message') + 'Prévenir Chris sur WhatsApp</a>' : '') +
+      (phone ? '<a class="btn" href="' + esc(PC.waLink(phone, msg)) + '" target="_blank" rel="noopener">' + PC.icon('message') + 'Nous prévenir sur WhatsApp</a>' : '') +
       '</div><button type="button" class="btn soft sm" id="again" style="margin-top:16px">Faire une autre réservation</button></div></section>';
     root.innerHTML = html;
     $('#ics').addEventListener('click', () => {
@@ -208,7 +208,7 @@
   function renderClubs() {
     const info = st.info;
     let html = '<div class="card" style="margin-bottom:22px"><p class="eyebrow">Clubs, coachs et événements</p><h2 style="font-size:24px;margin-top:6px">La récupération vient à vos licenciés</h2>' +
-      '<p class="muted" style="margin-top:8px;max-width:44rem">Chris installe ses bottes au club en 10 minutes et prend en charge jusqu\'à 15 athlètes par créneau d\'1h30. Le club n\'achète rien.</p>' +
+      '<p class="muted" style="margin-top:8px;max-width:44rem">On installe les bottes au club en 10 minutes et on prend en charge jusqu\'à 15 athlètes par créneau d\'1h30. Le club n\'achète rien.</p>' +
       '<div class="plans" style="margin-top:18px">';
     (info.club_plans || []).forEach((p) => {
       html += '<div class="plan"><span class="eyebrow">' + esc(p.name) + '</span><span class="price">' + PC.eur(p.price) + ' <small>/ mois</small></span>' +
@@ -347,7 +347,7 @@
     btn.textContent = 'Envoi…';
     try {
       await store.clubRequest(p);
-      e.target.innerHTML = '<div class="confirm-box"><div class="ok-ic">' + PC.icon('check') + '</div><h3 style="font-size:20px">Demande envoyée</h3><p class="muted" style="margin-top:8px">Chris vous recontacte très vite pour organiser le test pilote.</p></div>';
+      e.target.innerHTML = '<div class="confirm-box"><div class="ok-ic">' + PC.icon('check') + '</div><h3 style="font-size:20px">Demande envoyée</h3><p class="muted" style="margin-top:8px">On vous recontacte rapidement pour organiser le test pilote.</p></div>';
     } catch (ex) {
       errEl.textContent = ex.message || 'Envoi impossible, réessayez.';
       errEl.classList.remove('hide');

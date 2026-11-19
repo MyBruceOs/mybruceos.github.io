@@ -2,7 +2,7 @@
 -- Presso Center : schéma de la base Supabase
 -- Sécurité :
 --   - toutes les tables sont protégées par RLS ;
---   - seul un compte inscrit dans public.admins (Chris) lit et écrit ;
+--   - seul un compte inscrit dans public.admins (le compte gérant) lit et écrit ;
 --   - les visiteurs (rôle anon) n'ont accès qu'à 4 fonctions :
 --       public_info()   tarifs, horaires, nombre de bottes disponibles
 --       public_busy()   créneaux occupés, sans aucune donnée personnelle
@@ -222,7 +222,7 @@ set search_path = ''
 as $$
   select coalesce(
       (select jsonb_object_agg(k, s.data -> k)
-         from unnest(array['business_name', 'owner_name', 'phone', 'email', 'city', 'base_location', 'hours',
+         from unnest(array['business_name', 'phone', 'email', 'city', 'base_location', 'hours',
                            'slot_step', 'rotation_min', 'travel_min', 'min_notice_hours', 'max_days_ahead',
                            'services', 'packs', 'club_plans', 'club_options', 'season_discount']) as k
         where s.data ? k),
@@ -364,7 +364,7 @@ begin
   end if;
 
   -- capacité : 1 botte par personne, rotation de 5 min ; domicile, club,
-  -- événement et indisponibilité occupent Chris entièrement
+  -- événement et indisponibilité occupent le praticien entièrement
   select count(*) into v_cap from public.equipment where kind = 'botte' and status = 'ok';
   v_rot := coalesce((s ->> 'rotation_min')::int, 5);
   v_travel := coalesce((s ->> 'travel_min')::int, 30);
@@ -399,10 +399,10 @@ begin
 
   -- anti-abus
   if (select count(*) from public.bookings where client_phone = v_phone and status = 'demande' and start_at > now()) >= 3 then
-    raise exception 'Tu as déjà plusieurs demandes en attente : contacte Chris directement.';
+    raise exception 'Tu as déjà plusieurs demandes en attente : contacte-nous directement.';
   end if;
   if (select count(*) from public.bookings where source = 'en_ligne' and created_at > now() - interval '1 day') >= 60 then
-    raise exception 'Réservation momentanément indisponible : contacte Chris directement.';
+    raise exception 'Réservation momentanément indisponible : contacte-nous directement.';
   end if;
 
   select id into v_client
@@ -457,7 +457,7 @@ begin
     v_kind := 'autre';
   end if;
   if (select count(*) from public.partners where status = 'demande' and created_at > now() - interval '1 day') >= 20 then
-    raise exception 'Trop de demandes aujourd''hui : contactez Chris directement.';
+    raise exception 'Trop de demandes aujourd''hui : contactez-nous directement.';
   end if;
   insert into public.partners (name, kind, sport, contact_name, phone, email, status, plan, notes)
   values (v_name, v_kind,

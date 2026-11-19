@@ -32,15 +32,15 @@ where not exists (select 1 from public.stock);
 
 insert into public.partners (name, kind, sport, status, notes)
 select * from (values
-  ('JC Touraine', 'club', 'Judo', 'pilote', 'Mon club. Test pilote validé.'),
+  ('JC Touraine', 'club', 'Judo', 'pilote', 'Club partenaire historique. Test pilote validé.'),
   ('Réseau de coachs (4 à 5)', 'coach', 'Préparation physique', 'accord', 'Accord de collaboration, tarifs préférentiels pour leurs groupes.'),
   ('Change by Aida', 'coach', 'Sport-santé, suivi à domicile', 'accord', 'Intérêt confirmé, démarrage visé en janvier 2027.'),
   ('ASAP Run Crew', 'communaute', 'Course à pied', 'discussion', 'Séance de test proposée à la communauté.'),
-  ('Contact de mon réseau sportif', 'autre', null, 'discussion', 'Rendez-vous de présentation prévu.'),
+  ('Contact du réseau sportif', 'autre', null, 'discussion', 'Rendez-vous de présentation prévu.'),
   ('Coach indépendant, salle MyGym', 'coach', 'Musculation', 'prospect', 'Partenariat envisagé dès l''ouverture d''un espace d''accueil.'),
-  ('Club de football de Saint-Avertin', 'club', 'Football', 'prospect', 'Prospection via mon réseau.'),
-  ('Club de football de La Riche', 'club', 'Football', 'prospect', 'Prospection via mon réseau.'),
-  ('Club de football de Chambray-lès-Tours', 'club', 'Football', 'prospect', 'Prospection via mon réseau.'),
-  ('Club de football de Saint-Cyr-sur-Loire', 'club', 'Football', 'prospect', 'Prospection via mon réseau.')
+  ('Club de football de Saint-Avertin', 'club', 'Football', 'prospect', 'Prospection via le réseau.'),
+  ('Club de football de La Riche', 'club', 'Football', 'prospect', 'Prospection via le réseau.'),
+  ('Club de football de Chambray-lès-Tours', 'club', 'Football', 'prospect', 'Prospection via le réseau.'),
+  ('Club de football de Saint-Cyr-sur-Loire', 'club', 'Football', 'prospect', 'Prospection via le réseau.')
 ) as v(name, kind, sport, status, notes)
 where not exists (select 1 from public.partners);

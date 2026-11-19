@@ -1,9 +1,9 @@
 # Presso Center : réservations et gestion
 
-Application web de Presso Center, l'activité de récupération sportive mobile (pressothérapie) de Chris à Tours. Elle reprend les chiffres du business plan Adie de novembre 2026.
+Application web de Presso Center, l'activité de récupération sportive mobile (pressothérapie) à Tours. Elle reprend les chiffres du business plan Adie de novembre 2026.
 
-- **`/presso/`** : page publique où les clients réservent. Formules et tarifs, créneaux libres selon les bottes disponibles, questionnaire de santé, autorisation parentale, ajout à l'agenda, message WhatsApp à Chris. Les clubs y demandent aussi un test pilote.
-- **`/presso/gestion.html`** : espace de Chris.
+- **`/presso/`** : page publique où les clients réservent. Formules et tarifs, créneaux libres selon les bottes disponibles, questionnaire de santé, autorisation parentale, ajout à l'agenda, message WhatsApp à Presso Center. Les clubs y demandent aussi un test pilote.
+- **`/presso/gestion.html`** : espace de gestion, réservé au gérant.
   - **Accueil** : chiffre d'affaires comparé au prévisionnel, heures de la semaine sur le plafond de 16 h, liste « À faire » (demandes, séances à clôturer, paiements, stock, contrôle du matériel, mensualité Adie, seuil de TVA).
   - **Agenda** : semaine sur ordinateur, jour par jour sur téléphone ; séances, domicile, créneaux clubs, événements, indisponibilités ; confirmation et rappel par WhatsApp ; clôture d'une séance (passages, paiement, carte 10 séances).
   - **Clients** : fiches des sportifs (crédits, historique, santé) et suivi des clubs et partenaires, de la demande au contrat. Facturation du forfait mensuel et bilan de fréquentation imprimable pour le renouvellement.
@@ -18,7 +18,7 @@ Le site est statique (HTML, CSS, JavaScript), sans étape de compilation. GitHub
 | Mode | Quand | Données |
 |---|---|---|
 | Démo | `assets/config.js` vide | Fictives, enregistrées dans le navigateur. Rien n'est partagé. |
-| Supabase | `assets/config.js` rempli | Base partagée : les clients réservent, Chris gère depuis son téléphone. |
+| Supabase | `assets/config.js` rempli | Base partagée : les clients réservent, le gérant gère depuis son téléphone. |
 
 ## Brancher la base Supabase
 
@@ -32,7 +32,7 @@ Le site est statique (HTML, CSS, JavaScript), sans étape de compilation. GitHub
    ```
 4. Dans **Authentication → URL Configuration**, mettre l'adresse de `gestion.html` en Site URL et dans les Redirect URLs, par exemple `https://mybruceos.github.io/presso/gestion.html`. Les liens de confirmation et de mot de passe oublié y renverront.
 5. Copier l'URL du projet et la clé *publishable* dans `assets/config.js`. Cette clé est publique par conception : la sécurité repose sur les règles RLS.
-6. Chris ouvre `gestion.html`, crée son compte, confirme son e-mail, se connecte et saisit le code d'activation.
+6. Le gérant ouvre `gestion.html`, crée son compte, confirme son e-mail, se connecte et saisit le code d'activation.
 
 ## Sécurité
 

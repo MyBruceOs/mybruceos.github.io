@@ -82,7 +82,7 @@
 
   function renderAuth(mode, msg) {
     const forms = {
-      login: '<h2 style="font-size:22px">Connexion</h2><p class="muted" style="margin:6px 0 18px">Espace de gestion réservé à Chris.</p>' +
+      login: '<h2 style="font-size:22px">Connexion</h2><p class="muted" style="margin:6px 0 18px">Accès réservé à l\'équipe Presso Center.</p>' +
         '<form id="auth-form" class="stack"><label class="field"><span>E-mail</span><input name="email" type="email" autocomplete="email" required></label><label class="field"><span>Mot de passe</span><input name="password" type="password" autocomplete="current-password" required></label><button class="btn block">Se connecter</button></form>' +
         '<div class="row between" style="margin-top:14px"><button class="btn sm soft" data-auth="signup">Créer mon compte</button><button class="btn sm ghost" data-auth="forgot">Mot de passe oublié</button></div>',
       signup: '<h2 style="font-size:22px">Créer mon compte</h2><p class="muted" style="margin:6px 0 18px">Ensuite, tu actives l\'accès avec ton code d\'activation.</p>' +
@@ -416,9 +416,9 @@
     const fc = ms.forecast;
     const pct = fc ? Math.min(100, Math.round((ms.ca / fc) * 100)) : 0;
     const al = alerts();
-    const name = S.owner_name || 'Chris';
+    const name = String(S.owner_name || '').trim();
 
-    let h = '<div class="page-head"><div><h1>Bonjour ' + esc(name) + '</h1><p>' + esc(PC.capitalize(PC.fmtDayLong(now))) + '</p></div>' +
+    let h = '<div class="page-head"><div><h1>Bonjour' + (name ? ' ' + esc(name) : '') + '</h1><p>' + esc(PC.capitalize(PC.fmtDayLong(now))) + '</p></div>' +
       '<button class="btn" data-act="new-booking">' + I('plus') + 'Nouvelle séance</button></div>';
 
     h += '<div class="tiles">' +
@@ -617,9 +617,9 @@
     const what = sv ? sv.name : 'séance';
     const where = b.kind === 'domicile' ? 'chez toi (' + (b.address || '') + ')' : (b.location || S.base_location);
     const when = PC.fmtDayLong(s) + ' à ' + PC.fmtTime(s);
-    if (type === 'confirm') return 'Bonjour ' + first + ', c\'est ' + S.owner_name + ' de Presso Center. Ta séance ' + what + ' du ' + when + ' est confirmée. Lieu : ' + where + '. À bientôt !';
-    if (type === 'refuse') return 'Bonjour ' + first + ', c\'est ' + S.owner_name + ' de Presso Center. Je ne suis malheureusement pas disponible le ' + when + '. Tu peux choisir un autre créneau ici : ' + bookingUrl();
-    return 'Bonjour ' + first + ', petit rappel : ta séance ' + what + ' est prévue le ' + when + '. Lieu : ' + where + '. À très vite !';
+    if (type === 'confirm') return 'Bonjour ' + first + ', ici Presso Center. Ta séance ' + what + ' du ' + when + ' est confirmée. Lieu : ' + where + '. À bientôt !';
+    if (type === 'refuse') return 'Bonjour ' + first + ', ici Presso Center. Malheureusement, le créneau du ' + when + ' n\'est plus disponible. Tu peux en choisir un autre ici : ' + bookingUrl();
+    return 'Bonjour ' + first + ', ici Presso Center. Rappel : ta séance ' + what + ' est prévue le ' + when + '. Lieu : ' + where + '. À bientôt !';
   }
 
   function openBooking(id) {
@@ -1099,7 +1099,7 @@
       '<div class="e">' + esc(S.business_name) + '</div><h1>Bilan de fréquentation · ' + esc(PC.fmtMonth(key)) + '</h1><div>' + esc(p.name) + (p.sport ? ' · ' + esc(p.sport) : '') + '</div><div class="r"></div>' +
       '<div class="k"><div>Créneaux<b>' + list.length + '</b></div><div>Passages<b>' + passages + '</b></div><div>' + (price ? 'Coût par passage<b>' + (passages ? PC.eur(PC.round2(price / passages)) : '—') + '</b>' : 'Formule<b>' + esc(p.status === 'pilote' ? 'Pilote gratuit' : '—') + '</b>') + '</div></div>' +
       '<table><thead><tr><th>Date</th><th>Horaire</th><th>Lieu</th><th class="n">Passages</th></tr></thead><tbody>' + list.map((b) => '<tr><td>' + esc(PC.capitalize(PC.fmtDayLong(bStart(b)))) + '</td><td>' + PC.fmtTime(bStart(b)) + ' – ' + PC.fmtTime(bEnd(b)) + '</td><td>' + esc(b.location || '') + '</td><td class="n">' + (b.passages == null ? '—' : b.passages) + '</td></tr>').join('') + '</tbody><tfoot><tr><td colspan="3">Total</td><td class="n">' + passages + '</td></tr></tfoot></table>' +
-      '<p class="f">' + esc(S.business_name) + ' · ' + esc(S.owner_name) + (S.phone ? ' · ' + esc(S.phone) : '') + (S.email ? ' · ' + esc(S.email) : '') + ' · Récupération et bien-être sportif, sans visée médicale.</p>' +
+      '<p class="f">' + esc(S.business_name) + (S.phone ? ' · ' + esc(S.phone) : '') + (S.email ? ' · ' + esc(S.email) : '') + ' · Récupération et bien-être sportif, sans visée médicale.</p>' +
       '<script>window.onload=function(){window.print()}<\/script></body></html>');
     w.document.close();
   }
@@ -1482,7 +1482,7 @@
     h += '<div class="card" style="margin-bottom:16px"><div class="card-head"><h2>Partager la page de réservation</h2></div><div class="row wrap" style="align-items:flex-start;gap:16px"><div class="qr" id="qr" aria-label="QR code vers la page de réservation"></div><div class="grow stack" style="min-width:200px"><input readonly value="' + esc(bookingUrl()) + '" aria-label="Lien"><div class="row wrap"><button class="btn sm" data-act="copy-link">' + I('copy') + 'Copier le lien</button><button class="btn sm soft" data-act="dl-qr">' + I('download') + 'QR code (SVG)</button></div><p class="small muted">Imprime le QR code sur tes flyers et ton kakémono : les sportifs réservent directement.</p></div></div></div>';
     // Coordonnées
     h += '<form class="card" id="set-contact" style="margin-bottom:16px"><div class="card-head"><h2>Coordonnées</h2><button class="btn sm">Enregistrer</button></div><div class="stack">' +
-      '<div class="grid-2"><label class="field"><span>Nom de l\'activité</span><input name="business_name" value="' + esc(S.business_name) + '"></label><label class="field"><span>Ton prénom</span><input name="owner_name" value="' + esc(S.owner_name) + '"></label></div>' +
+      '<div class="grid-2"><label class="field"><span>Nom de l\'activité</span><input name="business_name" value="' + esc(S.business_name) + '"></label><label class="field"><span>Prénom (accueil de l\'espace de gestion)</span><input name="owner_name" value="' + esc(S.owner_name) + '"></label></div>' +
       '<div class="grid-2"><label class="field"><span>Téléphone WhatsApp</span><input name="phone" type="tel" value="' + esc(S.phone) + '"><small>Affiché aux clients pour te prévenir.</small></label><label class="field"><span>E-mail</span><input name="email" type="email" value="' + esc(S.email) + '"></label></div>' +
       '<label class="field"><span>Lieu des séances individuelles</span><input name="base_location" value="' + esc(S.base_location) + '"></label></div></form>';
     // Horaires
