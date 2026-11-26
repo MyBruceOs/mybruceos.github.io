@@ -5,20 +5,22 @@
 //|  Le robot ne passe AUCUN ordre : il lit et il envoie, c'est tout.|
 //+------------------------------------------------------------------+
 #property copyright   "Desk US"
-#property version     "1.01"
+#property version     "1.02"
 #property description "Pont MT5 -> Desk US. Lecture seule : aucun ordre n'est passé."
 
 //--- paramètres (onglet « Entrées »)
 input string InpKey      = "";                       // Clé Desk US (copiée depuis l'application)
 input string InpSymbols  = "US100.cash,US500.cash";  // Symboles à suivre, séparés par des virgules
+input string InpMacro    = "DXY.cash,XAUUSD,USOIL.cash,US30.cash"; // Intermarché (prix seulement, ignorés s'ils n'existent pas)
 input int    InpSeconds  = 3;                        // Envoi toutes les N secondes
 input int    InpDays     = 60;                       // Trades clôturés envoyés (jours d'historique)
 input string InpUrl      = "https://xakrdapoxthvvqpyjuji.supabase.co/rest/v1/rpc/desk_push"; // Adresse du service
 input string InpApiKey   = "sb_publishable_Hzn2bTrae-TflG_HCzLVWg_QYF4l0ec";                 // Clé publique du service
 
-#define EA_VERSION "1.01"
+#define EA_VERSION "1.02"
 
 string   g_syms[];
+string   g_qsyms[];   // symboles suivis + intermarché (cotations seulement)
 long     g_srvOff      = 0;     // décalage heure serveur - UTC (secondes)
 datetime g_lastBars    = 0;     // dernier envoi des bougies (heure locale PC)
 datetime g_lastTrades  = 0;     // dernier envoi des trades clôturés
@@ -149,9 +151,9 @@ string AccountJson()
 string QuotesJson()
   {
    string s = "{";
-   for(int k = 0; k < ArraySize(g_syms); k++)
+   for(int k = 0; k < ArraySize(g_qsyms); k++)
      {
-      string sym = g_syms[k];
+      string sym = g_qsyms[k];
       int    dg  = (int)SymbolInfoInteger(sym, SYMBOL_DIGITS);
       double ts  = SymbolInfoDouble(sym, SYMBOL_TRADE_TICK_SIZE);
       double tv  = SymbolInfoDouble(sym, SYMBOL_TRADE_TICK_VALUE_LOSS);
@@ -476,6 +478,20 @@ int OnInit()
      {
       Alert("Desk US : aucun symbole valide. Vérifie les noms (ex. US100.cash,US500.cash).");
       return INIT_PARAMETERS_INCORRECT;
+     }
+   ArrayCopy(g_qsyms, g_syms);
+   string mparts[];
+   int mn = StringSplit(InpMacro, ',', mparts);
+   for(int i = 0; i < mn; i++)
+     {
+      string s = mparts[i];
+      StringTrimLeft(s);
+      StringTrimRight(s);
+      if(s == "") continue;
+      if(!SymbolSelect(s, true)) { Print("Desk US : intermarché, symbole absent chez ce broker : ", s); continue; }
+      int k = ArraySize(g_qsyms);
+      ArrayResize(g_qsyms, k + 1);
+      g_qsyms[k] = s;
      }
    EventSetTimer(MathMax(1, InpSeconds));
    Send(true);
