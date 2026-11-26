@@ -218,6 +218,36 @@ Conclusions :
 - Jours de Fed : trop peu de trades (1 à 2) pour conclure. La décision tombe à 14:00, après la fenêtre de trading.
 - Détail par annonce (ISM, JOLTS…) : 3 à 6 trades par annonce, trop peu pour conclure.
 
+## 4 quinquies. Séries, drawdown et variance (référence A, TP 3R)
+
+Ce qui s'est passé sur l'année : 89 trades, espérance **+0,62 R** par trade, écart-type 1,77 R.
+- Au plus **5 pertes d'affilée** et 4 gains d'affilée.
+- Pire creux : **−5,3 R** (du 30 janvier au 16 mars, 14 trades avant de retrouver le sommet).
+- Pire journée : −2 R (deux pertes le même jour). Pire mois : −3 R. Mois négatifs : 2 sur 12.
+
+Simulations : 20 000 années tirées au hasard parmi les vraies séances. On garde la même fréquence et les mêmes journées à deux trades, avec 0,05 R de frais par trade (spread et glissement).
+
+| Sur une année | Si l'avantage tient | Si l'avantage n'est que la moitié du backtest |
+|---|---|---|
+| Résultat médian | +50,6 R | +24,8 R |
+| 5 % des années les moins bonnes | +21,6 R ou moins | −2,1 R ou moins |
+| Année perdante | moins de 1 % | 7 % |
+| Pire creux médian | −7,4 R | −10 R |
+| Pire creux, 1 année sur 10 | −11,3 R | −16,7 R |
+| Pire creux, 1 année sur 100 | −16,6 R | −25,3 R |
+| Pertes d'affilée : médiane / 1 an sur 10 / 1 an sur 100 | 6 / 9 / 13 | 8 / 11 / 16 |
+| Probabilité d'une série de 8 pertes ou plus | 24 % | 51 % |
+| Probabilité d'un creux de 10 R ou plus | 17 % | 50 % |
+| Séances pour atteindre +10 R : médiane / 8 cas sur 10 | 43 / 78 séances | 66 / 127 séances |
+| Toucher −10 R avant +10 R | 2 % | 10 % |
+
+À retenir :
+- Le creux historique de −5,3 R est le côté chanceux. Il faut s'attendre à des creux de **−7 à −11 R** dans une année normale, et à des séries de **6 à 9 pertes**, sans que la méthode soit cassée.
+- Une série de pertes ne prouve rien tant qu'elle reste dans ces bornes. Au-delà de 13 pertes d'affilée ou d'un creux de −17 R, la méthode ne se comporte plus comme dans le backtest.
+- Les montants en dollars suivent le risque par trade : à 500 $ de risque, tous les montants sont divisés par deux.
+
+![Séries, drawdown et variance](img/variance-drawdown.png)
+
 ## 5. Idées testées et rejetées
 
 | Idée | Effet |
