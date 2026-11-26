@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Desk US · Assistant SMC</title>
-<meta name="description" content="Assistant de séance pour le daytrading US100 / SP500 en CFD depuis la France : horaires AMD, biais, fondamentaux, plan Fibonacci et journal.">
+<title>Desk US · Règle A</title>
+<meta name="description" content="Desk US : suivi en direct de la règle A (Judas, cassure M1, entrée au 50 %) sur US100 et SP500, journal des setups et suivi du test en réel.">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#08090b">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2308090b'/%3E%3Cpath d='M5 22 L12 14 L17 18 L27 8' stroke='%23e4a24a' stroke-width='3' fill='none'/%3E%3C/svg%3E">
@@ -14,7 +14,7 @@
 
 <header class="top">
   <div class="top-inner">
-    <span class="brand">Desk US · SMC</span>
+    <span class="brand">Desk US · Règle A</span>
     <div class="clocks">
       <div class="clock"><small>Paris</small><b id="clkParis">--:--:--</b></div>
       <div class="clock secondary"><small>New York</small><b id="clkNY">--:--</b></div>
@@ -22,307 +22,108 @@
     <div class="status">
       <span class="live-q mono" id="liveQuotes"></span>
       <span class="pill off" id="pillMT5" hidden><span class="dot"></span><span>MT5</span></span>
-      <span class="pill off" id="pillMarket"><span class="dot"></span><span>…</span></span>
-      <span class="pill off" id="pillPhase"><span class="dot"></span><span>…</span></span>
-      <span class="countdown" id="countdown"></span>
+      <span class="pill off" id="pillSession"><span class="dot"></span><span>…</span></span>
     </div>
   </div>
   <nav class="tabs" role="tablist">
-    <button role="tab" data-tab="seance" aria-selected="true">Séance</button>
-    <button role="tab" data-tab="graph" aria-selected="false">Graphiques &amp; tendance</button>
-    <button role="tab" data-tab="fonda" aria-selected="false">Fondamentaux</button>
-    <button role="tab" data-tab="plan" aria-selected="false">Plan de trade</button>
+    <button role="tab" data-tab="jour" aria-selected="true">Aujourd'hui</button>
     <button role="tab" data-tab="journal" aria-selected="false">Journal</button>
+    <button role="tab" data-tab="suivi" aria-selected="false">Suivi du test</button>
+    <button role="tab" data-tab="regles" aria-selected="false">Règles</button>
     <button role="tab" data-tab="reglages" aria-selected="false">Réglages</button>
   </nav>
 </header>
 
 <main>
-<div id="alerts" aria-live="polite"></div>
+  <div id="alerts"></div>
 
-<!-- ================= SÉANCE ================= -->
-<section class="tab active" id="tab-seance" role="tabpanel">
-  <div class="grid">
-    <div class="card c12" id="ftmoCard"></div>
-    <div class="card c12" id="openCard"></div>
+  <!-- ================= AUJOURD'HUI ================= -->
+  <section class="tab active" id="tab-jour">
+    <div class="grid">
+      <div class="card c12" id="sessionCard"></div>
+      <div class="c12 grid" id="profileCards"></div>
+      <div class="card c12" id="newsCard"></div>
+      <div class="card c12" id="ftmoCard"></div>
+    </div>
+  </section>
 
-    <div class="card c12">
-      <h2>Journée du <span id="dayLabel" class="mono"></span> · heure de Paris</h2>
-      <div class="tl" id="timeline"></div>
-      <p class="hint">Violet : accumulation (Asie) · bleu : manipulation (Londres) · or : distribution (New York) · gris : à éviter · traits rouges : news.</p>
-    </div>
-
-    <div class="card c5">
-      <h2>Phases AMD du jour</h2>
-      <div class="phases" id="phases"></div>
-    </div>
-
-    <div class="card c7">
-      <h2>Biais du jour (structure SMC)<span class="spacer"></span><button class="btn small" id="biasCopy">Reprendre la veille</button></h2>
-      <table>
-        <thead><tr><th>UT</th><th>US100</th><th>SP500</th></tr></thead>
-        <tbody id="biasBody"></tbody>
-      </table>
-      <div class="fgrid" style="margin-top:12px">
-        <label class="f">SMT US100 / SP500
-          <select id="smt">
-            <option value="">Pas de divergence</option>
-            <option value="bull">SMT haussière (un indice ne fait pas de plus bas)</option>
-            <option value="bear">SMT baissière (un indice ne fait pas de plus haut)</option>
-          </select>
-        </label>
-        <label class="f">Sentiment fondamental
-          <select id="fondaSent">
-            <option value="">Neutre</option>
-            <option value="bull">Risk-on (favorable aux achats)</option>
-            <option value="bear">Risk-off (favorable aux ventes)</option>
-          </select>
-          <span id="fondaHint" style="font-size:12px"></span>
-        </label>
-      </div>
-      <div id="biasMt5"></div>
-      <div id="verdict"></div>
-    </div>
-
-    <div class="card c7">
-      <h2>Niveaux clés &amp; liquidité<span class="spacer"></span>
-        <label id="lvlAutoWrap" class="auto-toggle" hidden><input type="checkbox" id="lvlAuto"> Auto MT5</label>
-        <span class="seg" id="lvlInstr"><button data-v="US100" class="on">US100</button><button data-v="SP500">SP500</button></span>
-      </h2>
-      <div class="lvl-grid" id="lvlGrid"></div>
-      <div class="pd" id="pdBox"></div>
-      <p class="hint">Power of 3 : en biais haussier, on cherche la manipulation <b>sous</b> l'open de minuit (00:00 NY = <span class="midnightParis mono"></span> Paris) puis la distribution au-dessus. L'inverse en biais baissier.</p>
-    </div>
-
-    <div class="card c5">
-      <h2>Événements du jour<span class="spacer"></span><button class="btn small" id="evAddBtn">+ Ajouter</button></h2>
-      <div id="evForm" hidden style="margin-bottom:10px">
-        <div class="fgrid">
-          <label class="f">Heure Paris<input type="time" id="evTime"></label>
-          <label class="f">Impact<select id="evImpact"><option value="high">Fort (rouge)</option><option value="med">Moyen (orange)</option></select></label>
-        </div>
-        <label class="f" style="margin-top:8px">Événement<input type="text" id="evName" placeholder="ex. CPI US, discours Powell…"></label>
-        <div class="row" style="margin-top:8px"><button class="btn primary small" id="evSave">Enregistrer</button><button class="btn small" id="evCancel">Annuler</button></div>
-      </div>
-      <table><tbody id="evBody"></tbody></table>
-      <p class="hint">Les événements récurrents sont ajoutés automatiquement (à confirmer dans l'onglet Fondamentaux). Ajoute ceux du calendrier du jour (CPI, PPI, ventes au détail…).</p>
-    </div>
-
-    <div class="card c7">
-      <h2>Checklist avant entrée</h2>
-      <div id="checklist"></div>
-      <div id="goBox"></div>
-      <div class="row" style="margin-top:10px"><button class="btn small" id="chkReset">Réinitialiser pour le prochain setup</button></div>
-    </div>
-
-    <div class="card c5">
-      <h2>Compteur de séance</h2>
-      <div class="res" id="sessionStats" style="margin-top:0"></div>
-      <label class="f" style="margin-top:12px">Notes de séance
-        <textarea id="dayNotes" placeholder="Contexte, plan, ce que j'attends du marché…"></textarea>
-      </label>
-    </div>
-  </div>
-</section>
-
-<!-- ================= GRAPHIQUES ================= -->
-<section class="tab" id="tab-graph" role="tabpanel">
-  <div class="card" style="margin-bottom:16px;padding:6px 8px"><div class="tv" id="tvTape" style="min-height:46px"></div></div>
-  <div class="grid">
-    <div class="card c12" id="mt5TrendCard"></div>
-    <div class="card c6">
-      <h2>US100<span class="spacer"></span><span class="seg" data-chart="US100"></span></h2>
-      <div class="tv tv-chart" id="tvChartUS100"></div>
-    </div>
-    <div class="card c6">
-      <h2>SP500<span class="spacer"></span><span class="seg" data-chart="SP500"></span></h2>
-      <div class="tv tv-chart" id="tvChartSP500"></div>
-    </div>
-    <div class="card c12">
-      <p class="hint" style="margin:0">Les graphiques viennent de TradingView, qui n'a pas le flux FTMO : les prix peuvent différer de quelques points de ton MT5. Le flux se règle dans Réglages. La tendance et les niveaux, eux, sont calculés sur les prix de ton compte MT5.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ================= FONDAMENTAUX ================= -->
-<section class="tab" id="tab-fonda" role="tabpanel">
-  <div class="grid">
-    <div class="card c12" id="fondaBiasCard"></div>
-    <div class="card c12">
-      <h2>Moteurs du jour</h2>
-      <div class="grid" style="gap:10px">
-        <div class="c4" style="min-width:0"><small class="muted">VIX (volatilité)</small><div class="tv" id="tvMiniVIX" style="height:220px"></div></div>
-        <div class="c4" style="min-width:0"><small class="muted">Dollar (DXY)</small><div class="tv" id="tvMiniDXY" style="height:220px"></div></div>
-        <div class="c4" style="min-width:0"><small class="muted">Taux US 10 ans</small><div class="tv" id="tvMiniUS10Y" style="height:220px"></div></div>
-      </div>
-      <p class="hint">VIX en hausse ou au-dessus de 20 : risk-off, mouvements plus violents, réduis la taille. Dollar (DXY) et taux 10 ans en hausse : pression sur le Nasdaq (sensible aux taux). Taux en baisse : soutien aux valeurs tech.</p>
-    </div>
-    <div class="card c7">
-      <h2>Calendrier économique US (impact moyen et fort)</h2>
-      <div class="tv" id="tvCalendar" style="height:620px"></div>
-    </div>
-    <div class="card c5">
-      <h2>Rendez-vous récurrents · heures de Paris</h2>
-      <table><thead><tr><th>Paris</th><th>NY</th><th>Publication</th></tr></thead><tbody id="recurBody"></tbody></table>
-      <p class="hint">Les heures de Paris se recalculent toutes seules, y compris pendant les semaines de décalage d'heure d'été (mars et fin octobre) où New York ouvre à 14:30.</p>
-      <h3>Prochains FOMC (décision 20:00 Paris en général)</h3>
-      <div id="fomcList" class="muted" style="font-size:14px"></div>
-      <h3>Jours fériés et séances courtes NYSE</h3>
-      <div id="holList" class="muted" style="font-size:14px"></div>
-    </div>
-    <div class="card c12">
-      <h2>Règles fondamentales</h2>
-      <ul style="margin:0;padding-left:18px;font-size:14px" class="stack">
-        <li>Pas d'entrée dans les <b class="newsBuf">15</b> minutes avant et après une news rouge (CPI, NFP, FOMC, PCE, ISM).</li>
-        <li>Jour de FOMC : la vraie direction sort souvent après 20:00 Paris. Le matin est souvent un faux mouvement.</li>
-        <li>Jour de NFP / CPI : la publication de 14:30 Paris fait souvent la manipulation ; attends le MSS en M1 après la mèche.</li>
-        <li>Saison des résultats : NVDA, MSFT, AAPL, AMZN, META, GOOGL, TSLA bougent le US100 plus que le SP500. Vérifie les publications de la veille au soir.</li>
-        <li>Jour férié US : marché cash fermé, liquidité très faible en CFD. Pas de trade.</li>
-        <li>Lundi et vendredi après 19:00 Paris : volumes souvent plus faibles.</li>
-      </ul>
-    </div>
-  </div>
-</section>
-
-<!-- ================= PLAN ================= -->
-<section class="tab" id="tab-plan" role="tabpanel">
-  <div class="grid">
-    <div class="card c5">
-      <h2>Paramètres du setup</h2>
-      <div class="row" style="margin-bottom:12px">
-        <span class="seg" id="planInstr"><button data-v="US100" class="on">US100</button><button data-v="SP500">SP500</button></span>
-        <button class="btn buy on" id="dirBuy">Achat</button>
-        <button class="btn sell" id="dirSell">Vente</button>
-      </div>
-      <div class="fgrid">
-        <label class="f">Swing haut<input type="number" step="any" id="pHigh" inputmode="decimal"></label>
-        <label class="f">Swing bas<input type="number" step="any" id="pLow" inputmode="decimal"></label>
-        <label class="f">Niveau d'entrée
-          <select id="pLevel">
-            <option value="0.5">50 %</option>
-            <option value="0.618">61,8 %</option>
-            <option value="0.68">68 %</option>
-            <option value="0.705">70,5 %</option>
-            <option value="0.786">78,6 %</option>
-          </select>
-        </label>
-        <label class="f">Marge SL (pts, spread inclus)<input type="number" step="any" id="pBuffer" inputmode="decimal"></label>
-        <label class="f">RR cible<input type="number" step="0.1" id="pRR" inputmode="decimal"></label>
-        <label class="f">Risque (% capital)<input type="number" step="0.05" id="pRisk" inputmode="decimal"></label>
-      </div>
-      <p class="hint" id="planHelp"></p>
-    </div>
-
-    <div class="card c7">
-      <h2>Plan calculé</h2>
-      <div id="planOut"><p class="muted">Renseigne le swing haut et le swing bas de la jambe d'impulsion (le displacement après la manipulation).</p></div>
-    </div>
-  </div>
-</section>
-
-<!-- ================= JOURNAL ================= -->
-<section class="tab" id="tab-journal" role="tabpanel">
-  <div class="grid">
-    <div class="card c12">
-      <h2>Statistiques</h2>
-      <div class="res" id="jStats" style="margin-top:0"></div>
-      <svg class="equity" id="equity" viewBox="0 0 600 140" preserveAspectRatio="none" aria-label="Courbe de résultats en R"></svg>
-      <div class="grid" style="margin-top:6px">
-        <div class="c6" style="min-width:0"><h3>Par niveau de Fibonacci</h3><table><tbody id="jByFib"></tbody></table></div>
-        <div class="c6" style="min-width:0"><h3>Par fenêtre horaire</h3><table><tbody id="jByPhase"></tbody></table></div>
-      </div>
-    </div>
-
-    <div class="card c12" id="jFormCard">
-      <h2><span id="jFormTitle">Nouveau trade</span></h2>
-      <div class="fgrid">
-        <label class="f">Date<input type="date" id="jDate"></label>
-        <label class="f">Heure Paris<input type="time" id="jTime"></label>
-        <label class="f">Instrument<select id="jInstr"><option>US100</option><option>SP500</option></select></label>
-        <label class="f">Sens<select id="jDir"><option value="buy">Achat</option><option value="sell">Vente</option></select></label>
-        <label class="f">Fenêtre<select id="jPhase"></select></label>
-        <label class="f">Fib d'entrée<select id="jFib"><option value="0.5">50 %</option><option value="0.618">61,8 %</option><option value="0.68">68 %</option><option value="0.705">70,5 %</option><option value="0.786">78,6 %</option><option value="">Autre</option></select></label>
-        <label class="f">Entrée<input type="number" step="any" id="jEntry"></label>
-        <label class="f">Stop<input type="number" step="any" id="jSL"></label>
-        <label class="f">Objectif<input type="number" step="any" id="jTP"></label>
-        <label class="f">Lots<input type="number" step="any" id="jLots"></label>
-        <label class="f">Résultat<select id="jOutcome"><option value="TP">TP touché</option><option value="SL">SL touché</option><option value="BE">Break-even</option><option value="MAN">Sortie manuelle</option><option value="OPEN">En cours</option></select></label>
-        <label class="f">R obtenu<input type="number" step="0.01" id="jR"></label>
-        <label class="f">Plan respecté<select id="jRule"><option value="1">Oui</option><option value="0">Non</option></select></label>
-      </div>
-      <p class="hint" id="jMt5Note" hidden>Trade importé de MT5 : les prix et le résultat viennent du compte. Tu peux compléter la fenêtre, le niveau de Fibonacci, le respect du plan et les notes.</p>
-      <label class="f" style="margin-top:10px">Notes (contexte, émotion, erreur)<textarea id="jNotes"></textarea></label>
-      <div class="row" style="margin-top:10px">
-        <button class="btn primary" id="jSave">Enregistrer le trade</button>
-        <button class="btn" id="jClear">Vider</button>
-      </div>
-    </div>
-
-    <div class="card c12">
-      <h2>Historique<span class="spacer"></span>
+  <!-- ================= JOURNAL ================= -->
+  <section class="tab" id="tab-journal">
+    <div class="card">
+      <h2>Journal des setups<span class="spacer"></span>
+        <select id="jProfile" class="mini"></select>
+        <select id="jPeriod" class="mini"><option value="7">7 jours</option><option value="30" selected>30 jours</option><option value="90">90 jours</option><option value="400">Tout</option></select>
+        <select id="jType" class="mini"><option value="all">Tous les jours</option><option value="setup">Setups (cassure validée)</option><option value="filled">Entrées touchées</option><option value="taken">Trades pris</option><option value="missed">Entrées ratées</option></select>
         <button class="btn small" id="jCsv">Export CSV</button>
-        <button class="btn small" id="jBackup">Sauvegarde JSON</button>
-        <label class="btn small" style="cursor:pointer">Restaurer<input type="file" id="jRestore" accept="application/json" hidden></label>
       </h2>
-      <div class="tbl-wrap"><table>
-        <thead><tr><th>Date</th><th>Heure</th><th>Instr.</th><th>Sens</th><th>Fenêtre</th><th>Fib</th><th>Entrée</th><th>SL</th><th>TP</th><th>Résultat</th><th>R</th><th>Plan</th><th></th></tr></thead>
-        <tbody id="jBody"></tbody>
-      </table></div>
+      <div id="jSummary" class="res" style="margin-top:0"></div>
+      <div class="tbl-wrap" style="margin-top:12px"><table id="jTable"></table></div>
+      <p class="hint">Chaque jour, Desk Key envoie le setup de chaque indice : niveaux du pré-marché, Judas, cassure, entrée, SL, TP 2R / 2,5R / 3R, puis le résultat simulé exactement comme le backtest. Les trades pris avec Desk Key sont reliés automatiquement à leur setup (résultat réel à côté). Cliquez sur une ligne pour voir le détail.</p>
     </div>
-  </div>
-</section>
+    <div class="card" style="margin-top:16px" id="otherTradesCard"></div>
+  </section>
 
-<!-- ================= RÉGLAGES ================= -->
-<section class="tab" id="tab-reglages" role="tabpanel">
-  <div class="grid">
-    <div class="card c6">
-      <h2>Compte &amp; gestion du risque</h2>
-      <div class="fgrid">
-        <label class="f">Capital sans MT5<input type="number" step="any" id="sCapital"></label>
-        <label class="f">Risque par trade (%)<input type="number" step="0.05" id="sRisk"></label>
-        <label class="f">RR cible<input type="number" step="0.1" id="sRR"></label>
-        <label class="f">Trades max / jour<input type="number" step="1" id="sMaxTrades"></label>
-        <label class="f">Perte max / jour (R)<input type="number" step="0.5" id="sMaxLoss"></label>
-        <label class="f">Zone news (minutes)<input type="number" step="1" id="sNewsBuf"></label>
+  <!-- ================= SUIVI ================= -->
+  <section class="tab" id="tab-suivi">
+    <div class="card">
+      <h2>Suivi du test en réel<span class="spacer"></span>
+        <label class="auto-toggle"><input type="checkbox" id="sHist"> inclure l'historique envoyé à l'installation</label>
+      </h2>
+      <div id="suiviBody"></div>
+    </div>
+  </section>
+
+  <!-- ================= RÈGLES ================= -->
+  <section class="tab" id="tab-regles">
+    <div class="grid" id="rulesBody"></div>
+  </section>
+
+  <!-- ================= RÉGLAGES ================= -->
+  <section class="tab" id="tab-reglages">
+    <div class="grid">
+      <div class="card c6">
+        <h2>Connexion MT5</h2>
+        <div id="mt5Box"></div>
       </div>
-      <label class="chk" style="margin-top:12px;border:0"><input type="checkbox" id="sNotif"> Notifications 5 minutes avant chaque phase et chaque news (onglet ouvert)</label>
-    </div>
-    <div class="card c6">
-      <h2>Connexion MT5 (FTMO)</h2>
-      <div id="mt5Box"></div>
-    </div>
-    <div class="card c6">
-      <h2>Règles FTMO</h2>
-      <div class="fgrid">
-        <label class="f">Étape
-          <select id="fPhase"><option value="challenge">Challenge</option><option value="verification">Vérification</option><option value="funded">Compte financé</option></select>
-        </label>
-        <label class="f">Perte max du jour (%)<input type="number" step="0.5" id="fDaily"></label>
-        <label class="f">Perte max totale (%)<input type="number" step="0.5" id="fMax"></label>
-        <label class="f">Objectif (%)<input type="number" step="0.5" id="fTarget"></label>
-        <label class="f">Capital initial<input type="number" step="any" id="fInit" placeholder="auto (MT5)"></label>
-        <label class="f">Base du risque
-          <select id="sRiskBase"><option value="init">Capital initial du compte</option><option value="balance">Solde actuel</option></select>
-        </label>
+      <div class="card c6">
+        <h2>Desk Key (exécution en une touche)</h2>
+        <ol style="padding-left:18px;margin:0;font-size:14px" class="stack">
+          <li><a href="mt5/DeskUS_Key.mq5" download>Télécharger Desk Key</a> et la dernière version du <a href="mt5/DeskUS_Bridge.mq5" download>robot DeskUS_Bridge</a> (1.05 : il transmet votre clé à Desk Key).</li>
+          <li>Copier les deux fichiers dans <b>MQL5 → Experts</b> (Fichier → Ouvrir le dossier des données), puis les compiler dans MetaEditor.</li>
+          <li>Ouvrir <b>un graphique M1 par indice</b> (US100.cash, US500.cash) et glisser Desk Key sur chacun : le profil se choisit tout seul et refuse un symbole qui ne correspond pas.</li>
+          <li>Cocher « Autoriser le trading algorithmique » (nécessaire même pour l'exécution en une touche) et régler le risque par trade.</li>
+          <li>Touche <b>K</b> : placer l'ordre (ou l'armer avant 10:00 NY) · <b>X</b> : annuler · bouton <b>–</b> : réduire le panneau · <b>HISTO</b> : setups des 7 derniers jours sur le graphique.</li>
+        </ol>
+        <p class="hint">Desk Key envoie ses setups ici tout seul (même adresse autorisée que le robot DeskUS_Bridge). Le mode automatique est désactivé par défaut.</p>
+        <h3>Préférences d'affichage</h3>
+        <div class="fgrid">
+          <label class="f">Objectif de référence (stats)
+            <select id="pTp"><option value="2">2R</option><option value="2.5">2,5R</option><option value="3">3R</option></select></label>
+          <label class="f">Risque par trade pour les montants ($)
+            <input type="number" id="pRisk" min="0" step="50"></label>
+        </div>
       </div>
-      <p class="hint">Valeurs du Challenge FTMO en 2 étapes. Vérifie-les dans ton espace FTMO : elles changent selon le type de compte. Laisse le capital initial vide pour le lire dans MT5 (somme des dépôts).</p>
+      <div class="card c6">
+        <h2>Règles FTMO</h2>
+        <div class="fgrid">
+          <label class="f">Phase
+            <select id="fPhase"><option value="challenge">Challenge</option><option value="verification">Vérification</option><option value="funded">Compte financé</option></select></label>
+          <label class="f">Perte max du jour (%)<input type="number" id="fDaily" min="0" step="0.5"></label>
+          <label class="f">Perte max totale (%)<input type="number" id="fMax" min="0" step="0.5"></label>
+          <label class="f">Objectif (%)<input type="number" id="fTarget" min="0" step="0.5"></label>
+          <label class="f">Capital initial (vide = lu dans MT5)<input type="number" id="fInit" min="0" step="1000"></label>
+        </div>
+      </div>
+      <div class="card c6">
+        <h2>À propos</h2>
+        <p class="muted" style="margin-top:0">Les règles, les résultats de backtest et les bornes de suivi de chaque actif viennent de la base Desk US : quand un nouvel actif est validé en backtest, il apparaît ici tout seul (onglets Aujourd'hui, Journal, Suivi et Règles). Documents complets : <a href="docs/regles.md">règles</a> · <a href="docs/backtests.md">backtests</a>.</p>
+        <p class="hint" id="profilesInfo"></p>
+      </div>
     </div>
-    <div class="card c6">
-      <h2>Instruments (spécifications de ton broker)</h2>
-      <div id="instrSettings"></div>
-      <p class="hint">Quand MT5 est connecté, la valeur du point, le lot minimum et le pas de lot sont lus directement dans MT5 et remplacent ces valeurs. Valeur du point : ce que rapporte 1 point de mouvement pour 1 lot, dans la devise du compte. Elle varie selon le broker (souvent 1 €, 1 $, 10 € ou 20 € par point). Vérifie la fiche du contrat. Flux TradingView : choisis celui de ton broker s'il existe (ex. PEPPERSTONE:NAS100, CAPITALCOM:US100, ICMARKETS:US500) pour avoir les mêmes prix.</p>
-    </div>
-    <div class="card c12">
-      <h2>Données</h2>
-      <p class="muted" style="margin-top:0">Tout est enregistré dans ce navigateur uniquement (rien n'est envoyé sur un serveur). Fais une sauvegarde JSON du journal de temps en temps, ou pour passer sur un autre appareil.</p>
-      <div class="row"><button class="btn danger" id="sWipe">Effacer toutes les données</button></div>
-    </div>
-  </div>
-</section>
+  </section>
 </main>
 
-<footer>Outil d'aide à la décision, pas un conseil en investissement. Les CFD sont des produits à effet de levier : la majorité des comptes particuliers perdent de l'argent. Graphiques et données de marché : widgets TradingView.</footer>
-
+<footer>Desk US · outil d'aide à la décision, pas un conseil en investissement. Les résultats passés et simulés ne garantissent pas les résultats futurs.</footer>
 <script src="assets/app.js"></script>
 </body>
 </html>

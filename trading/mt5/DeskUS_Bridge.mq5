@@ -5,7 +5,7 @@
 //|  Le robot ne passe AUCUN ordre : il lit et il envoie, c'est tout.|
 //+------------------------------------------------------------------+
 #property copyright   "Desk US"
-#property version     "1.04"
+#property version     "1.05"
 #property description "Pont MT5 -> Desk US. Lecture seule : aucun ordre n'est passé."
 
 //--- paramètres (onglet « Entrées »)
@@ -22,7 +22,7 @@ input int    InpHistDaysM5  = 1095;   // Profondeur de l'export M5 (jours)
 input bool   InpHistRestart = false;  // Recommencer l'export depuis le début
 input string InpHistUrl     = "https://xakrdapoxthvvqpyjuji.supabase.co/rest/v1/rpc/desk_hist_push"; // Adresse de l'export
 
-#define EA_VERSION "1.04"
+#define EA_VERSION "1.05"
 
 string   g_syms[];
 string   g_qsyms[];   // symboles suivis + intermarché (cotations seulement)
@@ -565,6 +565,17 @@ void HistStep()
 //+------------------------------------------------------------------+
 //| Cycle de vie                                                     |
 //+------------------------------------------------------------------+
+// partage la clé avec Desk Key (fichier commun à tous les terminaux de ce PC)
+void PartagerCle()
+  {
+   if(StringLen(InpKey) < 32) return;
+   FolderCreate("DeskUS", FILE_COMMON);
+   int h = FileOpen("DeskUS\\cle.txt", FILE_WRITE | FILE_TXT | FILE_COMMON | FILE_ANSI);
+   if(h == INVALID_HANDLE) return;
+   FileWriteString(h, InpKey);
+   FileClose(h);
+  }
+
 int OnInit()
   {
    if(StringLen(InpKey) < 32)
@@ -613,6 +624,7 @@ int OnInit()
          GlobalVariableDel(HistGV(g_syms[k], "M5"));
         }
      }
+   PartagerCle();
    EventSetTimer(MathMax(1, InpSeconds));
    Send(true);
    return INIT_SUCCEEDED;

@@ -202,3 +202,25 @@ code.mono{font-size:12px;background:var(--panel2);padding:1px 5px;border-radius:
 input:disabled,select:disabled{opacity:.6}
 @media (max-width:600px){.live-q{display:none}}
 @media (max-width:600px){.tl-block{font-size:0;padding:0}}
+
+/* ---------- Refonte « Règle A » ---------- */
+.dotc{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:baseline;flex:none}
+select.mini{width:auto;padding:3px 8px;font-size:12px;text-transform:none;letter-spacing:0}
+.steps{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.step{display:grid;grid-template-columns:22px 1fr;gap:8px;align-items:start;padding:7px 10px;border-radius:8px;background:var(--panel2);font-size:14px}
+.step > b{font-family:var(--mono);color:var(--faint);text-align:center}
+.step.ok > b{color:var(--bull)}
+.step.ko > b{color:var(--bear)}
+.step small{display:block;color:var(--muted);font-size:13px}
+.kpi b.bull,.card b.bull{color:var(--bull)}.kpi b.bear,.card b.bear{color:var(--bear)}
+.sbar{position:relative;height:46px;border-radius:6px;background:var(--panel2);margin:8px 0 24px}
+.sbar-seg{position:absolute;top:6px;bottom:6px;border-radius:4px;overflow:hidden}
+.sbar-seg span{display:block;padding:8px 6px;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sbar-mark{position:absolute;top:0;bottom:-6px;width:0;border-left:1px dashed var(--accent)}
+.sbar-mark span{position:absolute;top:48px;left:-40px;width:120px;font-size:10px;color:var(--accent);font-family:var(--mono)}
+.sbar-now{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--fg);box-shadow:0 0 0 1px var(--bg)}
+tr.jrow{cursor:pointer}
+tr.jrow:hover td{background:var(--panel2)}
+tr.jdetail td{background:rgba(255,255,255,.02)}
+.tag.info{background:rgba(91,156,240,.2);color:var(--info)}
+@media (max-width:600px){.sbar-seg span{font-size:9px;padding:9px 3px}}
