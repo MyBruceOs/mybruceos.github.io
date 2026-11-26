@@ -322,7 +322,6 @@
     });
     mini('tvMiniVIX', 'TVC:VIX'); mini('tvMiniDXY', 'TVC:DXY'); mini('tvMiniUS10Y', 'TVC:US10Y');
     tv('tvCalendar', 'events', Object.assign({}, TV_BASE, { width: '100%', height: '100%', importanceFilter: '0,1', countryFilter: 'us' }));
-    tv('tvNews', 'timeline', Object.assign({}, TV_BASE, { feedMode: 'market', market: 'index', displayMode: 'regular', width: '100%', height: '100%' }));
     renderFonda();
   }
 
@@ -1151,6 +1150,8 @@
   function startLive() {
     renderMt5Settings(); renderFtmo(); renderLiveStatus(); renderTrends();
     if (LIVE.key) poll(true);
+    loadMacro();
+    setInterval(loadMacro, 30 * 60 * 1000);
     setInterval(() => poll(false), 3000);
   }
   function onLive(tradesChanged) {
@@ -1159,6 +1160,7 @@
       if ($('#lvlGrid input') && !$('#lvlGrid input').readOnly) renderLevels(); else refreshLevelValues();
     }
     if ($('#tab-plan').classList.contains('active')) renderPlan();
+    if ($('#tab-fonda').classList.contains('active') && LIVE.n % 5 === 0) renderFondaBias();
     if ($('#tab-reglages').classList.contains('active')) renderMt5Settings();
     if (tradesChanged) { renderSessionStats(); if ($('#tab-journal').classList.contains('active')) renderJournal(); }
   }
@@ -1303,7 +1305,7 @@
         const ok = await rpc('desk_claim', { p_code: code, p_key_hash: await sha256(key) });
         if (!ok) { msg.textContent = 'Code invalide ou déjà utilisé.'; return; }
         LIVE.key = key; store.set('td.mt5key', key);
-        renderMt5Settings(); renderFtmo(); renderLiveStatus(); poll(true);
+        renderMt5Settings(); renderFtmo(); renderLiveStatus(); poll(true); loadMacro();
         $('#mt5KeyShow').value = key;
         alert('Connexion activée. Copie ta clé (bouton « Copier la clé ») et garde-la précieusement : elle sert au robot MT5 et à tes autres appareils.');
       } catch (e) { msg.textContent = 'Activation impossible : ' + e.message; }
@@ -1312,7 +1314,7 @@
       const key = $('#mt5KeyIn').value.trim(); const msg = $('#mt5Msg');
       try { await rpc('desk_read', { p_key: key, p_trades: false, p_bars_after: 9e12 }); }
       catch (e) { msg.textContent = /unknown key/.test(e.message) ? 'Clé inconnue.' : 'Vérification impossible : ' + e.message; return; }
-      LIVE.key = key; store.set('td.mt5key', key); renderMt5Settings(); renderFtmo(); poll(true);
+      LIVE.key = key; store.set('td.mt5key', key); renderMt5Settings(); renderFtmo(); poll(true); loadMacro();
     }
     if (id === 'mt5Reveal') { const i = $('#mt5KeyShow'); const shown = i.value === LIVE.key; i.value = shown ? '•'.repeat(24) : LIVE.key; ev.target.textContent = shown ? 'Afficher' : 'Masquer'; }
     if (id === 'mt5Copy') {
@@ -1441,6 +1443,205 @@
     const n = fillBiasFromMt5();
     ev.target.textContent = n ? 'Biais rempli ✓' : 'Rien à remplir';
     setTimeout(() => renderTrends(), 1800);
+  });
+
+  /* =========================================================
+     Biais fondamental (données macro FRED + intermarché MT5)
+     ========================================================= */
+  const MACRO = { data: null, at: 0, err: '' };
+  async function loadMacro() {
+    if (!LIVE.key) { renderFondaBias(); return; }
+    try {
+      const r = await rpc('desk_macro_read', { p_key: LIVE.key });
+      MACRO.data = r && r.data ? r.data : null; MACRO.at = r && r.updated_at; MACRO.err = '';
+    } catch (e) { MACRO.err = e.message; }
+    renderFondaBias();
+  }
+  const mSer = id => (MACRO.data && MACRO.data[id]) || [];
+  const mLast = id => { const s = mSer(id); return s.length ? s[s.length - 1] : null; };
+  function mAt(id, dateStr) { // dernière valeur à cette date ou avant
+    const s = mSer(id); let v = null;
+    for (const [d, x] of s) { if (d <= dateStr) v = x; else break; }
+    return v;
+  }
+  const isoMinus = (dateStr, days) => new Date(Date.parse(dateStr + 'T00:00:00Z') - days * 86400000).toISOString().slice(0, 10);
+  function mChg(id, days) {
+    const l = mLast(id); if (!l) return null;
+    const p = mAt(id, isoMinus(l[0], days)); if (p == null) return null;
+    return { last: l[1], date: l[0], prev: p, d: l[1] - p, pct: p ? (l[1] / p - 1) * 100 : NaN };
+  }
+  const fr = (v, d) => isFinite(v) ? v.toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—';
+  const sgn = (v, d, unit) => isFinite(v) ? (v > 0 ? '+' : '') + fr(v, d) + (unit || '') : '—';
+  const frDay = d => { if (!d) return '—'; const [y, m, dd] = d.split('-'); return `${dd}/${m}`; };
+
+  function macroFactors() {
+    if (!MACRO.data) return [];
+    const F = [];
+    const add = (key, name, value, change, read, eff, wN, wS, date) => F.push({ key, name, value, change, read, eff, wN, wS, date });
+    // 1. Fed : ce que le marché anticipe (taux 2 ans contre taux directeur)
+    const U = mLast('DFEDTARU'), L = mLast('DFEDTARL'), y2 = mLast('DGS2');
+    if (U && L && y2) {
+      const mid = (U[1] + L[1]) / 2, s = y2[1] - mid, n = Math.round(Math.abs(s) / 0.25);
+      const eff = s <= -0.25 ? 1 : s >= 0.25 ? -1 : 0;
+      add('fed', 'Anticipations Fed', `2 ans ${fr(y2[1], 2)} % · Fed ${fr(L[1], 2)}–${fr(U[1], 2)} %`, sgn(s, 2, ' pt'),
+        eff > 0 ? `Le marché anticipe des baisses de taux (≈ ${n} de 0,25 %) : soutien pour les actions.`
+          : eff < 0 ? `Le marché anticipe des hausses de taux (≈ ${n} de 0,25 %) : pression sur les actions.`
+            : 'Le marché anticipe peu de changement de taux.', eff, 1, 1, y2[0]);
+    }
+    // 2. Taux 2 ans sur 4 semaines
+    const c2 = mChg('DGS2', 28);
+    if (c2) {
+      const eff = c2.d <= -0.15 ? 1 : c2.d >= 0.15 ? -1 : 0;
+      add('y2', 'Taux 2 ans (sensibilité Fed)', fr(c2.last, 2) + ' %', sgn(c2.d * 100, 0, ' pb / 4 sem.'),
+        eff > 0 ? 'En baisse : le marché devient plus accommodant.' : eff < 0 ? 'En hausse : le marché durcit ses anticipations.' : 'Stable.', eff, 1, 1, c2.date);
+    }
+    // 3. Taux réel 10 ans (le facteur clé du Nasdaq)
+    const cr = mChg('DFII10', 28);
+    if (cr) {
+      const eff = cr.d <= -0.15 ? 1 : cr.d >= 0.15 ? -1 : 0;
+      add('real', 'Taux réel 10 ans', fr(cr.last, 2) + ' %', sgn(cr.d * 100, 0, ' pb / 4 sem.'),
+        eff > 0 ? 'En baisse : favorable aux valeurs de croissance (Nasdaq).' : eff < 0 ? 'En hausse : pèse sur les valorisations, surtout le Nasdaq.' : 'Stable.', eff, 1.5, 1, cr.date);
+    }
+    // 4. Dollar
+    const cd = mChg('DTWEXBGS', 28);
+    if (cd) {
+      const eff = cd.pct <= -1 ? 1 : cd.pct >= 1 ? -1 : 0;
+      add('usd', 'Dollar (indice large)', fr(cd.last, 1), sgn(cd.pct, 1, ' % / 4 sem.'),
+        eff > 0 ? 'Dollar en baisse : conditions financières plus souples.' : eff < 0 ? 'Dollar fort : conditions plus serrées, vent contraire.' : 'Dollar stable.', eff, 1, 1, cd.date);
+    }
+    // 5. Volatilité
+    const cv = mChg('VIXCLS', 7);
+    if (cv) {
+      const eff = cv.last <= 16 ? 1 : cv.last >= 22 ? -1 : 0;
+      add('vix', 'VIX (peur)', fr(cv.last, 1), sgn(cv.pct, 0, ' % / 1 sem.'),
+        eff > 0 ? 'Marché calme : environnement favorable aux achats.' : eff < 0 ? 'Stress élevé : mouvements violents, risk-off.' : 'Volatilité normale.', eff, 1, 1, cv.date);
+    }
+    // 6. Crédit
+    const ch = mChg('BAMLH0A0HYM2', 28);
+    if (ch) {
+      const eff = ch.d <= -0.2 ? 1 : ch.d >= 0.3 ? -1 : 0;
+      add('credit', 'Spreads crédit high yield', fr(ch.last, 2) + ' %', sgn(ch.d * 100, 0, ' pb / 4 sem.'),
+        eff > 0 ? 'Spreads qui se resserrent : appétit pour le risque.' : eff < 0 ? 'Spreads qui s\'écartent : le marché du crédit s\'inquiète.' : 'Stables.', eff, 1, 1, ch.date);
+    }
+    // 7. Conditions financières
+    const cn = mChg('NFCI', 28);
+    if (cn) {
+      const eff = cn.d <= -0.05 ? 1 : cn.d >= 0.05 ? -1 : 0;
+      add('nfci', 'Conditions financières (NFCI)', fr(cn.last, 2), sgn(cn.d, 2, ' / 4 sem.'),
+        eff > 0 ? 'Elles s\'assouplissent.' : eff < 0 ? 'Elles se resserrent.' : 'Stables' + (cn.last < 0 ? ' et plutôt souples.' : '.'), eff, 0.5, 0.5, cn.date);
+    }
+    // 8. Inflation (core CPI : rythme sur 3 mois contre 12 mois)
+    const cp = mSer('CPILFESL');
+    if (cp.length >= 13) {
+      const n = cp.length - 1, c = cp[n][1];
+      const a3 = (Math.pow(c / cp[n - 3][1], 4) - 1) * 100, yoy = (c / cp[n - 12][1] - 1) * 100;
+      const eff = a3 < yoy - 0.3 ? 1 : a3 > yoy + 0.3 ? -1 : 0;
+      add('cpi', 'Inflation core (CPI)', fr(yoy, 1) + ' % sur 1 an', fr(a3, 1) + ' % annualisé sur 3 mois',
+        eff > 0 ? 'L\'inflation ralentit : laisse de la marge à la Fed.' : eff < 0 ? 'L\'inflation réaccélère : la Fed reste ferme.' : 'Rythme stable.', eff, 1, 1, cp[n][0]);
+    }
+    // 9. Emploi : règle de Sahm + inscriptions au chômage
+    const ur = mSer('UNRATE'), ic = mSer('ICSA');
+    if (ur.length >= 15) {
+      const avg3 = i => (ur[i][1] + ur[i - 1][1] + ur[i - 2][1]) / 3;
+      const n = ur.length - 1; let lo = Infinity;
+      for (let i = n - 12; i < n; i++) if (i >= 2) lo = Math.min(lo, avg3(i));
+      const sahm = avg3(n) - lo;
+      let claims = 0;
+      if (ic.length >= 26) {
+        const m = a => a.reduce((x, y) => x + y[1], 0) / a.length;
+        const r4 = m(ic.slice(-4)), r26 = m(ic.slice(-26));
+        claims = r4 > r26 * 1.08 ? -1 : 0;
+      }
+      const eff = sahm >= 0.3 || claims < 0 ? -1 : sahm < 0.2 ? 1 : 0;
+      add('jobs', 'Emploi (chômage, inscriptions)', `chômage ${fr(ur[n][1], 1)} %`, `Sahm ${sgn(sahm, 2, ' pt')}`,
+        sahm >= 0.5 ? 'Signal de récession (règle de Sahm déclenchée).' : sahm >= 0.3 ? 'Le chômage monte : risque de ralentissement.' : claims < 0 ? 'Les inscriptions au chômage remontent.' : 'Marché du travail solide.', eff, 1, 1, ur[n][0]);
+    }
+    // 10. Pétrole
+    const co = mChg('DCOILWTICO', 28);
+    if (co) {
+      const eff = co.pct >= 10 ? -1 : co.pct <= -10 ? 1 : 0;
+      add('oil', 'Pétrole WTI', fr(co.last, 2) + ' $', sgn(co.pct, 1, ' % / 4 sem.'),
+        eff < 0 ? 'Flambée du pétrole : risque d\'inflation.' : eff > 0 ? 'Baisse marquée : moins de pression inflationniste (mais surveille la demande).' : 'Sans tendance forte.', eff, 0.5, 0.5, co.date);
+    }
+    return F;
+  }
+  function macroScore(F, w) {
+    let s = 0, t = 0;
+    F.forEach(f => { s += f.eff * f[w]; t += f[w]; });
+    const v = t ? s / t : 0;
+    return { v, dir: v >= 0.2 ? 'bull' : v <= -0.2 ? 'bear' : 'range' };
+  }
+  function macroBias() {
+    const F = macroFactors(); if (!F.length) return null;
+    const n = macroScore(F, 'wN'), s = macroScore(F, 'wS');
+    const avg = (n.v + s.v) / 2;
+    return { F, n, s, dir: avg >= 0.2 ? 'bull' : avg <= -0.2 ? 'bear' : '' };
+  }
+
+  // Intermarché du jour, lu en direct dans MT5 (si le broker propose ces symboles)
+  const INTER = [
+    { sym: 'DXY.cash', name: 'Dollar (DXY)', rule: p => p >= 0.25 ? [-1, 'Dollar en hausse : vent contraire pour les indices.'] : p <= -0.25 ? [1, 'Dollar en baisse : soutien.'] : [0, 'Stable.'] },
+    { sym: 'XAUUSD', name: 'Or', rule: p => p >= 1 ? [0, 'Or en forte hausse : recherche de refuge, surveille le risk-off.'] : p <= -1 ? [0, 'Or en baisse.'] : [0, 'Stable.'] },
+    { sym: 'USOIL.cash', name: 'Pétrole', rule: p => p >= 2 ? [-1, 'Pétrole en forte hausse : crainte d\'inflation.'] : p <= -2 ? [0, 'Pétrole en forte baisse.'] : [0, 'Stable.'] },
+    { sym: 'US30.cash', name: 'Dow Jones', rule: null }
+  ];
+  function interToday() {
+    const q = LIVE.data && LIVE.data.quotes; if (!q) return [];
+    const ch = x => x && x.bid && x.dopen ? (x.bid / x.dopen - 1) * 100 : NaN;
+    const rows = [];
+    INTER.forEach(it => {
+      const x = q[it.sym]; if (!x) return;
+      const p = ch(x);
+      if (it.sym === 'US30.cash') {
+        const nq = ch(q[S.instruments.US100.mt5]); const rel = nq - p;
+        rows.push({ name: 'Nasdaq contre Dow', val: sgn(rel, 2, ' pt'), eff: rel >= 0.3 ? 1 : rel <= -0.3 ? -1 : 0, read: rel >= 0.3 ? 'La tech mène : appétit pour le risque.' : rel <= -0.3 ? 'Rotation défensive : la tech sous-performe.' : 'Pas de rotation marquée.' });
+      } else if (isFinite(p)) {
+        const [eff, read] = it.rule(p);
+        rows.push({ name: it.name, val: sgn(p, 2, ' %'), eff, read });
+      }
+    });
+    return rows;
+  }
+
+  const effTag = e => e > 0 ? '<span class="tag bull">+</span>' : e < 0 ? '<span class="tag bear">−</span>' : '<span class="tag range">=</span>';
+  const DIRF = { bull: 'HAUSSIER', bear: 'BAISSIER', range: 'NEUTRE' };
+  function renderFondaBias() {
+    const card = $('#fondaBiasCard'); if (!card) return;
+    const hint = $('#fondaHint');
+    if (!LIVE.key) {
+      card.innerHTML = `<h2>Biais fondamental</h2><p class="muted" style="margin:0">Connecte MT5 (Réglages > Connexion MT5) pour activer l'analyse fondamentale : Fed, taux, dollar, VIX, crédit, inflation, emploi, pétrole.</p>`;
+      if (hint) hint.textContent = '';
+      return;
+    }
+    const B = macroBias();
+    if (!B) { card.innerHTML = `<h2>Biais fondamental</h2><p class="muted" style="margin:0">${MACRO.err ? 'Données indisponibles : ' + esc(MACRO.err) : 'Chargement des données macro…'}</p>`; return; }
+    const next = FOMC.find(x => x >= ymd(DAY.y, DAY.m, DAY.d));
+    const days = next ? Math.round((Date.parse(next) - Date.parse(ymd(DAY.y, DAY.m, DAY.d))) / 86400000) : null;
+    const fedF = B.F.find(f => f.key === 'fed');
+    const drivers = B.F.filter(f => f.eff !== 0).sort((a, b) => Math.abs(b.eff * b.wN) - Math.abs(a.eff * a.wN));
+    const neg = drivers.filter(f => f.eff < 0).map(f => f.name.toLowerCase()), pos = drivers.filter(f => f.eff > 0).map(f => f.name.toLowerCase());
+    const head = (k, sc) => `<div class="kpi"><small>${k}</small><b class="${sc.dir}">${DIRF[sc.dir]}</b><div class="meter"><i style="width:${Math.round(Math.abs(sc.v) * 100)}%;background:var(--${sc.dir === 'range' ? 'range' : sc.dir})"></i></div><small style="text-transform:none;letter-spacing:0">score ${sgn(sc.v * 100, 0)} %</small></div>`;
+    const inter = interToday();
+    const freshest = B.F.map(f => f.date).sort().pop();
+    card.innerHTML = `
+      <h2>Biais fondamental (macro)<span class="spacer"></span><button class="btn small" id="fondaApply">Utiliser comme sentiment du jour</button></h2>
+      <div class="res" style="margin-top:0">${head('US100', B.n)}${head('SP500', B.s)}
+        <div class="kpi" style="grid-column:1/-1;min-width:0"><small>Fed</small><div style="font-size:14px;line-height:1.45">${fedF ? esc(fedF.read) : ''}<br>Prochain FOMC : ${next ? `<b>${frDay(next)}</b> (dans ${days} j), décision à ${parisHM(zoned(TZN, ...next.split('-').map(Number), 14, 0))} Paris` : 'à confirmer'}</div></div>
+      </div>
+      <p style="margin:12px 0 0;font-size:14px">${neg.length ? `Vents contraires : <b style="color:var(--bear)">${esc(neg.join(', '))}</b>. ` : ''}${pos.length ? `Soutiens : <b style="color:var(--bull)">${esc(pos.join(', '))}</b>.` : ''}${!neg.length && !pos.length ? 'Aucun facteur ne se détache : contexte neutre.' : ''}</p>
+      <div class="tbl-wrap" style="margin-top:10px"><table style="min-width:680px"><thead><tr><th></th><th>Facteur</th><th>Niveau</th><th>Variation</th><th>Lecture</th><th>Date</th></tr></thead><tbody>
+        ${B.F.map(f => `<tr><td>${effTag(f.eff)}</td><td>${esc(f.name)}${f.wN > 1 ? ' <span class="muted" style="font-size:11px">(poids ×1,5 sur US100)</span>' : ''}</td><td class="mono" style="font-size:13px">${esc(f.value)}</td><td class="mono" style="font-size:13px">${esc(f.change)}</td><td style="font-size:13px">${esc(f.read)}</td><td class="mono muted" style="font-size:12px">${frDay(f.date)}</td></tr>`).join('')}
+      </tbody></table></div>
+      ${inter.length ? `<h3>Intermarché aujourd'hui (MT5, depuis l'ouverture du jour)</h3><table><tbody>${inter.map(r => `<tr><td style="width:34px">${effTag(r.eff)}</td><td>${esc(r.name)}</td><td class="mono">${esc(r.val)}</td><td style="font-size:13px">${esc(r.read)}</td></tr>`).join('')}</tbody></table>`
+        : `<p class="hint">Intermarché en direct : mets à jour le robot MT5 (version 1.02) pour suivre dollar, or, pétrole et Dow Jones depuis ton compte.</p>`}
+      <p class="hint">Sources : Réserve fédérale de Saint-Louis (FRED), données à J-1 pour les marchés et au dernier mois publié pour la macro (plus récente : ${frDay(freshest)}). Chaque facteur vaut +1, 0 ou −1 selon des seuils fixes ; le score est leur moyenne pondérée. C'est un biais de fond, sur plusieurs jours : il ne remplace pas la lecture de la structure du jour.</p>`;
+    if (hint) hint.innerHTML = B.dir ? `Macro : <b class="${B.dir}" style="color:var(--${B.dir})">${DIRF[B.dir].toLowerCase()}</b>` : 'Macro : neutre';
+  }
+  document.addEventListener('click', ev => {
+    if (ev.target.id !== 'fondaApply') return;
+    const B = macroBias(); if (!B) return;
+    D.fonda = B.dir; saveDay(); $('#fondaSent').value = D.fonda; renderVerdict(); renderChecklist();
+    ev.target.textContent = 'Appliqué ✓'; setTimeout(() => { ev.target.textContent = 'Utiliser comme sentiment du jour'; }, 2000);
   });
 
   /* =========================================================

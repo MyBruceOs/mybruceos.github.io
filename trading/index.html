@@ -76,6 +76,7 @@
             <option value="bull">Risk-on (favorable aux achats)</option>
             <option value="bear">Risk-off (favorable aux ventes)</option>
           </select>
+          <span id="fondaHint" style="font-size:12px"></span>
         </label>
       </div>
       <div id="biasMt5"></div>
@@ -145,6 +146,7 @@
 <!-- ================= FONDAMENTAUX ================= -->
 <section class="tab" id="tab-fonda" role="tabpanel">
   <div class="grid">
+    <div class="card c12" id="fondaBiasCard"></div>
     <div class="card c12">
       <h2>Moteurs du jour</h2>
       <div class="grid" style="gap:10px">
@@ -167,11 +169,7 @@
       <h3>Jours fériés et séances courtes NYSE</h3>
       <div id="holList" class="muted" style="font-size:14px"></div>
     </div>
-    <div class="card c7">
-      <h2>Actualités marché</h2>
-      <div class="tv" id="tvNews" style="height:560px"></div>
-    </div>
-    <div class="card c5">
+    <div class="card c12">
       <h2>Règles fondamentales</h2>
       <ul style="margin:0;padding-left:18px;font-size:14px" class="stack">
         <li>Pas d'entrée dans les <b class="newsBuf">15</b> minutes avant et après une news rouge (CPI, NFP, FOMC, PCE, ISM).</li>
