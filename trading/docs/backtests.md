@@ -1,6 +1,6 @@
 # Backtests Desk US — US100 et SP500 (session US, entrées M1)
 
-*Mis à jour le 26 novembre 2026.*
+*Mis à jour le 26 novembre 2026 (avec le test de tendance H1).*
 
 Données : vraies bougies M1 de FTMO (US100.cash et US500.cash), exportées par le robot MT5 `DeskUS_Bridge` 1.04. La période va du **22 décembre 2025 au 25 novembre 2026**, soit 241 jours de bourse.
 
@@ -116,6 +116,44 @@ Robustesse :
 | **Total** | **58** | **47 %** | **+30 790 $** | **31** | **55 %** | **+24 440 $** | **76 (32 %)** |
 
 Résultat combiné : **+55 230 $ à 3R** (contre +41 080 $) et **+41 800 $ à 2R** (contre +27 650 $). Le SP500 passe de 5 à 10 mois positifs sur 12.
+
+## 4 bis. Tendance H1 au lieu du H4, ou les deux ensemble
+
+La tendance H1 est calculée de la même façon que la H4 (sommets/creux, EMA20/50), sur les bougies H1 terminées avant 9:25 NY. Les résultats ci-dessous incluent les nouveaux filtres (cassure nette pour US100, Judas après 9:50 pour SP500), avec un risque de 1 000 $.
+
+### US100
+
+| Filtre de tendance | Trades | % jours | Win rate 2R | Win rate 3R | 2R | 3R | Pire baisse |
+|---|---|---|---|---|---|---|---|
+| **H4 (actuel)** | **58** | **24 %** | **52 %** | **47 %** | **+24 160 $** | **+30 790 $** | −4 000 $ |
+| H1 seul | 65 | 27 % | 46 % | 45 % | +16 820 $ | +29 720 $ | −6 000 $ |
+| H1 et H4 d'accord | 40 | 17 % | 55 % | 53 % | +20 510 $ | +29 140 $ | −3 000 $ |
+| Daily + H1 + H4 | 21 | 9 % | 43 % | 38 % | +3 200 $ | +4 790 $ | −3 000 $ |
+
+### SP500
+
+| Filtre de tendance | Trades | % jours | Win rate 2R | Win rate 3R | 2R | 3R | Pire baisse |
+|---|---|---|---|---|---|---|---|
+| **H4 + Daily (actuel)** | **31** | **13 %** | **55 %** | **55 %** | **+17 640 $** | **+24 440 $** | **−3 000 $** |
+| H4 seul | 60 | 25 % | 45 % | 43 % | +18 060 $ | +27 740 $ | −7 000 $ |
+| H1 seul | 61 | 25 % | 39 % | 36 % | +10 140 $ | +13 130 $ | −15 770 $ |
+| H1 et H4 d'accord | 40 | 17 % | 40 % | 38 % | +7 130 $ | +12 300 $ | −10 000 $ |
+| Daily + H1 | 23 | 10 % | 48 % | 48 % | +9 130 $ | +13 490 $ | −4 000 $ |
+| Daily + H1 + H4 | 21 | 9 % | 48 % | 48 % | +8 130 $ | +12 440 $ | −3 000 $ |
+
+Conclusions :
+- **Le H1 seul ne remplace pas le H4.** Sur US100, il donne un peu plus de trades, mais moins de gains à 2R et une pire baisse plus grande. Sur SP500, il est nettement moins bon et perd sur la seconde moitié de l'année.
+- **US100 avec H1 et H4 d'accord** : c'est la variante au meilleur win rate (53 % à 3R, 55 % à 2R) et à la plus petite baisse (−3 000 $), pour le même résultat à 3R. En revanche, elle donne 31 % de trades en moins. C'est la même chose sans le filtre de cassure (42 trades, 50 %).
+- **SP500 avec H4 seul**, une fois le filtre « Judas après 9:50 » appliqué, devient rentable sur les deux moitiés de l'année : 2 fois plus de trades et un peu plus de gains, mais un win rate de 43 % et une pire baisse de −7 000 $. Sans ce filtre, le H4 seul restait faible sur SP500.
+
+### Combinaisons des deux indices (3R)
+
+| Combinaison | Trades | Jours avec un trade | Win rate 3R | 2R | 3R | Pire baisse |
+|---|---|---|---|---|---|---|
+| **A. US100 H4 + SP500 H4+Daily (actuel)** | 89 | 76 (32 %) | 49 % | +41 800 $ | +55 230 $ | −5 320 $ |
+| B. US100 H4 + SP500 H4 | 118 | 87 (36 %) | 45 % | +42 220 $ | +58 530 $ | −7 320 $ |
+| C. US100 H1+H4 + SP500 H4+Daily | 71 | 61 (25 %) | 54 % | +38 150 $ | +53 580 $ | −5 000 $ |
+| D. US100 H1+H4 + SP500 H4 | 100 | 78 (32 %) | 47 % | +38 570 $ | +56 880 $ | −7 000 $ |
 
 ## 5. Idées testées et rejetées
 
