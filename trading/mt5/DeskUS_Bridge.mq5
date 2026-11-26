@@ -5,7 +5,7 @@
 //|  Le robot ne passe AUCUN ordre : il lit et il envoie, c'est tout.|
 //+------------------------------------------------------------------+
 #property copyright   "Desk US"
-#property version     "1.03"
+#property version     "1.04"
 #property description "Pont MT5 -> Desk US. Lecture seule : aucun ordre n'est passé."
 
 //--- paramètres (onglet « Entrées »)
@@ -16,8 +16,13 @@ input int    InpSeconds  = 3;                        // Envoi toutes les N secon
 input int    InpDays     = 60;                       // Trades clôturés envoyés (jours d'historique)
 input string InpUrl      = "https://xakrdapoxthvvqpyjuji.supabase.co/rest/v1/rpc/desk_push"; // Adresse du service
 input string InpApiKey   = "sb_publishable_Hzn2bTrae-TflG_HCzLVWg_QYF4l0ec";                 // Clé publique du service
+input bool   InpHistExport  = true;   // Exporter l'historique (une seule fois) pour les backtests
+input int    InpHistDaysM1  = 365;    // Profondeur de l'export M1 (jours)
+input int    InpHistDaysM5  = 1095;   // Profondeur de l'export M5 (jours)
+input bool   InpHistRestart = false;  // Recommencer l'export depuis le début
+input string InpHistUrl     = "https://xakrdapoxthvvqpyjuji.supabase.co/rest/v1/rpc/desk_hist_push"; // Adresse de l'export
 
-#define EA_VERSION "1.03"
+#define EA_VERSION "1.04"
 
 string   g_syms[];
 string   g_qsyms[];   // symboles suivis + intermarché (cotations seulement)
@@ -26,6 +31,10 @@ datetime g_lastBars    = 0;     // dernier envoi des bougies (heure locale PC)
 datetime g_lastTrades  = 0;     // dernier envoi des trades clôturés
 datetime g_lastInit    = 0;     // dernier calcul du capital initial
 datetime g_lastSend    = 0;
+bool     g_histDone    = false;
+int      g_histSent    = 0;
+int      g_histFail    = 0;
+string   g_histStatus  = "";
 double   g_initBalance = 0;
 int      g_okCount     = 0;
 string   g_lastError   = "";
@@ -384,7 +393,9 @@ string TradesJson()
 //+------------------------------------------------------------------+
 //| Envoi HTTP                                                       |
 //+------------------------------------------------------------------+
-int Post(string body, string &resp)
+int Post(string body, string &resp) { return PostTo(InpUrl, body, resp, 5000); }
+
+int PostTo(string url, string body, string &resp, int timeout)
   {
    char data[];
    char result[];
@@ -393,7 +404,7 @@ int Post(string body, string &resp)
    if(len > 0) ArrayResize(data, len - 1);   // retire le zéro final
    string headers = "Content-Type: application/json\r\napikey: " + InpApiKey + "\r\n";
    ResetLastError();
-   int code = WebRequest("POST", InpUrl, headers, 5000, data, result, rh);
+   int code = WebRequest("POST", url, headers, timeout, data, result, rh);
    if(code == -1)
      {
       int err = GetLastError();
@@ -445,10 +456,110 @@ void Send(bool force)
       else g_lastError = "Réponse " + IntegerToString(code) + " : " + StringSubstr(resp, 0, 200);
       Print("Desk US : ", g_lastError);
      }
+   ShowStatus();
+  }
+
+void ShowStatus()
+  {
    string st = (g_lastError == "")
-               ? "Desk US · connecté · " + IntegerToString(g_okCount) + " envois · dernier à " + TimeToString(now, TIME_SECONDS)
+               ? "Desk US · connecté · " + IntegerToString(g_okCount) + " envois · dernier à " + TimeToString(g_lastSend, TIME_SECONDS)
                : "Desk US · ERREUR : " + g_lastError;
+   if(g_histStatus != "") st += "\n" + g_histStatus;
    Comment(st);
+  }
+
+//+------------------------------------------------------------------+
+//| Export d'historique : un paquet par cycle, reprend où il s'était |
+//| arrêté (variables globales du terminal), du plus récent au plus  |
+//| ancien. M1 par jour, M5 par semaine.                             |
+//+------------------------------------------------------------------+
+string HistGV(string sym, string tfn) { return "DeskUS_H_" + sym + "_" + tfn; }
+
+string RatesArray(MqlRates &r[], int got, int dg)
+  {
+   string a = "[";
+   for(int i = 0; i < got; i++)
+     {
+      if(i > 0) a += ",";
+      a += "[" + I(ToUtc(r[i].time)) + "," + N(r[i].open, dg) + "," + N(r[i].high, dg) + "," + N(r[i].low, dg) + "," + N(r[i].close, dg) + "]";
+     }
+   return a + "]";
+  }
+
+void HistStep()
+  {
+   if(!InpHistExport || g_histDone) return;
+   for(int k = 0; k < ArraySize(g_syms); k++)
+     {
+      for(int j = 0; j < 2; j++)
+        {
+         ENUM_TIMEFRAMES tf = (j == 0) ? PERIOD_M1 : PERIOD_M5;
+         string tfn = (j == 0) ? "M1" : "M5";
+         int days = (j == 0) ? InpHistDaysM1 : InpHistDaysM5;
+         long span = (j == 0) ? 86400 : 7 * 86400;
+         string gv = HistGV(g_syms[k], tfn);
+         long limit = (long)TimeTradeServer() - (long)days * 86400;
+         long cursor;
+         if(GlobalVariableCheck(gv)) cursor = (long)GlobalVariableGet(gv);
+         else
+           {
+            MqlDateTime t;
+            TimeToStruct(TimeTradeServer(), t);
+            t.hour = 0; t.min = 0; t.sec = 0;
+            cursor = (long)StructToTime(t) + 86400;   // début de demain, heure serveur
+           }
+         if(cursor <= limit) continue;                 // cette série est terminée
+         // saute les périodes vides (week-ends, jours fériés) sans attendre
+         for(int tries = 0; tries < 10 && cursor > limit; tries++)
+           {
+            long from = cursor - span;
+            MqlRates r[];
+            ArraySetAsSeries(r, false);
+            ResetLastError();
+            int got = CopyRates(g_syms[k], tf, (datetime)from, (datetime)(cursor - 1), r);
+            if(got < 0)
+              {
+               // historique pas encore chargé par le terminal : on réessaie au prochain cycle
+               g_histFail++;
+               if(g_histFail > 40)
+                 {
+                  Print("Desk US : historique ", g_syms[k], " ", tfn, " indisponible avant ", TimeToString((datetime)cursor), ", export arrêté pour cette série.");
+                  GlobalVariableSet(gv, (double)limit);
+                  g_histFail = 0;
+                 }
+               g_histStatus = "Historique : chargement " + g_syms[k] + " " + tfn + " par MT5…";
+               return;
+              }
+            if(got == 0)
+              {
+               cursor = from;
+               GlobalVariableSet(gv, (double)cursor);
+               continue;
+              }
+            g_histFail = 0;
+            int dg = (int)SymbolInfoInteger(g_syms[k], SYMBOL_DIGITS);
+            string body = "{\"p_key\":" + Q(InpKey) + ",\"p_sym\":" + Q(g_syms[k]) + ",\"p_tf\":" + Q(tfn) + ",\"p_bars\":" + RatesArray(r, got, dg) + "}";
+            string resp;
+            int code = PostTo(InpHistUrl, body, resp, 20000);
+            if(code >= 200 && code < 300)
+              {
+               GlobalVariableSet(gv, (double)from);
+               g_histSent++;
+               g_histStatus = "Historique : " + IntegerToString(g_histSent) + " paquets envoyés · " + g_syms[k] + " " + tfn + " jusqu'au " + TimeToString((datetime)from, TIME_DATE);
+              }
+            else
+              {
+               g_histStatus = "Historique : erreur " + IntegerToString(code) + " (" + StringSubstr(resp, 0, 120) + "), nouvel essai au prochain cycle";
+               Print("Desk US : ", g_histStatus);
+              }
+            return;   // un seul paquet par cycle pour ne pas ralentir le direct
+           }
+         return;
+        }
+     }
+   g_histDone = true;
+   g_histStatus = "Historique : export terminé (" + IntegerToString(g_histSent) + " paquets cette session)";
+   Print("Desk US : ", g_histStatus);
   }
 
 //+------------------------------------------------------------------+
@@ -494,6 +605,14 @@ int OnInit()
       ArrayResize(g_qsyms, k + 1);
       g_qsyms[k] = s;
      }
+   if(InpHistRestart)
+     {
+      for(int k = 0; k < ArraySize(g_syms); k++)
+        {
+         GlobalVariableDel(HistGV(g_syms[k], "M1"));
+         GlobalVariableDel(HistGV(g_syms[k], "M5"));
+        }
+     }
    EventSetTimer(MathMax(1, InpSeconds));
    Send(true);
    return INIT_SUCCEEDED;
@@ -508,6 +627,8 @@ void OnDeinit(const int reason)
 void OnTimer()
   {
    Send(false);
+   HistStep();
+   ShowStatus();
   }
 
 void OnTick()

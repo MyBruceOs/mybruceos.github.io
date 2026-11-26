@@ -1296,7 +1296,27 @@
         <li>Valide avec OK. Pas besoin de cocher « Autoriser le trading algorithmique » : le robot ne passe aucun ordre. En haut à gauche du graphique, il affiche « Desk US · connecté ». Ici, la pastille passe à « MT5 en direct ».</li>
       </ol>
       <p class="hint">Le robot ne passe aucun ordre : il lit les prix, le compte et l'historique, puis les envoie toutes les 3 secondes. Garde MT5 ouvert pendant ta séance.</p>
+      <h3>Export d'historique pour les backtests (robot 1.04)</h3>
+      <p class="hint" style="margin-top:0">Le robot envoie une seule fois 1 an de bougies M1 et 3 ans de M5, en arrière-plan (environ 30 à 60 minutes, MT5 ouvert). Avant de le lancer : <b>Outils → Options → Graphiques → « Barres max. dans le graphique » = Illimité</b>, sinon MT5 limite l'historique à environ 100 000 bougies.</p>
+      <div id="histBox" class="muted" style="font-size:14px">Chargement de l'état de l'export…</div>
       <div class="row" style="margin-top:10px"><button class="btn small danger" id="mt5Forget">Oublier la clé sur cet appareil</button></div>`;
+    loadHistStatus();
+  }
+  let histAt = 0, histCache = null;
+  async function loadHistStatus() {
+    const box = $('#histBox'); if (!box || !LIVE.key) return;
+    if (histCache && Date.now() - histAt < 20000) { box.innerHTML = histHtml(histCache); return; }
+    try { histCache = await rpc('desk_hist_status', { p_key: LIVE.key }); histAt = Date.now(); }
+    catch (e) { box.textContent = 'État indisponible : ' + e.message; return; }
+    const b = $('#histBox'); if (b) b.innerHTML = histHtml(histCache);
+  }
+  function histHtml(rows) {
+    if (!rows || !rows.length) return 'Aucun historique reçu pour l\'instant. Installe le robot 1.04 : l\'export démarre tout seul.';
+    const d = t => new Date(t * 1000).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+    const days = r => Math.round((r.to - r.from) / 86400);
+    return '<table><thead><tr><th>Symbole</th><th>UT</th><th>Du</th><th>Au</th><th>Jours</th><th>Bougies</th></tr></thead><tbody>' +
+      rows.map(r => `<tr><td>${esc(r.sym)}</td><td class="mono">${esc(r.tf)}</td><td class="mono">${d(r.from)}</td><td class="mono">${d(r.to)}</td><td class="mono">${days(r)}</td><td class="mono">${Number(r.bars).toLocaleString('fr-FR')}</td></tr>`).join('') +
+      '</tbody></table><p class="hint">Dernier paquet reçu il y a ' + dur(Date.now() - Math.max(...rows.map(r => r.last)) * 1000) + '. L\'export continue tant que la date « Du » recule.</p>';
   }
   $('#mt5Box').addEventListener('click', async ev => {
     const id = ev.target.id;
