@@ -5,7 +5,7 @@
 //|  Le robot ne passe AUCUN ordre : il lit et il envoie, c'est tout.|
 //+------------------------------------------------------------------+
 #property copyright   "Desk US"
-#property version     "1.00"
+#property version     "1.01"
 #property description "Pont MT5 -> Desk US. Lecture seule : aucun ordre n'est passé."
 
 //--- paramètres (onglet « Entrées »)
@@ -16,7 +16,7 @@ input int    InpDays     = 60;                       // Trades clôturés envoy�
 input string InpUrl      = "https://xakrdapoxthvvqpyjuji.supabase.co/rest/v1/rpc/desk_push"; // Adresse du service
 input string InpApiKey   = "sb_publishable_Hzn2bTrae-TflG_HCzLVWg_QYF4l0ec";                 // Clé publique du service
 
-#define EA_VERSION "1.00"
+#define EA_VERSION "1.01"
 
 string   g_syms[];
 long     g_srvOff      = 0;     // décalage heure serveur - UTC (secondes)
@@ -135,7 +135,7 @@ string AccountJson()
    s += ",\"lev\":" + I(AccountInfoInteger(ACCOUNT_LEVERAGE));
    s += ",\"init\":" + N(g_initBalance, 2);
    s += ",\"day_pl\":" + N(dayPl, 2);
-   s += ",\"day_start\":" + N(bal - dayPl - dayBal, 2);
+   s += ",\"day_start\":" + N(bal - dayPl, 2);
    s += ",\"mid\":" + I(ToUtc(mid));
    s += ",\"t\":" + I((long)TimeGMT());
    s += ",\"srv_off\":" + I(g_srvOff);
@@ -196,6 +196,10 @@ string PositionsJson()
       string sym = PositionGetString(POSITION_SYMBOL);
       int dg = (int)SymbolInfoInteger(sym, SYMBOL_DIGITS);
       long type = PositionGetInteger(POSITION_TYPE);
+      long pid  = PositionGetInteger(POSITION_IDENTIFIER);
+      double psl = PositionGetDouble(POSITION_SL), ptp = PositionGetDouble(POSITION_TP);
+      if(psl > 0 && !GlobalVariableCheck("DeskUS_SL_" + I(pid))) GlobalVariableSet("DeskUS_SL_" + I(pid), psl);
+      if(ptp > 0 && !GlobalVariableCheck("DeskUS_TP_" + I(pid))) GlobalVariableSet("DeskUS_TP_" + I(pid), ptp);
       if(n++ > 0) s += ",";
       s += "{\"id\":" + I(PositionGetInteger(POSITION_IDENTIFIER));
       s += ",\"sym\":" + Q(sym);
@@ -217,24 +221,32 @@ string PositionsJson()
 //+------------------------------------------------------------------+
 //| Bougies M15 (2 à 3 jours) pour calculer Asie, Londres, opens     |
 //+------------------------------------------------------------------+
+string RatesJson(string sym, ENUM_TIMEFRAMES tf, int count)
+  {
+   int dg = (int)SymbolInfoInteger(sym, SYMBOL_DIGITS);
+   MqlRates r[];
+   ArraySetAsSeries(r, false);
+   int got = CopyRates(sym, tf, 0, count, r);
+   string s = "[";
+   for(int i = 0; i < got; i++)
+     {
+      if(i > 0) s += ",";
+      s += "[" + I(ToUtc(r[i].time)) + "," + N(r[i].open, dg) + "," + N(r[i].high, dg) + "," + N(r[i].low, dg) + "," + N(r[i].close, dg) + "]";
+     }
+   return s + "]";
+  }
+
+// M15 (3 jours) pour les niveaux du jour, H1 (10 jours) et D1 (6 mois) pour la tendance
 string BarsJson()
   {
    string s = "{";
    for(int k = 0; k < ArraySize(g_syms); k++)
      {
       string sym = g_syms[k];
-      int dg = (int)SymbolInfoInteger(sym, SYMBOL_DIGITS);
-      MqlRates r[];
-      ArraySetAsSeries(r, false);
-      int got = CopyRates(sym, PERIOD_M15, 0, 288, r);
       if(k > 0) s += ",";
-      s += Q(sym) + ":[";
-      for(int i = 0; i < got; i++)
-        {
-         if(i > 0) s += ",";
-         s += "[" + I(ToUtc(r[i].time)) + "," + N(r[i].open, dg) + "," + N(r[i].high, dg) + "," + N(r[i].low, dg) + "," + N(r[i].close, dg) + "]";
-        }
-      s += "]";
+      s += Q(sym) + ":" + RatesJson(sym, PERIOD_M15, 288);
+      s += "," + Q(sym + "@H1") + ":" + RatesJson(sym, PERIOD_H1, 240);
+      s += "," + Q(sym + "@D1") + ":" + RatesJson(sym, PERIOD_D1, 120);
      }
    s += "}";
    return s;
@@ -342,6 +354,8 @@ string TradesJson()
       if(IsOpenPosition(a[j].id)) continue;
       int dg = (int)SymbolInfoInteger(a[j].sym, SYMBOL_DIGITS);
       if(dg <= 0) dg = 2;
+      if(a[j].sl == 0 && GlobalVariableCheck("DeskUS_SL_" + I(a[j].id))) a[j].sl = GlobalVariableGet("DeskUS_SL_" + I(a[j].id));
+      if(a[j].tp == 0 && GlobalVariableCheck("DeskUS_TP_" + I(a[j].id))) a[j].tp = GlobalVariableGet("DeskUS_TP_" + I(a[j].id));
       if(n++ > 0) s += ",";
       s += "{\"id\":" + I(a[j].id);
       s += ",\"sym\":" + Q(a[j].sym);
@@ -441,7 +455,7 @@ int OnInit()
   {
    if(StringLen(InpKey) < 32)
      {
-      Alert("Desk US : colle ta clé dans l'onglet « Entrées » du robot (Réglages > Connexion MT5 dans l'application).");
+      Alert("Desk US : colle ta clé (elle commence par dk_) dans l'onglet « Données d'entrée » du robot. Elle se copie dans l'application : Réglages > Connexion MT5.");
       return INIT_PARAMETERS_INCORRECT;
      }
    string parts[];

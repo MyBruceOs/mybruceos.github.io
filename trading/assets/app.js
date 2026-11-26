@@ -231,7 +231,8 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const num = v => { if (v === '' || v == null) return NaN; return parseFloat(String(v).replace(',', '.')); };
   const fmtP = v => isFinite(v) ? (Math.round(v * 100) / 100).toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) : '—';
-  const fmtE = v => isFinite(v) ? v.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }) : '—';
+  let CUR = store.get('td.cur', 'EUR');
+  const fmtE = v => { if (!isFinite(v)) return '—'; try { return v.toLocaleString('fr-FR', { style: 'currency', currency: CUR, maximumFractionDigits: 2 }); } catch (e) { return v.toLocaleString('fr-FR', { maximumFractionDigits: 2 }) + ' ' + CUR; } };
   const fmtR = v => isFinite(v) ? (v > 0 ? '+' : '') + v.toFixed(2).replace('.', ',') + ' R' : '—';
   const pct = v => (v * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' %';
   const dur = ms => {
@@ -277,6 +278,8 @@
     el.appendChild(wrap);
   }
   const TV_BASE = { colorTheme: 'dark', isTransparent: true, locale: 'fr' };
+  // Les widgets « jauge » et « bandeau » n'acceptent que certains flux : FOREXCOM est autorisé
+  const TV_WIDGET_SYM = { US100: 'FOREXCOM:NSXUSD', SP500: 'FOREXCOM:SPXUSD' };
   const chartInterval = { US100: '15', SP500: '15' };
   const INTERVALS = [['1', 'M1'], ['5', 'M5'], ['15', 'M15'], ['60', 'H1'], ['240', 'H4'], ['D', 'D1']];
   function mountChart(k) {
@@ -290,8 +293,8 @@
   function mountGraph() {
     tv('tvTape', 'ticker-tape', Object.assign({}, TV_BASE, {
       symbols: [
-        { proName: S.instruments.US100.symbol, title: 'US100' },
-        { proName: S.instruments.SP500.symbol, title: 'SP500' },
+        { proName: TV_WIDGET_SYM.US100, title: 'US100' },
+        { proName: TV_WIDGET_SYM.SP500, title: 'SP500' },
         { proName: 'TVC:VIX', title: 'VIX' },
         { proName: 'TVC:DXY', title: 'Dollar (DXY)' },
         { proName: 'TVC:US10Y', title: 'Taux US 10 ans' },
@@ -310,15 +313,16 @@
       };
       mountChart(k);
       tv('tvTa' + k, 'technical-analysis', Object.assign({}, TV_BASE, {
-        interval: '1h', width: '100%', height: '100%', symbol: S.instruments[k].symbol, showIntervalTabs: true, displayMode: 'multiple'
+        interval: '1h', width: '100%', height: '100%', symbol: TV_WIDGET_SYM[k], showIntervalTabs: true, displayMode: 'multiple'
       }));
     }
   }
   function mountFonda() {
-    const mini = (id, symbol) => tv(id, 'mini-symbol-overview', Object.assign({}, TV_BASE, {
-      symbol, width: '100%', height: '100%', dateRange: '1M', chartOnly: false, noTimeScale: false, trendLineColor: 'rgba(228,162,74,1)',
-      underLineColor: 'rgba(228,162,74,0.15)', underLineBottomColor: 'rgba(228,162,74,0)'
-    }));
+    const mini = (id, symbol) => tv(id, 'advanced-chart', {
+      autosize: true, symbol, interval: '60', timezone: 'Europe/Paris', theme: 'dark', style: '3', locale: 'fr',
+      hide_top_toolbar: true, hide_side_toolbar: true, allow_symbol_change: false, save_image: false, calendar: false,
+      hide_volume: true, support_host: 'https://www.tradingview.com', backgroundColor: 'rgba(16,18,22,1)', gridColor: 'rgba(244,243,239,0.05)'
+    });
     mini('tvMiniVIX', 'TVC:VIX'); mini('tvMiniDXY', 'TVC:DXY'); mini('tvMiniUS10Y', 'TVC:US10Y');
     tv('tvCalendar', 'events', Object.assign({}, TV_BASE, { width: '100%', height: '100%', importanceFilter: '0,1', countryFilter: 'us' }));
     tv('tvNews', 'timeline', Object.assign({}, TV_BASE, { feedMode: 'market', market: 'index', displayMode: 'regular', width: '100%', height: '100%' }));
@@ -665,7 +669,7 @@
     $('#sessionStats').innerHTML = `
       <div class="kpi"><small>Trades aujourd'hui</small><b>${s.count} / ${S.maxTrades}</b></div>
       <div class="kpi"><small>Résultat du jour</small><b class="${s.r > 0 ? 'bull' : s.r < 0 ? 'bear' : ''}">${fmtR(s.r)}</b></div>
-      <div class="kpi"><small>En euros</small><b class="${s.eur > 0 ? 'bull' : s.eur < 0 ? 'bear' : ''}">${fmtE(s.eur)}</b></div>
+      <div class="kpi"><small>Montant</small><b class="${s.eur > 0 ? 'bull' : s.eur < 0 ? 'bear' : ''}">${fmtE(s.eur)}</b></div>
       <div class="kpi"><small>Risque par trade</small><b>${fmtE(riskE)}</b></div>`;
   }
   const PHASE_OPTS = PHASES.filter(p => !p.marker).map(p => [p.id, p.name]).concat([['other', 'Autre']]);
@@ -786,7 +790,7 @@
       const r = num(t.r);
       return `<tr><td class="mono">${esc(t.date)}${t.src === 'mt5' ? ' <span class="tag mt5">MT5</span>' : ''}</td><td class="mono">${esc(t.time)}</td><td>${esc(t.instr)}</td><td>${t.dir === 'buy' ? '<span class="tag bull">Achat</span>' : '<span class="tag bear">Vente</span>'}</td>
         <td>${esc(phaseName(t.phase))}</td><td class="mono">${esc(fibName(t.fib))}</td><td class="mono">${esc(t.entry)}</td><td class="mono">${esc(t.sl)}</td><td class="mono">${esc(t.tp)}</td>
-        <td>${OUT[t.outcome] || esc(t.outcome)}</td><td class="${r > 0 ? 'r-pos' : r < 0 ? 'r-neg' : 'r-zero'}">${t.outcome === 'OPEN' ? '—' : fmtR(r)}</td><td>${t.rule === '1' ? 'Oui' : '<span style="color:var(--bear)">Non</span>'}</td>
+        <td>${OUT[t.outcome] || esc(t.outcome)}</td><td class="${r > 0 ? 'r-pos' : r < 0 ? 'r-neg' : 'r-zero'}" ${t.noSl ? 'title="Pas de stop connu : R estimé sur ton risque par trade"' : ''}>${t.outcome === 'OPEN' ? '—' : (t.noSl ? '≈ ' : '') + fmtR(r)}</td><td>${t.rule === '1' ? 'Oui' : '<span style="color:var(--bear)">Non</span>'}</td>
         <td style="white-space:nowrap"><button class="btn small" data-edit="${t.id}">Modifier</button> <button class="btn small danger" data-rm="${t.id}">✕</button></td></tr>`;
     }).join('') : '<tr><td colspan="13" class="muted">Aucun trade enregistré.</td></tr>';
   }
@@ -1096,7 +1100,7 @@
       else if (Math.abs((t.px - t.pi) * t.dir) <= tol * 2) outcome = 'BE';
     }
     return {
-      id: 'mt5:' + t.id, src: 'mt5', posId: t.id, hidden: !!a.hidden,
+      id: 'mt5:' + t.id, src: 'mt5', posId: t.id, hidden: !!a.hidden, noSl: !(t.sl > 0),
       date: parisYmd(open), time: parisHM(open), instr: k || t.sym, dir: t.dir > 0 ? 'buy' : 'sell',
       phase: a.phase || phaseAt(open), fib: a.fib != null ? a.fib : '', entry: t.pi, sl: t.sl || '', tp: t.tp || '',
       exit: t.px, lots: t.vol, outcome, r: r.toFixed(2), rule: a.rule != null ? a.rule : '1', notes: a.notes || '', net: t.net
@@ -1133,19 +1137,22 @@
       const wantTrades = force || LIVE.n % 10 === 0;
       const d = await rpc('desk_read', { p_key: LIVE.key, p_trades: wantTrades, p_bars_after: LIVE.barsAt });
       LIVE.readAt = Date.now(); LIVE.err = '';
-      if (d.bars) { LIVE.bars = d.bars; LIVE.barsAt = d.bars_updated_at; delete d.bars; }
+      let barsChanged = false;
+      if (d.bars) { LIVE.bars = d.bars; LIVE.barsAt = d.bars_updated_at; delete d.bars; barsChanged = true; }
       let tradesChanged = false;
       if (d.trades) { LIVE.trades = d.trades; delete d.trades; tradesChanged = true; }
       LIVE.data = d;
+      if (d.account && d.account.cur && d.account.cur !== CUR) { CUR = d.account.cur; store.set('td.cur', CUR); renderSessionStats(); if ($('#tab-journal').classList.contains('active')) renderJournal(); }
       if (tradesChanged && await linkPlannedTrades()) tradesChanged = true;
       onLive(tradesChanged);
+      if (barsChanged) renderTrends();
     } catch (e) {
       LIVE.err = /unknown key/.test(e.message) ? 'Clé inconnue : reconnecte MT5 dans Réglages.' : 'Service injoignable (' + e.message + ').';
       renderLiveStatus();
     } finally { LIVE.n++; LIVE.busy = false; }
   }
   function startLive() {
-    renderMt5Settings(); renderFtmo(); renderLiveStatus();
+    renderMt5Settings(); renderFtmo(); renderLiveStatus(); renderTrends();
     if (LIVE.key) poll(true);
     setInterval(() => poll(false), 3000);
   }
@@ -1178,7 +1185,7 @@
     const a = account(); if (!a) return null;
     const init = ftmoInit();
     const dailyLimit = init * S.ftmo.daily / 100;
-    const dayStart = a.day_start || a.bal;
+    const dayStart = isFinite(a.day_pl) ? a.bal - a.day_pl : (a.day_start || a.bal);
     const dayLoss = Math.max(0, dayStart - a.eq);
     const dayLeft = dailyLimit - dayLoss;
     const floor = init * (1 - S.ftmo.max / 100);
@@ -1282,8 +1289,8 @@
         <li>Dans MT5 : <b>Fichier → Ouvrir le dossier des données</b>, puis <b>MQL5 → Experts</b>. Copie le fichier dedans.</li>
         <li>Ouvre-le avec <b>MetaEditor</b> (clic droit → Modifier) et clique <b>Compiler</b> (F7). Il doit afficher « 0 errors ».</li>
         <li><b>Outils → Options → Expert Advisors</b> : coche <b>« Autoriser WebRequest pour les URL listées »</b> et ajoute <code class="mono">${SB_URL}</code>.</li>
-        <li>Dans le Navigateur, onglet Experts, glisse <b>DeskUS_Bridge</b> sur un graphique US100.cash. Onglet <b>Entrées</b> : colle ta clé dans « Clé Desk US ». Vérifie les symboles (US100.cash,US500.cash). Valide.</li>
-        <li>Active le bouton <b>Algo Trading</b>. En haut à gauche du graphique, le robot affiche « Desk US · connecté ». Ici, la pastille passe à « MT5 en direct ».</li>
+        <li>Dans le Navigateur, onglet Experts, glisse <b>DeskUS_Bridge</b> sur un graphique US100.cash. Onglet <b>Données d'entrée</b> : double-clique la valeur de « Clé Desk US » et colle ta clé. Vérifie les symboles (US100.cash,US500.cash). Valide.</li>
+        <li>Valide avec OK. Pas besoin de cocher « Autoriser le trading algorithmique » : le robot ne passe aucun ordre. En haut à gauche du graphique, il affiche « Desk US · connecté ». Ici, la pastille passe à « MT5 en direct ».</li>
       </ol>
       <p class="hint">Le robot ne passe aucun ordre : il lit les prix, le compte et l'historique, puis les envoie toutes les 3 secondes. Garde MT5 ouvert pendant ta séance.</p>
       <div class="row" style="margin-top:10px"><button class="btn small danger" id="mt5Forget">Oublier la clé sur cet appareil</button></div>`;
@@ -1318,7 +1325,7 @@
     }
     if (id === 'mt5Forget' && confirm('Oublier la clé sur cet appareil ? Note-la avant si tu ne l\'as pas ailleurs (le robot MT5 continue de fonctionner).')) {
       store.del('td.mt5key'); LIVE.key = ''; LIVE.data = null; LIVE.trades = []; LIVE.bars = null; LIVE.barsAt = null; LIVE.err = '';
-      renderMt5Settings(); renderFtmo(); renderLiveStatus(); renderLevels(); renderJournal(); renderSessionStats();
+      renderMt5Settings(); renderFtmo(); renderLiveStatus(); renderLevels(); renderJournal(); renderSessionStats(); renderTrends();
     }
   });
 
@@ -1337,6 +1344,107 @@
   });
   $('#sRiskBase').addEventListener('change', e => { S.riskBase = e.target.value; saveSettings(); renderFtmo(); renderSessionStats(); renderPlan(); });
   renderFtmoSettings();
+
+  /* =========================================================
+     Tendance calculée sur les bougies MT5 (structure + EMA)
+     ========================================================= */
+  function emaArr(vals, n) {
+    const k = 2 / (n + 1); let e = vals[0];
+    return vals.map((v, i) => (i ? (e = v * k + e * (1 - k)) : e));
+  }
+  function pivots(bars, w) {
+    const hs = [], ls = [];
+    for (let i = w; i < bars.length - w; i++) {
+      let isH = true, isL = true;
+      for (let j = 1; j <= w; j++) {
+        if (bars[i][2] <= bars[i - j][2] || bars[i][2] < bars[i + j][2]) isH = false;
+        if (bars[i][3] >= bars[i - j][3] || bars[i][3] > bars[i + j][3]) isL = false;
+      }
+      if (isH) hs.push(bars[i][2]);
+      if (isL) ls.push(bars[i][3]);
+    }
+    return { hs, ls };
+  }
+  function aggregate(bars, secs, off) {
+    const out = []; let cur = null;
+    for (const b of bars || []) {
+      const key = Math.floor((b[0] + off) / secs);
+      if (!cur || cur.k !== key) { if (cur) out.push(cur.b); cur = { k: key, b: b.slice(0, 5) }; }
+      else { cur.b[2] = Math.max(cur.b[2], b[2]); cur.b[3] = Math.min(cur.b[3], b[3]); cur.b[4] = b[4]; }
+    }
+    if (cur) out.push(cur.b);
+    return out;
+  }
+  function trendOf(bars) {
+    if (!bars || bars.length < 30) return null;
+    const closes = bars.map(b => b[4]);
+    const e20 = emaArr(closes, 20), e50 = emaArr(closes, 50);
+    const last = closes.length - 1, c = closes[last];
+    const { hs, ls } = pivots(bars.slice(-80), 2);
+    let st = 0, txt = 'structure indécise';
+    if (hs.length >= 2 && ls.length >= 2) {
+      const hh = hs[hs.length - 1] > hs[hs.length - 2], hl = ls[ls.length - 1] > ls[ls.length - 2];
+      if (hh && hl) { st = 1; txt = 'plus hauts et plus bas croissants'; }
+      else if (!hh && !hl) { st = -1; txt = 'plus hauts et plus bas décroissants'; }
+      else txt = hh ? 'haut croissant mais bas décroissant' : 'haut décroissant mais bas croissant';
+    }
+    const lastH = hs[hs.length - 1], lastL = ls[ls.length - 1];
+    if (lastH != null && c > lastH) { st = Math.max(st, 1); txt += ' · cassure du dernier haut'; }
+    if (lastL != null && c < lastL) { st = Math.min(st, -1); txt += ' · cassure du dernier bas'; }
+    const above = c > e50[last], up = e20[last] > e50[last];
+    const score = st + (above ? 0.5 : -0.5) + (up ? 0.5 : -0.5);
+    return {
+      dir: score >= 1 ? 'bull' : score <= -1 ? 'bear' : 'range', score, txt,
+      ema: `prix ${above ? 'au-dessus' : 'en dessous'} de l'EMA 50, EMA 20 ${up ? 'au-dessus' : 'en dessous'} de l'EMA 50`
+    };
+  }
+  function trendsFor(k) {
+    if (!LIVE.bars) return null;
+    const sym = S.instruments[k].mt5; const B = LIVE.bars;
+    const off = (account() && account().srv_off) || 0;
+    const h1 = B[sym + '@H1'];
+    const out = { D1: trendOf(B[sym + '@D1']), H4: trendOf(aggregate(h1, 14400, off)), H1: trendOf(h1), M15: trendOf(B[sym]) };
+    return Object.values(out).some(Boolean) ? out : null;
+  }
+  const DIRW = { bull: 'Haussier', bear: 'Baissier', range: 'Range' };
+  function renderTrends() {
+    const card = $('#mt5TrendCard'), sug = $('#biasMt5');
+    const T = { US100: trendsFor('US100'), SP500: trendsFor('SP500') };
+    const any = T.US100 || T.SP500;
+    if (!any) {
+      const needEa = LIVE.bars && !Object.keys(LIVE.bars).some(x => x.endsWith('@H1'));
+      card.innerHTML = `<h2>Tendance calculée sur MT5</h2><p class="muted" style="margin:0">${!LIVE.key ? 'Connecte MT5 (Réglages) pour calculer la tendance D1, H4, H1 et M15 sur les prix de ton compte FTMO.' : needEa ? 'Mets à jour le robot MT5 (version 1.01, Réglages > Connexion MT5) pour recevoir les bougies H1 et D1.' : 'En attente des bougies MT5…'}</p>`;
+      sug.innerHTML = '';
+      return;
+    }
+    const cell = t => t ? `<span class="tag ${t.dir}">${DIRW[t.dir]}</span><small class="muted" style="display:block;font-size:12px;margin-top:3px">${esc(t.txt)} · ${esc(t.ema)}</small>` : '<span class="muted">—</span>';
+    card.innerHTML = `<h2>Tendance calculée sur MT5<span class="spacer"></span><button class="btn small" data-fillbias>Remplir le biais du jour</button></h2>
+      <div class="tbl-wrap"><table style="min-width:560px"><thead><tr><th>UT</th><th>US100</th><th>SP500</th></tr></thead><tbody>
+      ${TF.map(tf => `<tr><td class="mono">${tf}</td><td>${cell(T.US100 && T.US100[tf])}</td><td>${cell(T.SP500 && T.SP500[tf])}</td></tr>`).join('')}
+      </tbody></table></div>
+      <p class="hint">Calcul automatique sur les bougies de ton compte FTMO. La structure compare les deux derniers sommets et creux (pivots à 2 bougies) et repère les cassures. Les moyennes EMA 20 et 50 confirment. Ça reste une aide : valide toujours la structure toi-même sur le graphique.</p>`;
+    const short = t => t ? `<span class="tag ${t.dir}">${DIRW[t.dir].slice(0, 4)}.</span>` : '—';
+    sug.innerHTML = `<div class="row" style="margin-top:10px;font-size:13px;gap:6px"><span class="muted">MT5 propose :</span>
+      US100 ${TF.map(tf => `<span class="mono" style="font-size:11px">${tf}</span> ${short(T.US100 && T.US100[tf])}`).join(' ')}
+      · SP500 ${TF.map(tf => `<span class="mono" style="font-size:11px">${tf}</span> ${short(T.SP500 && T.SP500[tf])}`).join(' ')}
+      <button class="btn small" data-fillbias>Remplir</button></div>`;
+  }
+  function fillBiasFromMt5() {
+    let n = 0;
+    for (const k of ['US100', 'SP500']) {
+      const T = trendsFor(k); if (!T) continue;
+      D.bias[k] = D.bias[k] || {};
+      TF.forEach(tf => { if (T[tf]) { D.bias[k][tf] = T[tf].dir; n++; } });
+    }
+    if (n) { saveDay(); renderBias(); renderChecklist(); }
+    return n;
+  }
+  document.addEventListener('click', ev => {
+    if (!ev.target.closest('[data-fillbias]')) return;
+    const n = fillBiasFromMt5();
+    ev.target.textContent = n ? 'Biais rempli ✓' : 'Rien à remplir';
+    setTimeout(() => renderTrends(), 1800);
+  });
 
   /* =========================================================
      Rendu initial
