@@ -439,7 +439,7 @@
       .filter(x => x.at > now).sort((a, b) => a.at - b.at)[0];
     $('#countdown').textContent = upcoming && !MODEL.weekend ? `${upcoming.name} dans ${dur(upcoming.at - now)}` : '';
     renderAlerts(now);
-    if (pp.mi !== lastMinute) { lastMinute = pp.mi; renderTimeline(now); renderPhases(now); renderEvents(); renderChecklist(); }
+    if (pp.mi !== lastMinute) { lastMinute = pp.mi; renderTimeline(now); renderPhases(now); renderEvents(); renderChecklist(); renderOpening(); }
     notify(now);
   }
 
@@ -613,7 +613,11 @@
      Checklist
      ========================================================= */
   const CHECKS = [
-    { id: 'htf', label: 'Biais HTF (D1 + H4) défini et aligné avec le sens du trade', req: true, auto: () => { const o = overallBias(); return o.a.filled + o.b.filled ? o.dir !== 'range' : null; } },
+    { id: 'htf', label: 'Biais d\'ouverture clair (sinon biais D1 + H4) et sens du trade aligné', req: true, auto: () => {
+      const a = LIVE.key ? openingAnalysis('US100') : null;
+      if (a && !a.closed) return a.dir !== 'range';
+      const o = overallBias(); return o.a.filled + o.b.filled ? o.dir !== 'range' : null;
+    } },
     { id: 'acc', label: 'Range d\'accumulation marqué (Asie / pré-ouverture)', req: false },
     { id: 'man', label: 'Manipulation : liquidité prise (sweep d\'un haut/bas, Judas swing)', req: true },
     { id: 'mss', label: 'Displacement + MSS / CHoCH en M1–M5 dans le sens du biais', req: true },
@@ -1141,7 +1145,7 @@
       if (d.account && d.account.cur && d.account.cur !== CUR) { CUR = d.account.cur; store.set('td.cur', CUR); renderSessionStats(); if ($('#tab-journal').classList.contains('active')) renderJournal(); }
       if (tradesChanged && await linkPlannedTrades()) tradesChanged = true;
       onLive(tradesChanged);
-      if (barsChanged) renderTrends();
+      if (barsChanged) { renderTrends(); renderOpening(); }
     } catch (e) {
       LIVE.err = /unknown key/.test(e.message) ? 'Clé inconnue : reconnecte MT5 dans Réglages.' : 'Service injoignable (' + e.message + ').';
       renderLiveStatus();
@@ -1643,6 +1647,157 @@
     D.fonda = B.dir; saveDay(); $('#fondaSent').value = D.fonda; renderVerdict(); renderChecklist();
     ev.target.textContent = 'Appliqué ✓'; setTimeout(() => { ev.target.textContent = 'Utiliser comme sentiment du jour'; }, 2000);
   });
+
+  /* =========================================================
+     Biais d'ouverture (intraday) : avant et après 9:30 NY
+     ========================================================= */
+  const nyT = (y, m, d, h, mi) => zoned(TZN, y, m, d, h, mi).getTime() / 1000;
+  function prevTradingDay(y, m, d) {
+    let p = addDays(y, m, d, -1);
+    while (p.wd === 0 || p.wd === 6 || holidayOn(p.y, p.m, p.d)) p = addDays(p.y, p.m, p.d, -1);
+    return p;
+  }
+  function barsWin(bars, a, b) {
+    let hi = -Infinity, lo = Infinity, hiT = 0, loT = 0;
+    for (const r of bars || []) if (r[0] >= a && r[0] < b) {
+      if (r[2] > hi) { hi = r[2]; hiT = r[0]; }
+      if (r[3] < lo) { lo = r[3]; loT = r[0]; }
+    }
+    return isFinite(hi) ? { hi, lo, hiT, loT } : null;
+  }
+  const barAt = (bars, t, span) => (bars || []).find(r => r[0] >= t && r[0] < t + span) || null;
+
+  function openingAnalysis(k) {
+    const q = liveQuote(k), B = LIVE.bars;
+    if (!q || !q.bid || !B) return null;
+    const sym = S.instruments[k].mt5;
+    const m15 = B[sym] || [];
+    const m5 = B[sym + '@M5'];
+    const fine = m5 && m5.length ? m5 : m15;
+    if (!m15.length) return null;
+    const { y, m, d, wd } = DAY;
+    if (wd === 0 || wd === 6 || holidayOn(y, m, d)) return { closed: true };
+    const cal = addDays(y, m, d, -1), pd = prevTradingDay(y, m, d);
+    const now = Date.now() / 1000, px = q.bid;
+    const tOpen = nyT(y, m, d, 9, 30), t945 = nyT(y, m, d, 9, 45), t10 = nyT(y, m, d, 10, 0);
+    const asia = barsWin(m15, nyT(cal.y, cal.m, cal.d, 20, 0), nyT(y, m, d, 0, 0));
+    const lon = barsWin(m15, nyT(y, m, d, 2, 0), nyT(y, m, d, 5, 0));
+    const on = barsWin(m15, nyT(cal.y, cal.m, cal.d, 18, 0), Math.min(tOpen, now + 900));
+    const pre = barsWin(m15, nyT(y, m, d, 5, 0), Math.min(tOpen, now + 900));
+    const moBar = barAt(m15, nyT(y, m, d, 0, 0), 900);
+    const mo = moBar ? moBar[1] : null;
+    const pcBar = barAt(m15, nyT(pd.y, pd.m, pd.d, 15, 45), 900);
+    const prevClose = pcBar ? pcBar[4] : null;
+    const pdh = q.pdh || null, pdl = q.pdl || null;
+    const F = [];
+    const add = (name, eff, txt) => F.push({ name, eff, txt });
+    const fp = v => fmtP(v);
+    // après 15:30, la préparation est jugée sur le prix d'ouverture
+    const openBar0 = barAt(fine, tOpen, fine === m5 ? 300 : 900);
+    const afterOpen = now >= tOpen && !!openBar0;
+    const ref = afterOpen ? openBar0[1] : px;
+    const refTxt = afterOpen ? 'À l\'ouverture, prix' : 'Prix';
+
+    // --- Avant l'ouverture : liquidité prise pendant Londres et le pré-marché ---
+    const morning = barsWin(m15, nyT(y, m, d, 2, 0), Math.min(tOpen, now + 900));
+    if (asia && morning) {
+      const sellTaken = morning.lo < asia.lo || (pdl && morning.lo < pdl);
+      const buyTaken = morning.hi > asia.hi || (pdh && morning.hi > pdh);
+      const lowName = pdl && morning.lo < pdl ? 'le bas de la veille' : 'le bas d\'Asie';
+      const highName = pdh && morning.hi > pdh ? 'le haut de la veille' : 'le haut d\'Asie';
+      if (sellTaken && !buyTaken) add('Liquidité prise avant l\'ouverture', 1, `Londres ou le pré-marché a pris ${lowName} (descendu à ${fp(morning.lo)}) sans toucher les hauts : la manipulation baissière est faite, la distribution est attendue vers le haut.`);
+      else if (buyTaken && !sellTaken) add('Liquidité prise avant l\'ouverture', -1, `Londres ou le pré-marché a pris ${highName} (monté à ${fp(morning.hi)}) sans toucher les bas : la manipulation haussière est faite, la distribution est attendue vers le bas.`);
+      else if (buyTaken && sellTaken) {
+        const last = morning.loT > morning.hiT ? 1 : -1;
+        add('Liquidité prise avant l\'ouverture', last * 0.5, `Les deux côtés du range d'Asie ont été pris. Le dernier sweep est ${last > 0 ? 'en bas' : 'en haut'} : léger avantage ${last > 0 ? 'acheteur' : 'vendeur'}.`);
+      } else add('Liquidité prise avant l\'ouverture', 0, 'Aucune liquidité majeure prise avant l\'ouverture : le sweep a souvent lieu entre 15:30 et 16:00 Paris. Attends-le.');
+    }
+    // Power of 3 : prix contre l'open de minuit
+    if (mo) {
+      const lastLiq = F.length ? F[0].eff : 0;
+      const below = ref < mo;
+      const eff = below && lastLiq > 0 ? 0.5 : !below && lastLiq < 0 ? -0.5 : 0;
+      add('Open de minuit (Power of 3)', eff, `${refTxt} ${below ? 'sous' : 'au-dessus de'} l'open de minuit (${fp(mo)}). ${below ? 'Zone d\'achat si le biais est haussier.' : 'Zone de vente si le biais est baissier.'}`);
+    }
+    // Gap par rapport à la clôture d'hier
+    if (prevClose) {
+      const g = (ref / prevClose - 1) * 100;
+      const eff = g <= -0.2 ? 0.5 : g >= 0.2 ? -0.5 : 0;
+      add('Gap contre la clôture d\'hier', eff, `${afterOpen ? 'Ouverture' : 'Prix'} ${sgnPct(g)} par rapport à la clôture d'hier (${fp(prevClose)}). ${eff > 0 ? 'Gap baissier : tendance à le combler vers le haut.' : eff < 0 ? 'Gap haussier : tendance à le combler vers le bas.' : 'Pas de gap significatif.'}`);
+    }
+    // Discount / premium dans le range de la nuit
+    if (on && on.hi > on.lo) {
+      const pos = (ref - on.lo) / (on.hi - on.lo);
+      const eff = pos <= 0.3 ? 0.5 : pos >= 0.7 ? -0.5 : 0;
+      add('Position dans le range de la nuit', eff, `${refTxt} à ${Math.round(pos * 100)} % du range de la nuit (${fp(on.lo)} – ${fp(on.hi)}) : ${pos <= 0.3 ? 'discount, zone d\'achat' : pos >= 0.7 ? 'premium, zone de vente' : 'au milieu, pas d\'avantage'}.`);
+    }
+
+    // --- Après l'ouverture : Judas swing, range d'ouverture, déplacement ---
+    let phase = 'pre';
+    if (now >= tOpen) {
+      phase = now < t10 ? 'open' : 'post';
+      const first = barsWin(fine, tOpen, Math.min(t945, now + 300));
+      const openBar = barAt(fine, tOpen, fine === m5 ? 300 : 900);
+      const openPx = openBar ? openBar[1] : null;
+      if (first) {
+        const levelsBelow = [on && on.lo, asia && asia.lo, pdl].filter(Boolean);
+        const levelsAbove = [on && on.hi, asia && asia.hi, pdh].filter(Boolean);
+        const sweptLow = levelsBelow.some(l => first.lo < l), sweptHigh = levelsAbove.some(l => first.hi > l);
+        if (now >= t945 && px > first.hi) add('Premier quart d\'heure', sweptLow ? 1.5 : 1, sweptLow ? `Judas baissier : le premier quart d'heure a pris la liquidité sous ${fp(first.lo)}, puis le prix a cassé son haut (${fp(first.hi)}). Configuration d'achat typique.` : `Le prix casse le haut du premier quart d'heure (${fp(first.hi)}).`);
+        else if (now >= t945 && px < first.lo) add('Premier quart d\'heure', sweptHigh ? -1.5 : -1, sweptHigh ? `Judas haussier : le premier quart d'heure a pris la liquidité au-dessus de ${fp(first.hi)}, puis le prix a cassé son bas (${fp(first.lo)}). Configuration de vente typique.` : `Le prix casse le bas du premier quart d'heure (${fp(first.lo)}).`);
+        else add('Premier quart d\'heure', 0, now < t945 ? `Premier quart d'heure en cours (${fp(first.lo)} – ${fp(first.hi)}). Ne prends pas le premier mouvement : c'est souvent la manipulation.` : `Prix encore dans le range du premier quart d'heure (${fp(first.lo)} – ${fp(first.hi)}).`);
+      }
+      if (now >= t10) {
+        const or = barsWin(fine, tOpen, t10);
+        if (or) {
+          const eff = px > or.hi ? 1 : px < or.lo ? -1 : 0;
+          add('Range d\'ouverture 15:30–16:00', eff, eff > 0 ? `Cassure par le haut du range d'ouverture (${fp(or.hi)}).` : eff < 0 ? `Cassure par le bas du range d'ouverture (${fp(or.lo)}).` : `Prix dans le range d'ouverture (${fp(or.lo)} – ${fp(or.hi)}) : attends la cassure.`);
+        }
+      }
+      if (openPx) {
+        const mv = (px / openPx - 1) * 100;
+        const eff = mv >= 0.25 ? 0.5 : mv <= -0.25 ? -0.5 : 0;
+        add('Déplacement depuis 15:30', eff, `${sgnPct(mv)} depuis l'ouverture (${fp(openPx)}).`);
+      }
+    }
+    const score = F.reduce((a, f) => a + f.eff, 0);
+    const dir = score >= 1 ? 'bull' : score <= -1 ? 'bear' : 'range';
+    // Liquidités visées
+    const lv = [['haut de la nuit', on && on.hi], ['bas de la nuit', on && on.lo], ['haut d\'Asie', asia && asia.hi], ['bas d\'Asie', asia && asia.lo],
+      ['haut de Londres', lon && lon.hi], ['bas de Londres', lon && lon.lo], ['haut de la veille', pdh], ['bas de la veille', pdl], ['clôture d\'hier', prevClose], ['open de minuit', mo]]
+      .filter(x => x[1]);
+    const above = lv.filter(x => x[1] > px).sort((a, b) => a[1] - b[1]).slice(0, 3);
+    const below = lv.filter(x => x[1] < px).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    return { phase, F, score, dir, above, below, px, usedM5: fine === m5 };
+  }
+  const sgnPct = v => (v > 0 ? '+' : '') + fr(v, 2) + ' %';
+
+  function renderOpening() {
+    const card = $('#openCard'); if (!card) return;
+    if (!LIVE.key) { card.innerHTML = `<h2>Biais d'ouverture (intraday)</h2><p class="muted" style="margin:0">Connecte MT5 (Réglages) pour analyser l'ouverture : liquidité prise avant 15:30, Judas swing, range d'ouverture.</p>`; return; }
+    const R = { US100: openingAnalysis('US100'), SP500: openingAnalysis('SP500') };
+    if (!R.US100 && !R.SP500) { card.innerHTML = `<h2>Biais d'ouverture (intraday)</h2><p class="muted" style="margin:0">En attente des bougies MT5…</p>`; return; }
+    if ((R.US100 || R.SP500).closed) { card.innerHTML = `<h2>Biais d'ouverture (intraday)</h2><p class="muted" style="margin:0">Pas de séance cash aujourd'hui.</p>`; return; }
+    const htf = overallBias(), macro = typeof macroBias === 'function' ? macroBias() : null;
+    const phaseTxt = { pre: 'Préparation (avant 15:30) : scénario privilégié', open: 'Ouverture en cours : confirmation', post: 'Après 16:00 : biais confirmé ou non' }[(R.US100 || R.SP500).phase];
+    const W = { bull: 'ACHATS', bear: 'VENTES', range: 'ATTENDRE' };
+    const col = k => {
+      const A = R[k]; if (!A || A.closed) return `<div class="c6" style="min-width:0"><h3>${k}</h3><p class="muted">Données indisponibles.</p></div>`;
+      const fond = htf.a.filled + htf.b.filled ? htf.dir : (macro && macro.dir) || '';
+      const align = A.dir === 'range' || !fond || fond === 'range' ? '' : fond === A.dir
+        ? '<p class="hint" style="color:var(--bull)">Aligné avec la tendance de fond : tu peux viser plus loin que 2R si la structure le permet.</p>'
+        : '<p class="hint" style="color:var(--accent)">Contre la tendance de fond : c\'est jouable en intraday, mais prends ton 2R sans chercher plus loin.</p>';
+      return `<div class="c6" style="min-width:0">
+        <h3 style="margin-top:0">${k} · <span class="${A.dir === 'range' ? 'muted' : ''}" style="color:var(--${A.dir === 'range' ? 'range' : A.dir})">${W[A.dir]}</span> <small class="muted" style="font-weight:400">score ${A.score > 0 ? '+' : ''}${fr(A.score, 1)}</small></h3>
+        <table><tbody>${A.F.map(f => `<tr><td style="width:30px;vertical-align:top">${effTag(f.eff)}</td><td style="font-size:13px"><b>${esc(f.name)}</b><br><span class="muted">${esc(f.txt)}</span></td></tr>`).join('')}</tbody></table>
+        <p style="font-size:13px;margin:8px 0 0"><span class="muted">Liquidité au-dessus :</span> ${A.above.map(x => `${esc(x[0])} <b class="mono">${fmtP(x[1])}</b>`).join(' · ') || '—'}<br><span class="muted">Liquidité en dessous :</span> ${A.below.map(x => `${esc(x[0])} <b class="mono">${fmtP(x[1])}</b>`).join(' · ') || '—'}</p>
+        ${align}</div>`;
+    };
+    const m5 = (R.US100 && R.US100.usedM5) || (R.SP500 && R.SP500.usedM5);
+    card.innerHTML = `<h2>Biais d'ouverture (intraday)<span class="spacer"></span><span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">${esc(phaseTxt)}</span></h2>
+      <div class="grid" style="gap:16px">${col('US100')}${col('SP500')}</div>
+      <p class="hint">Ce biais est fait pour un trade de quelques heures pris à l'ouverture : il prime sur la tendance de fond pour le sens du trade, qui sert surtout à doser l'objectif. Il se met à jour toutes les minutes${m5 ? '' : ' (précision M15 : mets à jour le robot en 1.03 pour la précision M5)'}. Ton entrée reste ta validation M1 : MSS puis retracement 50–68 %.</p>`;
+  }
 
   /* =========================================================
      Rendu initial
