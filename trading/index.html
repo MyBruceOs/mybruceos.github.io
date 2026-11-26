@@ -78,6 +78,7 @@
           </select>
         </label>
       </div>
+      <div id="biasMt5"></div>
       <div id="verdict"></div>
     </div>
 
@@ -126,6 +127,7 @@
 <section class="tab" id="tab-graph" role="tabpanel">
   <div class="card" style="margin-bottom:16px;padding:6px 8px"><div class="tv" id="tvTape" style="min-height:46px"></div></div>
   <div class="grid">
+    <div class="card c12" id="mt5TrendCard"></div>
     <div class="card c6">
       <h2>US100<span class="spacer"></span><span class="seg" data-chart="US100"></span></h2>
       <div class="tv tv-chart" id="tvChartUS100"></div>
@@ -143,7 +145,7 @@
       <div class="tv" id="tvTaSP500" style="height:460px"></div>
     </div>
     <div class="card c12">
-      <p class="hint" style="margin:0">Les jauges résument moyennes mobiles et oscillateurs (tendance « indicateurs »). Elles ne lisent pas la structure SMC : c'est ton tableau de biais (onglet Séance) qui fait foi. Change d'unité de temps avec les onglets au-dessus de chaque jauge. Le flux de prix se règle dans Réglages pour coller à ton broker CFD.</p>
+      <p class="hint" style="margin:0">Les jauges TradingView résument moyennes mobiles et oscillateurs sur le flux FOREX.com, le seul que TradingView autorise ici. Elles ne lisent pas la structure SMC : préfère la tendance calculée sur MT5 en haut de l'onglet, et ton tableau de biais. Change d'unité de temps avec les onglets au-dessus de chaque jauge. Le flux de prix se règle dans Réglages pour coller à ton broker CFD.</p>
     </div>
   </div>
 </section>
@@ -154,9 +156,9 @@
     <div class="card c12">
       <h2>Moteurs du jour</h2>
       <div class="grid" style="gap:10px">
-        <div class="c4" style="min-width:0"><div class="tv" id="tvMiniVIX" style="height:200px"></div></div>
-        <div class="c4" style="min-width:0"><div class="tv" id="tvMiniDXY" style="height:200px"></div></div>
-        <div class="c4" style="min-width:0"><div class="tv" id="tvMiniUS10Y" style="height:200px"></div></div>
+        <div class="c4" style="min-width:0"><small class="muted">VIX (volatilité)</small><div class="tv" id="tvMiniVIX" style="height:220px"></div></div>
+        <div class="c4" style="min-width:0"><small class="muted">Dollar (DXY)</small><div class="tv" id="tvMiniDXY" style="height:220px"></div></div>
+        <div class="c4" style="min-width:0"><small class="muted">Taux US 10 ans</small><div class="tv" id="tvMiniUS10Y" style="height:220px"></div></div>
       </div>
       <p class="hint">VIX en hausse ou au-dessus de 20 : risk-off, mouvements plus violents, réduis la taille. Dollar (DXY) et taux 10 ans en hausse : pression sur le Nasdaq (sensible aux taux). Taux en baisse : soutien aux valeurs tech.</p>
     </div>
@@ -285,7 +287,7 @@
     <div class="card c6">
       <h2>Compte &amp; gestion du risque</h2>
       <div class="fgrid">
-        <label class="f">Capital (€) sans MT5<input type="number" step="any" id="sCapital"></label>
+        <label class="f">Capital sans MT5<input type="number" step="any" id="sCapital"></label>
         <label class="f">Risque par trade (%)<input type="number" step="0.05" id="sRisk"></label>
         <label class="f">RR cible<input type="number" step="0.1" id="sRR"></label>
         <label class="f">Trades max / jour<input type="number" step="1" id="sMaxTrades"></label>
@@ -307,7 +309,7 @@
         <label class="f">Perte max du jour (%)<input type="number" step="0.5" id="fDaily"></label>
         <label class="f">Perte max totale (%)<input type="number" step="0.5" id="fMax"></label>
         <label class="f">Objectif (%)<input type="number" step="0.5" id="fTarget"></label>
-        <label class="f">Capital initial (€)<input type="number" step="any" id="fInit" placeholder="auto (MT5)"></label>
+        <label class="f">Capital initial<input type="number" step="any" id="fInit" placeholder="auto (MT5)"></label>
         <label class="f">Base du risque
           <select id="sRiskBase"><option value="init">Capital initial du compte</option><option value="balance">Solde actuel</option></select>
         </label>
