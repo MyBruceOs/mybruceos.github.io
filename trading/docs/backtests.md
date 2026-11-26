@@ -184,6 +184,40 @@ Résultats :
 
 Le filtre « H1 contre » ajoute environ +6 000 $ à 3R, mais rien à 2R : à 2R, le gagnant retiré compense les pertes évitées.
 
+## 4 quater. Annonces économiques (10:00 NY et 8:30 NY)
+
+Calendrier : 608 dates de publication réelles pour décembre 2025 à novembre 2026, tirées du calendrier FRED (table `desk_events`, fonction `desk-cal`). FRED ne publie pas l'ISM ni le Conference Board ; leurs dates sont calculées d'après leur calendrier fixe :
+- ISM industrie : 1er jour ouvré du mois ;
+- ISM services : 3e jour ouvré du mois ;
+- Conference Board : dernier mardi du mois.
+
+Les dates de réunion de la Fed (FOMC) ont été ajoutées à la main.
+
+Groupes d'annonces :
+- **10:00 majeures** : ISM industrie, ISM services, Conference Board, JOLTS, Michigan.
+- **10:00 toutes** : les majeures, plus ventes de logements neufs et anciens, dépenses de construction et stocks des entreprises.
+- **8:30 majeures** : CPI, emploi (NFP), PPI, ventes au détail, PIB, PCE.
+
+| Groupe de trades | Jours avec annonce 10:00 | Jours sans annonce 10:00 |
+|---|---|---|
+| US100 (H4) | 25 trades · 40 % · +5 010 $ (0,20 R/trade) | 33 trades · 52 % · +25 780 $ (0,78 R/trade) |
+| SP500 A (H4 + Daily) | 13 trades · 62 % · +12 310 $ | 18 trades · 50 % · +12 130 $ |
+| SP500 B (H4) | 19 trades · 53 % · +13 330 $ | 41 trades · 39 % · +14 410 $ |
+
+(Win rate et résultat à 3R.)
+
+| Groupe de trades | Jours avec annonce 8:30 | Jours sans annonce 8:30 |
+|---|---|---|
+| US100 (H4) | 11 trades · 64 % · +12 670 $ | 47 trades · 43 % · +18 120 $ |
+| SP500 B (H4) | 16 trades · 63 % · +14 910 $ | 44 trades · 36 % · +12 830 $ |
+
+Conclusions :
+- **Les annonces de 10:00 ne sont pas un motif de perte.** Sur le SP500, les jours d'annonce sont même **meilleurs**. Le surplus de volatilité semble donner des Judas plus nets.
+- Sur l'**US100**, les jours d'annonce de 10:00 rapportent moins par trade (0,20 R contre 0,78 R à 3R), mais le win rate à 2R est le même (52 %). Les pertes ne se concentrent pas sur les minutes qui suivent la publication. Les retirer supprimerait 43 % des trades US100 et +5 010 $ de gains. Ce n'est donc pas un filtre, juste un point à surveiller sur les prochains mois.
+- Les jours avec une annonce de 8:30 sont plutôt **favorables** aux deux indices.
+- Jours de Fed : trop peu de trades (1 à 2) pour conclure. La décision tombe à 14:00, après la fenêtre de trading.
+- Détail par annonce (ISM, JOLTS…) : 3 à 6 trades par annonce, trop peu pour conclure.
+
 ## 5. Idées testées et rejetées
 
 | Idée | Effet |
