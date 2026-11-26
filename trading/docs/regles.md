@@ -1,6 +1,6 @@
 # Règles de trading Desk US — référence A
 
-*Version du 26 novembre 2026. Règles validées par le backtest M1 FTMO (décembre 2025 – novembre 2026). Les chiffres détaillés sont dans [backtests.md](backtests.md).*
+*Version du 27 novembre 2026 (Desk Key 1.02, nouvelle application). Règles validées par le backtest M1 FTMO (décembre 2025 – novembre 2026). Les chiffres détaillés sont dans [backtests.md](backtests.md).*
 
 > **Un indice = un profil = un graphique.** On ne mélange jamais les règles de l'US100 et du SP500.
 
@@ -79,6 +79,8 @@ Fichier : `trading/mt5/DeskUS_Key.mq5`.
   - avant 10:00 NY, si le setup est prêt : l'ordre est **armé** et partira à 10:00 s'il est encore valide ;
   - entre 10:00 et 11:00 NY : l'ordre limite part **tout de suite**, avec le lot calculé.
 - **Touche X** : annule l'ordre en attente ou l'armement.
+- **Bouton –** : réduit le panneau à deux lignes (état du jour + bouton de placement) ; **+** le rouvre.
+- **Bouton HISTO 7 J** : affiche sur le graphique les setups des 7 derniers jours (niveaux, zone gain/perte, résultat « +3R », « −1R », ou la raison de l'absence de trade).
 - Boutons **2R / 2,5R / 3R** : choix de l'objectif.
 - Bouton **AUTO** : mode automatique, désactivé par défaut. À n'activer que si la prop firm l'autorise.
 - Gestion faite par Desk Key :
@@ -86,6 +88,19 @@ Fichier : `trading/mt5/DeskUS_Key.mq5`.
   - il est annulé à 11:00 NY s'il n'est pas rempli ;
   - la position est fermée à 13:00 NY (réglage modifiable).
 - Chaque profil a son **numéro magique** : US100 = 7710100, SP500 = 7710500. Le commentaire de l'ordre indique le profil (« DeskKey US100 3R »), pour le suivi dans le journal.
+
+### Envoi vers l'application
+- Desk Key envoie chaque setup (pré-marché, Judas, cassure, entrée, SL, TP 2R / 2,5R / 3R, lot, état, résultat simulé) à l'application Desk US : le jour même en direct, et les 7 derniers jours à l'installation.
+- La clé est reprise automatiquement du robot **DeskUS_Bridge 1.05** (fichier commun `DeskUS\cle.txt`) ; sinon, la coller dans le réglage « Clé Desk US » de Desk Key.
+- Les trades pris avec Desk Key sont reliés à leur setup dans le journal (résultat réel à côté du résultat de la règle).
+
+## 7. L'application Desk US
+
+- **Aujourd'hui** : déroulé de la séance en heure de Paris, setup du jour de chaque actif (tendance, Judas, cassure, ordre, lot, état), annonces économiques, compte FTMO.
+- **Journal** : un jour = une ligne par actif, avec les niveaux, le résultat de la règle et le trade réel ; filtres (pris, ratés…) et export CSV.
+- **Suivi du test** : win rate, R, séries de pertes et creux de chaque actif comparés aux bornes du backtest (« dans la norme », « à surveiller », « alarme »).
+- **Règles** : règles et résultats de backtest de chaque actif.
+- **Ajouter un actif** : quand un nouvel actif (Dow Jones, XAUUSD…) est validé en backtest, son profil est ajouté dans la base (`desk_profiles`) et un profil correspondant est ajouté à Desk Key ; l'application l'affiche toute seule dans tous les onglets.
 
 ### Différences possibles avec le backtest
 - Le backtest utilise les prix Bid. En réel, un achat limite se remplit quand l'Ask touche le prix : avec le spread, quelques remplissages « de justesse » n'auront pas lieu.
