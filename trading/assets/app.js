@@ -312,9 +312,6 @@
         mountChart(k);
       };
       mountChart(k);
-      tv('tvTa' + k, 'technical-analysis', Object.assign({}, TV_BASE, {
-        interval: '1h', width: '100%', height: '100%', symbol: TV_WIDGET_SYM[k], showIntervalTabs: true, displayMode: 'multiple'
-      }));
     }
   }
   function mountFonda() {
