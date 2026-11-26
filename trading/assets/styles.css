@@ -192,3 +192,13 @@ footer{max-width:1400px;margin:0 auto;padding:16px 16px 40px;font-size:12px;colo
   .clock b{font-size:17px}
   main{padding:12px}
 }
+.live-q{font-size:12px;color:var(--muted);white-space:nowrap}
+.live-q b{color:var(--fg);font-weight:600}
+.pill[hidden]{display:none}
+.tag.mt5{background:rgba(91,156,240,.2);color:var(--info);font-size:10px;padding:1px 5px}
+.auto-toggle{display:inline-flex;align-items:center;gap:5px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--muted);font-weight:400;cursor:pointer}
+.auto-toggle input{accent-color:var(--accent)}
+code.mono{font-size:12px;background:var(--panel2);padding:1px 5px;border-radius:4px;word-break:break-all}
+input:disabled,select:disabled{opacity:.6}
+@media (max-width:600px){.live-q{display:none}}
+@media (max-width:600px){.tl-block{font-size:0;padding:0}}

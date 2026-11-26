@@ -20,6 +20,8 @@
       <div class="clock secondary"><small>New York</small><b id="clkNY">--:--</b></div>
     </div>
     <div class="status">
+      <span class="live-q mono" id="liveQuotes"></span>
+      <span class="pill off" id="pillMT5" hidden><span class="dot"></span><span>MT5</span></span>
       <span class="pill off" id="pillMarket"><span class="dot"></span><span>…</span></span>
       <span class="pill off" id="pillPhase"><span class="dot"></span><span>…</span></span>
       <span class="countdown" id="countdown"></span>
@@ -41,6 +43,8 @@
 <!-- ================= SÉANCE ================= -->
 <section class="tab active" id="tab-seance" role="tabpanel">
   <div class="grid">
+    <div class="card c12" id="ftmoCard"></div>
+
     <div class="card c12">
       <h2>Journée du <span id="dayLabel" class="mono"></span> · heure de Paris</h2>
       <div class="tl" id="timeline"></div>
@@ -79,6 +83,7 @@
 
     <div class="card c7">
       <h2>Niveaux clés &amp; liquidité<span class="spacer"></span>
+        <label id="lvlAutoWrap" class="auto-toggle" hidden><input type="checkbox" id="lvlAuto"> Auto MT5</label>
         <span class="seg" id="lvlInstr"><button data-v="US100" class="on">US100</button><button data-v="SP500">SP500</button></span>
       </h2>
       <div class="lvl-grid" id="lvlGrid"></div>
@@ -252,6 +257,7 @@
         <label class="f">R obtenu<input type="number" step="0.01" id="jR"></label>
         <label class="f">Plan respecté<select id="jRule"><option value="1">Oui</option><option value="0">Non</option></select></label>
       </div>
+      <p class="hint" id="jMt5Note" hidden>Trade importé de MT5 : les prix et le résultat viennent du compte. Tu peux compléter la fenêtre, le niveau de Fibonacci, le respect du plan et les notes.</p>
       <label class="f" style="margin-top:10px">Notes (contexte, émotion, erreur)<textarea id="jNotes"></textarea></label>
       <div class="row" style="margin-top:10px">
         <button class="btn primary" id="jSave">Enregistrer le trade</button>
@@ -279,7 +285,7 @@
     <div class="card c6">
       <h2>Compte &amp; gestion du risque</h2>
       <div class="fgrid">
-        <label class="f">Capital (€)<input type="number" step="any" id="sCapital"></label>
+        <label class="f">Capital (€) sans MT5<input type="number" step="any" id="sCapital"></label>
         <label class="f">Risque par trade (%)<input type="number" step="0.05" id="sRisk"></label>
         <label class="f">RR cible<input type="number" step="0.1" id="sRR"></label>
         <label class="f">Trades max / jour<input type="number" step="1" id="sMaxTrades"></label>
@@ -289,9 +295,29 @@
       <label class="chk" style="margin-top:12px;border:0"><input type="checkbox" id="sNotif"> Notifications 5 minutes avant chaque phase et chaque news (onglet ouvert)</label>
     </div>
     <div class="card c6">
+      <h2>Connexion MT5 (FTMO)</h2>
+      <div id="mt5Box"></div>
+    </div>
+    <div class="card c6">
+      <h2>Règles FTMO</h2>
+      <div class="fgrid">
+        <label class="f">Étape
+          <select id="fPhase"><option value="challenge">Challenge</option><option value="verification">Vérification</option><option value="funded">Compte financé</option></select>
+        </label>
+        <label class="f">Perte max du jour (%)<input type="number" step="0.5" id="fDaily"></label>
+        <label class="f">Perte max totale (%)<input type="number" step="0.5" id="fMax"></label>
+        <label class="f">Objectif (%)<input type="number" step="0.5" id="fTarget"></label>
+        <label class="f">Capital initial (€)<input type="number" step="any" id="fInit" placeholder="auto (MT5)"></label>
+        <label class="f">Base du risque
+          <select id="sRiskBase"><option value="init">Capital initial du compte</option><option value="balance">Solde actuel</option></select>
+        </label>
+      </div>
+      <p class="hint">Valeurs du Challenge FTMO en 2 étapes. Vérifie-les dans ton espace FTMO : elles changent selon le type de compte. Laisse le capital initial vide pour le lire dans MT5 (somme des dépôts).</p>
+    </div>
+    <div class="card c6">
       <h2>Instruments (spécifications de ton broker)</h2>
       <div id="instrSettings"></div>
-      <p class="hint">Valeur du point : ce que rapporte 1 point de mouvement pour 1 lot, dans la devise du compte. Elle varie selon le broker (souvent 1 €, 1 $, 10 € ou 20 € par point). Vérifie la fiche du contrat. Flux TradingView : choisis celui de ton broker s'il existe (ex. PEPPERSTONE:NAS100, CAPITALCOM:US100, ICMARKETS:US500) pour avoir les mêmes prix.</p>
+      <p class="hint">Quand MT5 est connecté, la valeur du point, le lot minimum et le pas de lot sont lus directement dans MT5 et remplacent ces valeurs. Valeur du point : ce que rapporte 1 point de mouvement pour 1 lot, dans la devise du compte. Elle varie selon le broker (souvent 1 €, 1 $, 10 € ou 20 € par point). Vérifie la fiche du contrat. Flux TradingView : choisis celui de ton broker s'il existe (ex. PEPPERSTONE:NAS100, CAPITALCOM:US100, ICMARKETS:US500) pour avoir les mêmes prix.</p>
     </div>
     <div class="card c12">
       <h2>Données</h2>

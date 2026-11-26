@@ -18,14 +18,17 @@
 
   const DEFAULT_SETTINGS = {
     capital: 10000, risk: 1, rr: 2, maxTrades: 2, maxLoss: 2, newsBuf: 15, notif: false,
+    riskBase: 'init',
+    ftmo: { phase: 'challenge', daily: 5, max: 10, target: 10, init: 0 },
     instruments: {
-      US100: { label: 'US100', symbol: 'OANDA:NAS100USD', ppv: 1, minLot: 0.1, lotStep: 0.1, buffer: 5 },
-      SP500: { label: 'SP500', symbol: 'OANDA:SPX500USD', ppv: 1, minLot: 0.1, lotStep: 0.1, buffer: 1.5 }
+      US100: { label: 'US100', symbol: 'OANDA:NAS100USD', mt5: 'US100.cash', ppv: 1, minLot: 0.1, lotStep: 0.1, buffer: 5 },
+      SP500: { label: 'SP500', symbol: 'OANDA:SPX500USD', mt5: 'US500.cash', ppv: 1, minLot: 0.1, lotStep: 0.1, buffer: 1.5 }
     }
   };
   function loadSettings() {
     const s = store.get(K.settings, {});
     const out = Object.assign({}, DEFAULT_SETTINGS, s);
+    out.ftmo = Object.assign({}, DEFAULT_SETTINGS.ftmo, s.ftmo || {});
     out.instruments = {};
     for (const k of Object.keys(DEFAULT_SETTINGS.instruments)) {
       out.instruments[k] = Object.assign({}, DEFAULT_SETTINGS.instruments[k], (s.instruments || {})[k] || {});
@@ -365,6 +368,7 @@
     const st = dayStats();
     if (st.count >= S.maxTrades) out.push(['danger', `Limite de ${S.maxTrades} trade(s) atteinte aujourd'hui. Séance terminée.`]);
     if (st.r <= -S.maxLoss) out.push(['danger', `Perte maximale du jour atteinte (${fmtR(st.r)}). On coupe et on revient demain.`]);
+    liveAlerts(now).forEach(a => out.push(a));
     const html = out.map(([c, t]) => `<div class="alert ${c}">${t}</div>`).join('');
     if (html !== lastAlertsHtml) { $('#alerts').innerHTML = html; lastAlertsHtml = html; }
   }
@@ -478,9 +482,9 @@
   }
   function overallBias() {
     const a = biasScore('US100'), b = biasScore('SP500');
-    let s = (a.score + b.score) / 2;
-    if (D.smt === 'bull') s += 0.15; if (D.smt === 'bear') s -= 0.15;
-    if (D.fonda === 'bull') s += 0.15; if (D.fonda === 'bear') s -= 0.15;
+    // 80 % structure, 10 % SMT, 10 % sentiment : 100 % seulement si tout est aligné
+    const sig = v => v === 'bull' ? 1 : v === 'bear' ? -1 : 0;
+    let s = 0.8 * (a.score + b.score) / 2 + 0.1 * sig(D.smt) + 0.1 * sig(D.fonda);
     s = Math.max(-1, Math.min(1, s));
     const dir = s >= 0.35 ? 'bull' : s <= -0.35 ? 'bear' : 'range';
     return { s, dir, a, b };
@@ -527,13 +531,28 @@
     ['px', 'Prix actuel']
   ];
   let lvlInstr = 'US100';
+  function levelsFor(k) {
+    if (D.levelsAuto !== false) { const a = autoLevels(k); if (a) return a; }
+    return D.levels[k] || {};
+  }
   function renderLevels() {
-    const L = (D.levels[lvlInstr] = D.levels[lvlInstr] || {});
-    $('#lvlGrid').innerHTML = LEVELS.map(([k, l]) => `<label class="f">${l}<input type="number" step="any" inputmode="decimal" data-lvl="${k}" value="${L[k] != null ? L[k] : ''}"></label>`).join('');
+    D.levels[lvlInstr] = D.levels[lvlInstr] || {};
+    const auto = D.levelsAuto !== false && !!autoLevels(lvlInstr);
+    const L = levelsFor(lvlInstr);
+    const v = x => x != null && x !== '' && isFinite(num(x)) ? +num(x) : '';
+    $('#lvlAuto').checked = D.levelsAuto !== false;
+    $('#lvlAutoWrap').hidden = !LIVE.key;
+    $('#lvlGrid').innerHTML = LEVELS.map(([k, l]) => `<label class="f">${l}<input type="number" step="any" inputmode="decimal" data-lvl="${k}" value="${v(L[k])}" ${auto ? 'readonly title="Valeur lue dans MT5"' : ''}></label>`).join('');
+    renderPD();
+  }
+  function refreshLevelValues() {
+    if (D.levelsAuto === false || !autoLevels(lvlInstr)) return;
+    const L = levelsFor(lvlInstr);
+    $$('#lvlGrid input').forEach(inp => { const x = L[inp.dataset.lvl]; const val = x != null && isFinite(num(x)) ? String(+num(x)) : ''; if (inp.value !== val) inp.value = val; });
     renderPD();
   }
   function renderPD() {
-    const L = D.levels[lvlInstr] || {};
+    const L = levelsFor(lvlInstr);
     const px = num(L.px);
     // Range de référence : veille si dispo, sinon Asie
     let hi = num(L.pdh), lo = num(L.pdl), src = 'range de la veille';
@@ -550,8 +569,9 @@
     $('#pdBox').innerHTML = `Sur le ${src} : ${zone} · équilibre ${fmtP(eq)} · position ${Math.round(pos * 100)} %${moTxt}
       <div class="pdbar"><span style="left:6px">Discount</span><span style="right:6px">Premium</span><i style="left:calc(${clamp * 100}% - 1px)"></i></div>`;
   }
+  $('#lvlAuto').addEventListener('change', ev => { D.levelsAuto = ev.target.checked; saveDay(); renderLevels(); });
   $('#lvlGrid').addEventListener('input', ev => {
-    const k = ev.target.dataset.lvl; if (!k) return;
+    const k = ev.target.dataset.lvl; if (!k || ev.target.readOnly) return;
     D.levels[lvlInstr][k] = ev.target.value === '' ? null : ev.target.value;
     saveDay(); renderPD();
   });
@@ -633,17 +653,19 @@
   const saveJ = () => store.set(K.journal, J);
   const todayStr = () => ymd(DAY.y, DAY.m, DAY.d);
   function dayStats() {
-    const t = J.filter(x => x.date === todayStr());
+    const t = allTrades().filter(x => x.date === todayStr());
     const closed = t.filter(x => x.outcome !== 'OPEN');
-    return { count: t.length, r: closed.reduce((a, x) => a + (num(x.r) || 0), 0), wins: closed.filter(x => num(x.r) > 0).length };
+    const riskE = capitalBase() * S.risk / 100;
+    const eur = closed.reduce((a, x) => a + (x.net != null ? x.net : (num(x.r) || 0) * riskE), 0);
+    return { count: t.length, r: closed.reduce((a, x) => a + (num(x.r) || 0), 0), eur, wins: closed.filter(x => num(x.r) > 0).length };
   }
   function renderSessionStats() {
     const s = dayStats();
-    const riskE = S.capital * S.risk / 100;
+    const riskE = capitalBase() * S.risk / 100;
     $('#sessionStats').innerHTML = `
       <div class="kpi"><small>Trades aujourd'hui</small><b>${s.count} / ${S.maxTrades}</b></div>
       <div class="kpi"><small>Résultat du jour</small><b class="${s.r > 0 ? 'bull' : s.r < 0 ? 'bear' : ''}">${fmtR(s.r)}</b></div>
-      <div class="kpi"><small>En euros (≈)</small><b class="${s.r > 0 ? 'bull' : s.r < 0 ? 'bear' : ''}">${fmtE(s.r * riskE)}</b></div>
+      <div class="kpi"><small>En euros</small><b class="${s.eur > 0 ? 'bull' : s.eur < 0 ? 'bear' : ''}">${fmtE(s.eur)}</b></div>
       <div class="kpi"><small>Risque par trade</small><b>${fmtE(riskE)}</b></div>`;
   }
   const PHASE_OPTS = PHASES.filter(p => !p.marker).map(p => [p.id, p.name]).concat([['other', 'Autre']]);
@@ -670,15 +692,29 @@
     ['#jEntry', '#jSL', '#jTP', '#jLots', '#jNotes'].forEach(s => { $(s).value = ''; });
     $('#jOutcome').value = 'OPEN'; $('#jRule').value = '1';
     const cp = currentPhase(now); $('#jPhase').value = cp ? cp.id : 'sb';
+    setJFormMode(false);
     autoR();
   }
+  function setJFormMode(isMt5) {
+    ['#jDate', '#jTime', '#jInstr', '#jDir', '#jEntry', '#jSL', '#jTP', '#jLots', '#jOutcome', '#jR'].forEach(sel => { $(sel).disabled = isMt5; });
+    $('#jMt5Note').hidden = !isMt5;
+  }
   function fillJForm(t) {
+    setJFormMode(t.src === 'mt5');
     $('#jDate').value = t.date; $('#jTime').value = t.time; $('#jInstr').value = t.instr; $('#jDir').value = t.dir;
     $('#jPhase').value = t.phase; $('#jFib').value = t.fib; $('#jEntry').value = t.entry; $('#jSL').value = t.sl; $('#jTP').value = t.tp;
     $('#jLots').value = t.lots; $('#jOutcome').value = t.outcome; $('#jR').value = t.r; $('#jRule').value = t.rule; $('#jNotes').value = t.notes || '';
     $('#jR').readOnly = t.outcome !== 'MAN';
   }
-  $('#jSave').addEventListener('click', () => {
+  $('#jSave').addEventListener('click', async () => {
+    if (editId && editId.startsWith('mt5:')) {
+      const row = LIVE.trades.find(x => 'mt5:' + x.data.id === editId);
+      if (!row) return;
+      const annot = Object.assign({}, row.annot, { phase: $('#jPhase').value, fib: $('#jFib').value, rule: $('#jRule').value, notes: $('#jNotes').value });
+      try { await rpc('desk_annotate', { p_key: LIVE.key, p_position_id: row.data.id, p_annot: annot }); row.annot = annot; }
+      catch (e) { alert('Enregistrement impossible : ' + e.message); return; }
+      clearJForm(); renderJournal(); return;
+    }
     const t = {
       id: editId || 't' + Date.now(), date: $('#jDate').value, time: $('#jTime').value, instr: $('#jInstr').value, dir: $('#jDir').value,
       phase: $('#jPhase').value, fib: $('#jFib').value, entry: $('#jEntry').value, sl: $('#jSL').value, tp: $('#jTP').value,
@@ -692,7 +728,17 @@
   $('#jClear').addEventListener('click', clearJForm);
   $('#jBody').addEventListener('click', ev => {
     const ed = ev.target.closest('[data-edit]'), del = ev.target.closest('[data-rm]');
-    if (ed) { const t = J.find(x => x.id === ed.dataset.edit); if (t) { editId = t.id; fillJForm(t); $('#jFormTitle').textContent = 'Modifier le trade'; $('#jFormCard').scrollIntoView({ behavior: 'smooth' }); } }
+    if (ed) { const t = allTrades().find(x => x.id === ed.dataset.edit); if (t) { editId = t.id; fillJForm(t); $('#jFormTitle').textContent = 'Modifier le trade'; $('#jFormCard').scrollIntoView({ behavior: 'smooth' }); } }
+    if (del && del.dataset.rm.startsWith('mt5:')) {
+      const row = LIVE.trades.find(x => 'mt5:' + x.data.id === del.dataset.rm);
+      if (row && confirm('Masquer ce trade MT5 du journal et des statistiques ?')) {
+        const annot = Object.assign({}, row.annot, { hidden: true });
+        rpc('desk_annotate', { p_key: LIVE.key, p_position_id: row.data.id, p_annot: annot })
+          .then(() => { row.annot = annot; renderJournal(); renderSessionStats(); })
+          .catch(e => alert('Impossible : ' + e.message));
+      }
+      return;
+    }
     if (del && confirm('Supprimer ce trade ?')) { J = J.filter(x => x.id !== del.dataset.rm); saveJ(); renderJournal(); renderSessionStats(); renderChecklist(); tick(); }
   });
   const phaseName = id => (PHASE_OPTS.find(p => p[0] === id) || [, id])[1];
@@ -708,7 +754,7 @@
     }).join('') : '<tr><td class="muted">Pas encore de données.</td></tr>';
   }
   function renderJournal() {
-    const sorted = J.slice().sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+    const sorted = allTrades().sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
     const closed = sorted.filter(t => t.outcome !== 'OPEN' && isFinite(num(t.r)));
     const rs = closed.map(t => num(t.r));
     const tot = rs.reduce((a, b) => a + b, 0);
@@ -738,7 +784,7 @@
     groupTable($('#jByPhase'), t => t.phase, phaseName, closed);
     $('#jBody').innerHTML = sorted.length ? sorted.slice().reverse().map(t => {
       const r = num(t.r);
-      return `<tr><td class="mono">${esc(t.date)}</td><td class="mono">${esc(t.time)}</td><td>${esc(t.instr)}</td><td>${t.dir === 'buy' ? '<span class="tag bull">Achat</span>' : '<span class="tag bear">Vente</span>'}</td>
+      return `<tr><td class="mono">${esc(t.date)}${t.src === 'mt5' ? ' <span class="tag mt5">MT5</span>' : ''}</td><td class="mono">${esc(t.time)}</td><td>${esc(t.instr)}</td><td>${t.dir === 'buy' ? '<span class="tag bull">Achat</span>' : '<span class="tag bear">Vente</span>'}</td>
         <td>${esc(phaseName(t.phase))}</td><td class="mono">${esc(fibName(t.fib))}</td><td class="mono">${esc(t.entry)}</td><td class="mono">${esc(t.sl)}</td><td class="mono">${esc(t.tp)}</td>
         <td>${OUT[t.outcome] || esc(t.outcome)}</td><td class="${r > 0 ? 'r-pos' : r < 0 ? 'r-neg' : 'r-zero'}">${t.outcome === 'OPEN' ? '—' : fmtR(r)}</td><td>${t.rule === '1' ? 'Oui' : '<span style="color:var(--bear)">Non</span>'}</td>
         <td style="white-space:nowrap"><button class="btn small" data-edit="${t.id}">Modifier</button> <button class="btn small danger" data-rm="${t.id}">✕</button></td></tr>`;
@@ -753,7 +799,7 @@
   $('#jCsv').addEventListener('click', () => {
     const cols = ['date', 'time', 'instr', 'dir', 'phase', 'fib', 'entry', 'sl', 'tp', 'lots', 'outcome', 'r', 'rule', 'notes'];
     const q = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
-    const csv = [cols.join(';')].concat(J.map(t => cols.map(c => q(c === 'phase' ? phaseName(t[c]) : t[c])).join(';'))).join('\n');
+    const csv = [cols.join(';')].concat(allTrades().map(t => cols.map(c => q(c === 'phase' ? phaseName(t[c]) : t[c])).join(';'))).join('\n');
     download(`journal-trading-${todayStr()}.csv`, '﻿' + csv, 'text/csv;charset=utf-8');
   });
   $('#jBackup').addEventListener('click', () => {
@@ -789,7 +835,7 @@
     $('#pRR').value = S.rr; $('#pRisk').value = S.risk;
   }
   function renderPlan() {
-    const I = S.instruments[planInstr];
+    const I = spec(planInstr);
     const hi = num($('#pHigh').value), lo = num($('#pLow').value), lvl = num($('#pLevel').value);
     const buf = num($('#pBuffer').value) || 0, rr = num($('#pRR').value) || S.rr, riskPct = num($('#pRisk').value) || S.risk;
     store.set('td.plan', { high: $('#pHigh').value, low: $('#pLow').value, level: $('#pLevel').value, buffer: $('#pBuffer').value, instr: planInstr });
@@ -805,7 +851,7 @@
     const risk = Math.abs(entry - sl);
     const tp = buy ? entry + rr * risk : entry - rr * risk;
     const tpExt = buy ? (tp - hi) / range : (lo - tp) / range; // extension au-delà du swing (0 %)
-    const riskMoney = S.capital * riskPct / 100;
+    const riskMoney = capitalBase() * riskPct / 100;
     const rawLots = riskMoney / (risk * I.ppv);
     const step = I.lotStep > 0 ? I.lotStep : 0.01;
     const lots = Math.floor(rawLots / step + 1e-9) * step;
@@ -845,6 +891,7 @@
         <div class="kpi"><small>Gain visé</small><b class="bull">${lotsOk ? fmtE(realRisk * rr) : '—'}</b></div>
         <div class="kpi"><small>Break-even à 1R</small><b>${fmtP(buy ? entry + risk : entry - risk)}</b></div>
       </div>
+      <p class="hint">${I.live ? `Spécifications lues dans MT5 : 1 lot = ${fmtE(I.ppv)} par point, lot min ${I.minLot}, pas ${I.lotStep}.` : 'Spécifications saisies dans Réglages (connecte MT5 pour les lire automatiquement).'} Risque calculé sur ${fmtE(capitalBase())}.${(() => { const q = liveQuote(planInstr); return q && q.bid ? ` Prix actuel ${fmtP(q.bid)}, soit ${fmtP(Math.abs(q.bid - entry))} pts de l'entrée.` : ''; })()}</p>
       ${warn.map(w => `<div class="alert warn" style="margin-top:10px">${w}</div>`).join('')}
       <div class="ladder" id="ladder">${ladder}</div>
       <p class="hint">Clique un niveau pour y placer l'entrée. Le TP à ${rr}R tombe sur l'extension ${(-tpExt * 100).toFixed(0)} % : vérifie qu'il vise une liquidité (PDH/PDL, haut/bas d'Asie ou de Londres, equal highs/lows) et qu'aucun niveau majeur ne bloque avant.</p>
@@ -858,7 +905,7 @@
     if (rung) { $('#pLevel').value = String(parseFloat(rung.dataset.lvl)); renderPlan(); return; }
     if (ev.target.id === 'toJournal' && lastPlan) {
       clearJForm();
-      const I = S.instruments[lastPlan.instr];
+      const I = spec(lastPlan.instr);
       const dec = (String(I.lotStep).split('.')[1] || '').length;
       $('#jInstr').value = lastPlan.instr; $('#jDir').value = lastPlan.dir; $('#jFib').value = String(lastPlan.lvl);
       $('#jEntry').value = (+lastPlan.entry.toFixed(2)); $('#jSL').value = (+lastPlan.sl.toFixed(2)); $('#jTP').value = (+lastPlan.tp.toFixed(2));
@@ -916,6 +963,7 @@
     $('#instrSettings').innerHTML = Object.entries(S.instruments).map(([k, I]) => `
       <h3>${k}</h3>
       <div class="fgrid">
+        <label class="f">Symbole MT5<input type="text" data-i="${k}" data-f="mt5" value="${esc(I.mt5 || '')}"></label>
         <label class="f">Flux TradingView<input type="text" data-i="${k}" data-f="symbol" value="${esc(I.symbol)}"></label>
         <label class="f">Valeur du point / lot<input type="number" step="any" data-i="${k}" data-f="ppv" value="${I.ppv}"></label>
         <label class="f">Lot minimum<input type="number" step="any" data-i="${k}" data-f="minLot" value="${I.minLot}"></label>
@@ -936,6 +984,7 @@
   $('#instrSettings').addEventListener('change', e => {
     const k = e.target.dataset.i, f = e.target.dataset.f; if (!k) return;
     if (f === 'symbol') S.instruments[k].symbol = e.target.value.trim().toUpperCase();
+    else if (f === 'mt5') S.instruments[k].mt5 = e.target.value.trim();
     else { const v = num(e.target.value); if (!isFinite(v) || v < 0) return; S.instruments[k][f] = v; }
     saveSettings(); onSettingsChange();
     if (f === 'symbol') { mounted.graph = false; }
@@ -950,6 +999,344 @@
     $('#pRR').value = S.rr; $('#pRisk').value = S.risk;
     renderSessionStats(); renderChecklist(); renderPlan(); lastAlertsHtml = ''; tick();
   }
+
+  /* =========================================================
+     MT5 en direct (robot DeskUS_Bridge -> Supabase -> ici)
+     ========================================================= */
+  const SB_URL = 'https://xakrdapoxthvvqpyjuji.supabase.co';
+  const SB_KEY = 'sb_publishable_Hzn2bTrae-TflG_HCzLVWg_QYF4l0ec'; // clé publique par conception
+  const LIVE = { key: store.get('td.mt5key', ''), data: null, bars: null, barsAt: null, trades: [], readAt: 0, err: '', n: 0, busy: false };
+
+  async function rpc(fn, args) {
+    const r = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SB_KEY }, body: JSON.stringify(args)
+    });
+    const txt = await r.text();
+    let body = null; try { body = txt ? JSON.parse(txt) : null; } catch (e) {}
+    if (!r.ok) throw new Error((body && (body.message || body.hint)) || ('HTTP ' + r.status));
+    return body;
+  }
+  const hex = buf => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  const sha256 = async txt => hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt)));
+
+  function liveAge() {
+    const d = LIVE.data; if (!d || !d.updated_at) return Infinity;
+    return (d.now - d.updated_at) + (Date.now() - LIVE.readAt) / 1000;
+  }
+  const liveOn = () => liveAge() < 30;
+  const account = () => (LIVE.data && LIVE.data.account) || null;
+  function liveQuote(k) {
+    const q = LIVE.data && LIVE.data.quotes; const sym = S.instruments[k] && S.instruments[k].mt5;
+    return q && sym ? (q[sym] || null) : null;
+  }
+  function spec(k) {
+    const I = S.instruments[k], q = liveQuote(k);
+    if (q && q.ppv > 0 && q.vstep > 0) return { ppv: q.ppv, minLot: q.vmin || I.minLot, lotStep: q.vstep, buffer: I.buffer, live: true };
+    return { ppv: I.ppv, minLot: I.minLot, lotStep: I.lotStep, buffer: I.buffer, live: false };
+  }
+  function ftmoInit() {
+    if (S.ftmo.init > 0) return S.ftmo.init;
+    const a = account(); if (a && a.init > 0) return a.init;
+    return S.capital;
+  }
+  function capitalBase() {
+    const a = account();
+    if (!a) return S.capital;
+    if (S.riskBase === 'balance' && a.bal > 0) return a.bal;
+    return ftmoInit();
+  }
+  function instrForSym(sym) {
+    const k = Object.keys(S.instruments).find(k => (S.instruments[k].mt5 || '').toLowerCase() === String(sym).toLowerCase());
+    return k || null;
+  }
+
+  /* ---------- niveaux calculés à partir des bougies M15 de MT5 ---------- */
+  function autoLevels(k) {
+    const q = liveQuote(k); if (!q) return null;
+    const out = { pdh: q.pdh || null, pdl: q.pdl || null, px: q.bid || null };
+    const bars = LIVE.bars && LIVE.bars[S.instruments[k].mt5];
+    if (bars && bars.length) {
+      const { y, m, d } = DAY; const prev = addDays(y, m, d, -1);
+      const T = (yy, mm, dd, h, mi) => zoned(TZN, yy, mm, dd, h, mi).getTime() / 1000;
+      const win = (a, b) => {
+        let hi = -Infinity, lo = Infinity;
+        for (const r of bars) if (r[0] >= a && r[0] < b) { if (r[2] > hi) hi = r[2]; if (r[3] < lo) lo = r[3]; }
+        return isFinite(hi) ? [hi, lo] : [null, null];
+      };
+      const openAt = t => { const r = bars.find(r => r[0] >= t && r[0] < t + 900); return r ? r[1] : null; };
+      [out.ah, out.al] = win(T(prev.y, prev.m, prev.d, 20, 0), T(y, m, d, 0, 0));
+      [out.lh, out.ll] = win(T(y, m, d, 2, 0), T(y, m, d, 5, 0));
+      out.mo = openAt(T(y, m, d, 0, 0));
+      out.o930 = openAt(T(y, m, d, 9, 30));
+    }
+    return out;
+  }
+
+  /* ---------- trades MT5 -> lignes du journal ---------- */
+  function phaseAt(date) {
+    const p = partsIn(TZN, date); const mins = p.h * 60 + p.mi;
+    if (mins >= 20 * 60) return 'asia';
+    const ph = PHASES.find(x => !x.marker && !x.prevDay && mins >= x.from[0] * 60 + x.from[1] && mins < x.to[0] * 60 + x.to[1]);
+    return ph ? ph.id : 'other';
+  }
+  const parisYmd = date => { const p = partsIn(TZP, date); return ymd(p.y, p.m, p.d); };
+  function mt5Entry(row) {
+    const t = row.data, a = row.annot || {};
+    const k = instrForSym(t.sym);
+    const open = new Date(t.to * 1000);
+    const risk = t.sl > 0 ? Math.abs(t.pi - t.sl) : 0;
+    const sp = k ? spec(k) : null;
+    const riskMoney = risk > 0 && sp ? risk * sp.ppv * t.vol : 0;
+    let r = riskMoney > 0 ? t.net / riskMoney : t.net / (capitalBase() * S.risk / 100);
+    let outcome = 'MAN';
+    if (risk > 0) {
+      const tol = risk * 0.05;
+      if (t.tp > 0 && Math.abs(t.px - t.tp) <= tol) outcome = 'TP';
+      else if (Math.abs(t.px - t.sl) <= tol && t.net < 0) outcome = 'SL';
+      else if (Math.abs((t.px - t.pi) * t.dir) <= tol * 2) outcome = 'BE';
+    }
+    return {
+      id: 'mt5:' + t.id, src: 'mt5', posId: t.id, hidden: !!a.hidden,
+      date: parisYmd(open), time: parisHM(open), instr: k || t.sym, dir: t.dir > 0 ? 'buy' : 'sell',
+      phase: a.phase || phaseAt(open), fib: a.fib != null ? a.fib : '', entry: t.pi, sl: t.sl || '', tp: t.tp || '',
+      exit: t.px, lots: t.vol, outcome, r: r.toFixed(2), rule: a.rule != null ? a.rule : '1', notes: a.notes || '', net: t.net
+    };
+  }
+  function allTrades() {
+    return J.slice().concat(LIVE.trades.map(mt5Entry).filter(t => !t.hidden));
+  }
+  // Un trade « En cours » saisi depuis le plan est relié automatiquement au trade MT5 correspondant
+  async function linkPlannedTrades() {
+    let changed = false;
+    for (const row of LIVE.trades) {
+      if (row.annot && row.annot.linked) continue;
+      const e = mt5Entry(row);
+      const risk = e.sl ? Math.abs(e.entry - e.sl) : 0;
+      const tol = Math.max(2, risk * 0.25);
+      const local = J.find(x => x.outcome === 'OPEN' && x.date === e.date && x.instr === e.instr && x.dir === e.dir && Math.abs(num(x.entry) - e.entry) <= tol);
+      if (!local) continue;
+      const annot = Object.assign({}, row.annot, { fib: local.fib, phase: local.phase, rule: local.rule, notes: local.notes, linked: true });
+      try {
+        await rpc('desk_annotate', { p_key: LIVE.key, p_position_id: row.data.id, p_annot: annot });
+        row.annot = annot; J = J.filter(x => x !== local); saveJ(); changed = true;
+      } catch (err) { /* nouvel essai au prochain passage */ }
+    }
+    return changed;
+  }
+
+  /* ---------- lecture périodique ---------- */
+  async function poll(force) {
+    if (!LIVE.key || LIVE.busy) return;
+    if (!force && document.hidden && LIVE.n % 4 !== 0) { LIVE.n++; return; }
+    LIVE.busy = true;
+    try {
+      const wantTrades = force || LIVE.n % 10 === 0;
+      const d = await rpc('desk_read', { p_key: LIVE.key, p_trades: wantTrades, p_bars_after: LIVE.barsAt });
+      LIVE.readAt = Date.now(); LIVE.err = '';
+      if (d.bars) { LIVE.bars = d.bars; LIVE.barsAt = d.bars_updated_at; delete d.bars; }
+      let tradesChanged = false;
+      if (d.trades) { LIVE.trades = d.trades; delete d.trades; tradesChanged = true; }
+      LIVE.data = d;
+      if (tradesChanged && await linkPlannedTrades()) tradesChanged = true;
+      onLive(tradesChanged);
+    } catch (e) {
+      LIVE.err = /unknown key/.test(e.message) ? 'Clé inconnue : reconnecte MT5 dans Réglages.' : 'Service injoignable (' + e.message + ').';
+      renderLiveStatus();
+    } finally { LIVE.n++; LIVE.busy = false; }
+  }
+  function startLive() {
+    renderMt5Settings(); renderFtmo(); renderLiveStatus();
+    if (LIVE.key) poll(true);
+    setInterval(() => poll(false), 3000);
+  }
+  function onLive(tradesChanged) {
+    renderLiveStatus(); renderFtmo();
+    if (D.levelsAuto !== false && autoLevels(lvlInstr)) {
+      if ($('#lvlGrid input') && !$('#lvlGrid input').readOnly) renderLevels(); else refreshLevelValues();
+    }
+    if ($('#tab-plan').classList.contains('active')) renderPlan();
+    if ($('#tab-reglages').classList.contains('active')) renderMt5Settings();
+    if (tradesChanged) { renderSessionStats(); if ($('#tab-journal').classList.contains('active')) renderJournal(); }
+  }
+
+  /* ---------- affichage : barre du haut ---------- */
+  function renderLiveStatus() {
+    const pill = $('#pillMT5'), q = $('#liveQuotes');
+    if (!LIVE.key) { pill.hidden = true; q.textContent = ''; return; }
+    pill.hidden = false;
+    const age = liveAge();
+    if (LIVE.err) setPill(pill, 'danger', 'MT5 · ' + (LIVE.err.startsWith('Clé') ? 'clé inconnue' : 'hors ligne'));
+    else if (!LIVE.data || !LIVE.data.updated_at) setPill(pill, 'warn', 'MT5 · en attente du robot');
+    else if (age < 30) setPill(pill, 'live', 'MT5 en direct');
+    else setPill(pill, 'warn', 'MT5 · silencieux depuis ' + dur(age * 1000));
+    const parts = Object.keys(S.instruments).map(k => { const x = liveQuote(k); return x && x.bid ? `${k} <b>${fmtP(x.bid)}</b>` : ''; }).filter(Boolean);
+    q.innerHTML = parts.join(' · ');
+  }
+
+  /* ---------- affichage : compte FTMO ---------- */
+  function ftmoNumbers() {
+    const a = account(); if (!a) return null;
+    const init = ftmoInit();
+    const dailyLimit = init * S.ftmo.daily / 100;
+    const dayStart = a.day_start || a.bal;
+    const dayLoss = Math.max(0, dayStart - a.eq);
+    const dayLeft = dailyLimit - dayLoss;
+    const floor = init * (1 - S.ftmo.max / 100);
+    const maxLeft = a.eq - floor;
+    const target = S.ftmo.phase === 'funded' ? 0 : init * S.ftmo.target / 100;
+    const progress = target > 0 ? (a.bal - init) / target : NaN;
+    const riskMoney = capitalBase() * S.risk / 100;
+    const tradesLeft = riskMoney > 0 ? Math.max(0, Math.floor(Math.min(dayLeft, maxLeft) / riskMoney)) : 0;
+    return { a, init, dailyLimit, dayStart, dayLoss, dayLeft, floor, maxLeft, target, progress, riskMoney, tradesLeft };
+  }
+  function bar(ratio, color) {
+    const w = Math.max(0, Math.min(1, ratio)) * 100;
+    return `<div class="meter" style="height:8px"><i style="width:${w}%;background:${color}"></i></div>`;
+  }
+  function renderFtmo() {
+    const card = $('#ftmoCard');
+    if (!LIVE.key) {
+      card.innerHTML = `<h2>Compte FTMO</h2><p class="muted" style="margin:0">Connecte MT5 pour voir ton compte en direct : solde, équité, limite de perte du jour, objectif, positions ouvertes. <button class="btn small" data-goto="reglages">Connecter MT5</button></p>`;
+      return;
+    }
+    const F = ftmoNumbers();
+    if (!F) { card.innerHTML = `<h2>Compte FTMO</h2><p class="muted" style="margin:0">En attente des premières données du robot MT5… ${LIVE.err ? esc(LIVE.err) : 'Vérifie qu\'il est bien posé sur un graphique (Réglages > Connexion MT5).'}</p>`; return; }
+    const { a } = F;
+    const cls = v => v > 0 ? 'bull' : v < 0 ? 'bear' : '';
+    const dayRes = a.eq - F.dayStart;
+    const usedDay = F.dailyLimit > 0 ? F.dayLoss / F.dailyLimit : 0;
+    const phaseLbl = { challenge: 'Challenge', verification: 'Vérification', funded: 'Compte financé' }[S.ftmo.phase] || '';
+    const pos = (a && LIVE.data.positions) || [];
+    const posRows = pos.map(p => {
+      const k = instrForSym(p.sym); const risk = p.sl > 0 ? Math.abs(p.po - p.sl) : 0;
+      const rNow = risk > 0 ? ((p.pc - p.po) * p.dir) / risk : NaN;
+      return `<tr><td>${esc(k || p.sym)}</td><td>${p.dir > 0 ? '<span class="tag bull">Achat</span>' : '<span class="tag bear">Vente</span>'}</td><td class="mono">${p.vol}</td><td class="mono">${fmtP(p.po)}</td><td class="mono">${p.sl ? fmtP(p.sl) : '<span style="color:var(--bear)">aucun</span>'}</td><td class="mono">${p.tp ? fmtP(p.tp) : '—'}</td><td class="${p.pl >= 0 ? 'r-pos' : 'r-neg'}">${fmtE(p.pl)}</td><td class="mono">${isFinite(rNow) ? fmtR(rNow) : '—'}</td></tr>`;
+    }).join('');
+    card.innerHTML = `
+      <h2>Compte FTMO · ${esc(phaseLbl)}<span class="spacer"></span><span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">${liveOn() ? 'en direct' : 'dernière donnée il y a ' + dur(liveAge() * 1000)}</span></h2>
+      <div class="res" style="margin-top:0">
+        <div class="kpi"><small>Solde</small><b>${fmtE(a.bal)}</b></div>
+        <div class="kpi"><small>Équité</small><b>${fmtE(a.eq)}</b></div>
+        <div class="kpi"><small>Flottant</small><b class="${cls(a.pl)}">${fmtE(a.pl)}</b></div>
+        <div class="kpi"><small>Résultat du jour</small><b class="${cls(dayRes)}">${fmtE(dayRes)}</b></div>
+        <div class="kpi"><small>Trades possibles</small><b class="${F.tradesLeft < 1 ? 'bear' : ''}">${F.tradesLeft} à ${fmtE(F.riskMoney)}</b></div>
+      </div>
+      <div class="grid" style="gap:14px;margin-top:14px">
+        <div class="c4" style="min-width:0"><small class="muted">Perte du jour (max ${S.ftmo.daily} % = ${fmtE(F.dailyLimit)})</small>
+          ${bar(usedDay, usedDay > 0.7 ? 'var(--bear)' : usedDay > 0.4 ? 'var(--accent)' : 'var(--bull)')}
+          <div style="font-size:13px;margin-top:4px">Utilisé ${fmtE(F.dayLoss)} · il reste <b>${fmtE(F.dayLeft)}</b><br><span class="muted">Équité plancher du jour : ${fmtE(F.dayStart - F.dailyLimit)}</span></div></div>
+        <div class="c4" style="min-width:0"><small class="muted">Perte max (${S.ftmo.max} % = plancher ${fmtE(F.floor)})</small>
+          ${bar(1 - F.maxLeft / (F.init * S.ftmo.max / 100), F.maxLeft < F.init * S.ftmo.max / 200 ? 'var(--bear)' : 'var(--bull)')}
+          <div style="font-size:13px;margin-top:4px">Marge restante <b>${fmtE(F.maxLeft)}</b></div></div>
+        <div class="c4" style="min-width:0"><small class="muted">${F.target > 0 ? `Objectif +${S.ftmo.target} % = ${fmtE(F.init + F.target)}` : 'Compte financé : pas d\'objectif'}</small>
+          ${F.target > 0 ? bar(F.progress, 'var(--accent)') : ''}
+          <div style="font-size:13px;margin-top:4px">${F.target > 0 ? `Progression <b>${pct(Math.max(0, F.progress))}</b> · reste ${fmtE(Math.max(0, F.init + F.target - a.bal))}` : `Résultat depuis le départ : ${fmtE(a.bal - F.init)}`}</div></div>
+      </div>
+      ${pos.length ? `<h3>Positions ouvertes</h3><div class="tbl-wrap"><table style="min-width:560px"><thead><tr><th>Instr.</th><th>Sens</th><th>Lots</th><th>Entrée</th><th>SL</th><th>TP</th><th>P&amp;L</th><th>R</th></tr></thead><tbody>${posRows}</tbody></table></div>` : ''}
+      <p class="hint">Capital initial ${fmtE(F.init)}${S.ftmo.init > 0 ? ' (saisi)' : ' (lu dans MT5)'} · règles modifiables dans Réglages. FTMO compte l'équité, flottant compris, et remet la limite du jour à zéro à minuit (heure de Prague, la même qu'à Paris).</p>`;
+  }
+  $('#ftmoCard').addEventListener('click', ev => { const b = ev.target.closest('[data-goto]'); if (b) showTab(b.dataset.goto); });
+
+  function liveAlerts(now) {
+    const out = [];
+    if (!LIVE.key) return out;
+    if (LIVE.err) out.push(['danger', 'MT5 : ' + esc(LIVE.err)]);
+    const ms = marketState(now);
+    if (!LIVE.err && LIVE.data && LIVE.data.updated_at && liveAge() > 60 && ms.cls === 'live')
+      out.push(['warn', `Le robot MT5 n'envoie plus rien depuis ${dur(liveAge() * 1000)} : vérifie que MT5 est ouvert, connecté, et que le robot est actif sur un graphique.`]);
+    const F = ftmoNumbers();
+    if (F) {
+      if (F.dayLeft <= 0) out.push(['danger', `Limite de perte journalière FTMO dépassée (${fmtE(F.dayLoss)} sur ${fmtE(F.dailyLimit)}).`]);
+      else if (F.dayLeft < F.riskMoney) out.push(['danger', `Il ne reste que ${fmtE(F.dayLeft)} avant la limite FTMO du jour : moins d'un trade à ton risque. On arrête pour aujourd'hui.`]);
+      else if (F.dayLoss > F.dailyLimit * 0.5) out.push(['warn', `Tu as utilisé plus de la moitié de ta perte journalière FTMO (${fmtE(F.dayLoss)} sur ${fmtE(F.dailyLimit)}).`]);
+      if (F.maxLeft < F.riskMoney * 2) out.push(['danger', `Plus que ${fmtE(F.maxLeft)} avant la perte maximale FTMO.`]);
+      (LIVE.data.positions || []).forEach(p => { if (!p.sl) out.push(['danger', `Position ${esc(instrForSym(p.sym) || p.sym)} ouverte sans stop loss.`]); });
+    }
+    return out;
+  }
+
+  /* ---------- Réglages : connexion MT5 ---------- */
+  function renderMt5Settings() {
+    const box = $('#mt5Box');
+    if (!LIVE.key) {
+      box.innerHTML = `
+        <p style="margin-top:0">Première connexion : saisis le code d'activation qu'on t'a donné. Une clé secrète est créée dans ce navigateur ; tu la colleras dans le robot MT5.</p>
+        <div class="row"><input type="text" id="mt5Code" placeholder="Code d'activation" style="max-width:240px" autocomplete="off"><button class="btn primary" id="mt5Activate">Activer</button></div>
+        <p class="hint">Autre appareil déjà configuré ? Colle ta clé existante :</p>
+        <div class="row"><input type="text" id="mt5KeyIn" placeholder="dk_…" style="max-width:360px" autocomplete="off"><button class="btn" id="mt5UseKey">Utiliser cette clé</button></div>
+        <p class="hint" id="mt5Msg"></p>`;
+      return;
+    }
+    const d = LIVE.data, a = account();
+    const status = LIVE.err ? `<span style="color:var(--bear)">${esc(LIVE.err)}</span>`
+      : !d || !d.updated_at ? 'Clé active. En attente du robot MT5 (suis les étapes ci-dessous).'
+      : `${liveOn() ? '<b style="color:var(--bull)">Robot connecté</b>' : '<b style="color:var(--accent)">Robot silencieux</b>'} · dernière donnée il y a ${dur(liveAge() * 1000)} · robot v${esc(d.v || '?')}${a ? ` · ${esc(a.server)} · ${esc(a.cur)}` : ''}`;
+    const syms = d && d.quotes ? Object.keys(d.quotes).map(esc).join(', ') : '';
+    box.innerHTML = `
+      <p style="margin-top:0">${status}</p>
+      ${syms ? `<p class="hint" style="margin-top:0">Symboles reçus : ${syms}</p>` : ''}
+      <div class="row"><input type="text" id="mt5KeyShow" readonly value="${'•'.repeat(24)}" style="max-width:360px;font-family:var(--mono)"><button class="btn small" id="mt5Reveal">Afficher</button><button class="btn small" id="mt5Copy">Copier la clé</button></div>
+      <h3>Installer le robot dans MT5 (une seule fois)</h3>
+      <ol style="padding-left:18px;margin:0;font-size:14px" class="stack">
+        <li><a href="mt5/DeskUS_Bridge.mq5" download>Télécharge le robot DeskUS_Bridge.mq5</a>.</li>
+        <li>Dans MT5 : <b>Fichier → Ouvrir le dossier des données</b>, puis <b>MQL5 → Experts</b>. Copie le fichier dedans.</li>
+        <li>Ouvre-le avec <b>MetaEditor</b> (clic droit → Modifier) et clique <b>Compiler</b> (F7). Il doit afficher « 0 errors ».</li>
+        <li><b>Outils → Options → Expert Advisors</b> : coche <b>« Autoriser WebRequest pour les URL listées »</b> et ajoute <code class="mono">${SB_URL}</code>.</li>
+        <li>Dans le Navigateur, onglet Experts, glisse <b>DeskUS_Bridge</b> sur un graphique US100.cash. Onglet <b>Entrées</b> : colle ta clé dans « Clé Desk US ». Vérifie les symboles (US100.cash,US500.cash). Valide.</li>
+        <li>Active le bouton <b>Algo Trading</b>. En haut à gauche du graphique, le robot affiche « Desk US · connecté ». Ici, la pastille passe à « MT5 en direct ».</li>
+      </ol>
+      <p class="hint">Le robot ne passe aucun ordre : il lit les prix, le compte et l'historique, puis les envoie toutes les 3 secondes. Garde MT5 ouvert pendant ta séance.</p>
+      <div class="row" style="margin-top:10px"><button class="btn small danger" id="mt5Forget">Oublier la clé sur cet appareil</button></div>`;
+  }
+  $('#mt5Box').addEventListener('click', async ev => {
+    const id = ev.target.id;
+    if (id === 'mt5Activate') {
+      const code = $('#mt5Code').value.trim(); const msg = $('#mt5Msg');
+      if (!code) return;
+      try {
+        if (!(window.crypto && crypto.subtle)) throw new Error('navigateur trop ancien');
+        const key = 'dk_' + hex(crypto.getRandomValues(new Uint8Array(32)));
+        const ok = await rpc('desk_claim', { p_code: code, p_key_hash: await sha256(key) });
+        if (!ok) { msg.textContent = 'Code invalide ou déjà utilisé.'; return; }
+        LIVE.key = key; store.set('td.mt5key', key);
+        renderMt5Settings(); renderFtmo(); renderLiveStatus(); poll(true);
+        $('#mt5KeyShow').value = key;
+        alert('Connexion activée. Copie ta clé (bouton « Copier la clé ») et garde-la précieusement : elle sert au robot MT5 et à tes autres appareils.');
+      } catch (e) { msg.textContent = 'Activation impossible : ' + e.message; }
+    }
+    if (id === 'mt5UseKey') {
+      const key = $('#mt5KeyIn').value.trim(); const msg = $('#mt5Msg');
+      try { await rpc('desk_read', { p_key: key, p_trades: false, p_bars_after: 9e12 }); }
+      catch (e) { msg.textContent = /unknown key/.test(e.message) ? 'Clé inconnue.' : 'Vérification impossible : ' + e.message; return; }
+      LIVE.key = key; store.set('td.mt5key', key); renderMt5Settings(); renderFtmo(); poll(true);
+    }
+    if (id === 'mt5Reveal') { const i = $('#mt5KeyShow'); const shown = i.value === LIVE.key; i.value = shown ? '•'.repeat(24) : LIVE.key; ev.target.textContent = shown ? 'Afficher' : 'Masquer'; }
+    if (id === 'mt5Copy') {
+      try { await navigator.clipboard.writeText(LIVE.key); ev.target.textContent = 'Copiée ✓'; }
+      catch (e) { const i = $('#mt5KeyShow'); i.value = LIVE.key; i.select(); ev.target.textContent = 'Sélectionnée : Ctrl+C'; }
+      setTimeout(() => { ev.target.textContent = 'Copier la clé'; }, 2500);
+    }
+    if (id === 'mt5Forget' && confirm('Oublier la clé sur cet appareil ? Note-la avant si tu ne l\'as pas ailleurs (le robot MT5 continue de fonctionner).')) {
+      store.del('td.mt5key'); LIVE.key = ''; LIVE.data = null; LIVE.trades = []; LIVE.bars = null; LIVE.barsAt = null; LIVE.err = '';
+      renderMt5Settings(); renderFtmo(); renderLiveStatus(); renderLevels(); renderJournal(); renderSessionStats();
+    }
+  });
+
+  /* ---------- Réglages : règles FTMO ---------- */
+  function renderFtmoSettings() {
+    $('#fPhase').value = S.ftmo.phase; $('#fDaily').value = S.ftmo.daily; $('#fMax').value = S.ftmo.max;
+    $('#fTarget').value = S.ftmo.target; $('#fInit').value = S.ftmo.init || ''; $('#sRiskBase').value = S.riskBase;
+  }
+  $('#fPhase').addEventListener('change', e => {
+    S.ftmo.phase = e.target.value;
+    S.ftmo.target = e.target.value === 'verification' ? 5 : e.target.value === 'funded' ? 0 : 10;
+    saveSettings(); renderFtmoSettings(); renderFtmo();
+  });
+  [['#fDaily', 'daily'], ['#fMax', 'max'], ['#fTarget', 'target'], ['#fInit', 'init']].forEach(([sel, key]) => {
+    $(sel).addEventListener('change', e => { const v = e.target.value === '' ? 0 : num(e.target.value); if (isFinite(v) && v >= 0) { S.ftmo[key] = v; saveSettings(); renderFtmo(); renderSessionStats(); renderPlan(); } });
+  });
+  $('#sRiskBase').addEventListener('change', e => { S.riskBase = e.target.value; saveSettings(); renderFtmo(); renderSessionStats(); renderPlan(); });
+  renderFtmoSettings();
 
   /* =========================================================
      Rendu initial
@@ -973,6 +1360,7 @@
   renderPlan();
   tick();
   setInterval(tick, 1000);
+  startLive();
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { MODEL = buildDayModel(); lastMinute = -1; tick(); } });
   let startTab = 'seance';
   try { startTab = sessionStorage.getItem('td.tab') || 'seance'; } catch (e) {}
