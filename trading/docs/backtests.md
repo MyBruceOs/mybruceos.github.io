@@ -155,6 +155,35 @@ Conclusions :
 | C. US100 H1+H4 + SP500 H4+Daily | 71 | 61 (25 %) | 54 % | +38 150 $ | +53 580 $ | −5 000 $ |
 | D. US100 H1+H4 + SP500 H4 | 100 | 78 (32 %) | 47 % | +38 570 $ | +56 880 $ | −7 000 $ |
 
+## 4 ter. Analyse des trades perdants de B
+
+Objectif : trouver un motif commun aux trades perdants de B, qu'on pourrait retirer sans toucher aux gagnants.
+
+Méthode : B compte 118 trades (65 perdants, 53 gagnants). Pour chaque mesure du setup, j'ai comparé les perdants et les gagnants. Les mesures testées :
+- profondeur et heure du Judas, heure de la cassure, netteté et corps de la bougie de cassure ;
+- taille de la jambe, risque comparé à la volatilité, range du pré-marché, gap ;
+- premium/discount par rapport à la veille, liquidité visée, distance à l'ouverture ;
+- délai entre la cassure et l'entrée ;
+- tendance Daily et H1 par rapport au trade ;
+- les 10 facteurs fondamentaux.
+
+Contrôle anti-hasard : le motif est choisi sur la première moitié de l'année (déc.–juin), puis vérifié sur la seconde (juin–nov.).
+
+Résultats :
+- **La plupart des motifs sont du hasard.** Les 8 meilleurs motifs trouvés sur la première moitié font perdre de l'argent ou n'apportent rien sur la seconde moitié, sauf un. Par exemple, « Judas très profond » sur SP500 : 8 perdants pour 1 gagnant sur l'année, mais tout l'effet vient de la première moitié. Sur US100, le même motif retire 7 gagnants.
+- **Le vrai motif des pertes de B, c'est le Daily sur SP500.** Les 29 trades SP500 de B où le Daily n'est pas d'accord ont un win rate de 31 %. Ils ne rapportent que +3 300 $ à 3R et font passer la pire baisse de −5 320 à −7 320 $. C'est exactement ce que le filtre de A retire.
+- **Un seul motif tient sur les deux moitiés : US100 quand le H1 va contre le trade.** Il concerne 7 trades : 6 perdants et 1 gagnant, avec +2 920 $ puis +3 000 $ selon la moitié. C'est logique : on ne prend pas un trade contre la tendance horaire à l'ouverture. Sur SP500, ce motif ne marche pas (3 perdants, 4 gagnants).
+- Fondamentaux : aucun des 10 facteurs (VIX, dollar, taux, Fed, emploi, inflation, crédit…) ne trie les perdants sans retirer autant ou plus de gagnants.
+
+| Combinaison | Trades | Jours | Win rate 3R | Win rate 2R | 2R | 3R | Pire baisse |
+|---|---|---|---|---|---|---|---|
+| A actuel | 89 | 76 (32 %) | 49 % | 53 % | +41 800 $ | +55 230 $ | −5 320 $ |
+| **A + US100 sans H1 contre** | **82** | **70 (29 %)** | **52 %** | **54 %** | **+41 720 $** | **+61 150 $** | **−5 000 $** |
+| B | 118 | 87 (36 %) | 45 % | 48 % | +42 220 $ | +58 530 $ | −7 320 $ |
+| B + US100 sans H1 contre | 111 | 83 (34 %) | 47 % | 49 % | +42 140 $ | +64 450 $ | −7 000 $ |
+
+Le filtre « H1 contre » ajoute environ +6 000 $ à 3R, mais rien à 2R : à 2R, le gagnant retiré compense les pertes évitées.
+
 ## 5. Idées testées et rejetées
 
 | Idée | Effet |
