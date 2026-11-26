@@ -14,12 +14,12 @@
 //|    leur résultat), et envoie les niveaux à l'application.        |
 //+------------------------------------------------------------------+
 #property copyright "Desk US"
-#property version   "1.03"
+#property version   "1.05"
 #property description "Règle A Desk US (US100 / SP500) : détection, dessin, historique et exécution en une touche."
 
 #include <Trade\Trade.mqh>
 
-#define DK_VERSION "1.03"
+#define DK_VERSION "1.05"
 
 enum ENUM_DK_PROFIL
   {
@@ -53,7 +53,7 @@ input bool           InpSortie13h   = true;            // Fermer la position à 
 input bool           InpFiltreH1    = false;           // US100 : pas de trade si le H1 va contre (filtre optionnel)
 input bool           InpProtection  = false;           // Protection annonces FTMO (aucun ordre autour des annonces US)
 input int            InpProtMin     = 2;               // Protection : minutes avant et après chaque annonce
-input int            InpHistJours   = 7;               // Setups des N derniers jours affichés (0 = aucun)
+input int            InpHistJours   = 7;               // Historique : nombre de séances au démarrage (0 à 250, bouton PÉRIODE)
 input bool           InpEnvoyer     = true;            // Envoyer les setups à l'application Desk US
 input string         InpKey         = "";              // Clé Desk US (vide = reprise du robot DeskUS_Bridge)
 input ENUM_DK_HEURE  InpHeure       = HEURE_AUTO;      // Heure du serveur
@@ -141,10 +141,17 @@ string   g_lastPush = "";
 datetime g_lastPushT = 0;
 string   g_pushErr  = "";
 string   g_histJour = "";
+int      g_deinit   = -1;      // raison du dernier arrêt (changement d'unité de temps : on garde l'état)
 bool     g_protect  = false;   // protection annonces active
 long     g_evT[];              // annonces du jour (UTC)
 string   g_evNom[];
 string   g_evJour   = "";
+string   g_hLab[];             // résumé des derniers jours (du plus récent au plus ancien)
+color    g_hCol[];
+long     g_hT[];               // 9:30 NY de chaque jour (UTC)
+int      g_hObj     = 0;       // objets dessinés pour l'historique
+int      g_histN    = 7;       // séances analysées (7, 30, 90, 250)
+string   g_hStat    = "";      // statistiques de la période
 
 //+------------------------------------------------------------------+
 //| Heures                                                           |
@@ -343,6 +350,52 @@ void BuildCtx(Bar &m[], int n, int y, int mo, int d, Ctx &c)
       double px = m[iB].c, sN = 0, sP = 0;
       for(int i = nc - 10; i < nc; i++) sN += closes[i];
       for(int i = nc - 15; i < nc - 5; i++) sP += closes[i];
+      sN /= 10.0; sP /= 10.0;
+      c.d1 = (px > sN && sN > sP) ? 1 : ((px < sN && sN < sP) ? -1 : 0);
+     }
+   c.dir = 0; c.raison = "";
+   if(P.daily)
+     {
+      if(nc < 15) c.raison = "historique Daily insuffisant";
+      else if(c.h4 == 0) c.raison = "H4 sans tendance";
+      else if(c.d1 != c.h4) c.raison = "H4 et Daily pas d'accord";
+      else c.dir = c.h4;
+     }
+   else
+     {
+      if(c.h4 == 0) c.raison = "H4 sans tendance";
+      else c.dir = c.h4;
+     }
+   if(c.dir != 0 && InpFiltreH1 && !P.daily && c.h1 == -c.dir) { c.raison = "H1 contre le trade (filtre)"; c.dir = 0; }
+   c.ok = true;
+  }
+
+// même calcul que BuildCtx, à partir d'agrégats déjà calculés (historique long)
+int DernierFini(Bar &a[], int na, long secs, long fin) { return Lb(a, na, fin - secs + 1) - 1; }
+int TrendDe(Bar &a[], int na, long secs, long fin)
+  {
+   int j = DernierFini(a, na, secs, fin);
+   if(j < 0) return 0;
+   int first = MathMax(0, j - 59), cnt = j - first + 1;
+   Bar tmp[]; ArrayResize(tmp, cnt);
+   for(int i = 0; i < cnt; i++) tmp[i] = a[first + i];
+   return TrendOf(tmp, cnt);
+  }
+void BuildCtxFast(Bar &m[], int n, Bar &a4[], int n4, Bar &a1[], int n1, long &dT[], double &dC[], int nd, int y, int mo, int d, Ctx &c)
+  {
+   c.y = y; c.mo = mo; c.d = d;
+   c.t800 = NyToUtc(y, mo, d, 8, 0);  c.t930 = NyToUtc(y, mo, d, 9, 30); c.t925 = c.t930 - 300; c.t950 = c.t930 + 20 * 60;
+   c.t10  = NyToUtc(y, mo, d, 10, 0); c.t11  = NyToUtc(y, mo, d, 11, 0); c.t13  = NyToUtc(y, mo, d, 13, 0);
+   c.h4 = TrendDe(a4, n4, 14400, c.t925);
+   c.h1 = TrendDe(a1, n1, 3600, c.t925);
+   int nc = 0; while(nc < nd && dT[nc] < c.t930) nc++;
+   c.d1 = 0;
+   int iB = Lb(m, n, c.t925) - 1;
+   if(nc >= 15 && iB >= 0)
+     {
+      double px = m[iB].c, sN = 0, sP = 0;
+      for(int i = nc - 10; i < nc; i++) sN += dC[i];
+      for(int i = nc - 15; i < nc - 5; i++) sP += dC[i];
       sN /= 10.0; sP /= 10.0;
       c.d1 = (px > sN && sN > sP) ? 1 : ((px < sN && sN < sP) ? -1 : 0);
      }
@@ -847,8 +900,8 @@ void DessinerSetup(string p, Ctx &c, Setup &s, bool complet)
       Seg(p + "f0", s.extT, c.t13, s.ext, cFib, STYLE_DOT, 1, "Fibo 0 % (Judas)");
       Seg(p + "f100", s.extT, c.t13, s.far, cFib, STYLE_DOT, 1, "Fibo 100 %");
      }
-   Seg(p + "entry", s.mssT, tEnd, s.entry, cEnt, STYLE_SOLID, complet ? 2 : 1, complet ? "Entrée 50 % " + Px(s.entry) : "");
-   Seg(p + "sl", s.mssT, tEnd, s.sl, clrRed, STYLE_SOLID, complet ? 2 : 1, complet ? "SL " + Px(s.sl) : "");
+   Seg(p + "entry", s.mssT, tEnd, s.entry, cEnt, STYLE_SOLID, 2, complet ? "Entrée 50 % " + Px(s.entry) : "");
+   Seg(p + "sl", s.mssT, tEnd, s.sl, clrRed, STYLE_SOLID, 2, complet ? "SL " + Px(s.sl) : "");
    double tps[3] = {2.0, 2.5, 3.0};
    for(int k = 0; k < 3; k++)
      {
@@ -860,11 +913,11 @@ void DessinerSetup(string p, Ctx &c, Setup &s, bool complet)
    if(s.fillT > 0 && s.etape == E_TOUCHE)
      {
       long tx = s.exitT > 0 ? s.exitT : c.t13;
-      Rect(p + "bw", s.fillT, tx, s.entry, TpPrix(s, c.dir, g_tp), clair ? (color)0xD8F0D8 : (color)0x183818);
-      Rect(p + "bl", s.fillT, tx, s.entry, s.sl, clair ? (color)0xD8D8F5 : (color)0x181838);
+      Rect(p + "bw", s.fillT, tx, s.entry, TpPrix(s, c.dir, g_tp), clair ? (color)0xB8E6B8 : (color)0x1E4A1E);
+      Rect(p + "bl", s.fillT, tx, s.entry, s.sl, clair ? (color)0xB8B8EE : (color)0x1E1E4A);
       double rr = MathAbs(g_tp - 2.0) < 0.01 ? s.r2 : (MathAbs(g_tp - 2.5) < 0.01 ? s.r25 : s.r3);
       string lab = (rr > 0 ? "+" : "") + Fr(rr, 1) + "R" + (s.fini ? "" : " (en cours)");
-      Txt(p + "res", tx, c.dir > 0 ? TpPrix(s, c.dir, g_tp) : s.sl, lab, rr > 0 ? cTp : clrRed, 9, ANCHOR_LEFT_LOWER);
+      Txt(p + "res", tx, c.dir > 0 ? TpPrix(s, c.dir, g_tp) : s.sl, lab, rr > 0 ? cTp : clrRed, 11, ANCHOR_LEFT_LOWER);
      }
    else
      {
@@ -895,37 +948,98 @@ void DessinerJour()
 void Historique(bool envoyer)
   {
    ObjectsDeleteAll(0, PFX + "H");
-   if(InpHistJours <= 0 || (!g_histo && !envoyer)) { ChartRedraw(); return; }
+   ArrayResize(g_hLab, 0); ArrayResize(g_hCol, 0); ArrayResize(g_hT, 0); g_hObj = 0;
+   g_hStat = "";
+   if(g_histN <= 0) { ChartRedraw(); return; }
    g_clair = FondClair();
+   ulong t0 = GetTickCount64();
    Bar m[];
    long now = NowUtc();
-   int n = LoadM1(now - (long)(InpHistJours + 50) * 86400, G.t800 - 60, m);
-   if(n < 1000) return;
-   string rows = "[";
-   int found = 0;
+   int n = LoadM1(now - (long)(g_histN * 7 / 5 + 60) * 86400, G.t800 - 60, m);
+   if(n < 1000) { Print("Desk Key ", P.nom, " : historique M1 insuffisant (", n, " bougies) — Outils > Options > Graphiques > Barres max = Illimité"); return; }
+   // agrégats H4 / H1 et clôtures journalières, calculés une seule fois
+   Bar a4[], a1[];
+   int n4 = Aggregate(m, n, 14400, 7200, (long)9e15, a4, 10000000);
+   int n1 = Aggregate(m, n, 3600, 0, (long)9e15, a1, 10000000);
+   long dT[]; double dC[]; int nd = 0, lastDay = -1;
+   for(int i = 0; i < n; i++)
+     {
+      MqlDateTime t; TimeToStruct((datetime)m[i].t, t);
+      int key = t.year * 10000 + t.mon * 100 + t.day;
+      if(key == lastDay) continue;
+      lastDay = key;
+      if(t.day_of_week == 0 || t.day_of_week == 6) continue;
+      long o930 = NyToUtc(t.year, t.mon, t.day, 9, 30), o16 = NyToUtc(t.year, t.mon, t.day, 16, 0);
+      int a = Lb(m, n, o930);
+      if(a >= n || m[a].t != o930) continue;
+      int z = Lb(m, n, o16) - 1;
+      if(z < 0) continue;
+      nd++; ArrayResize(dT, nd, 512); ArrayResize(dC, nd, 512); dT[nd - 1] = o930; dC[nd - 1] = m[z].c;
+     }
+   string rows[]; int nr = 0;
+   int found = 0, nTr = 0, nWin = 0, nMiss = 0; double sumR = 0;
    long ny0 = NyLocal(G.t930);
-   for(int back = 1; back <= InpHistJours * 2 + 10 && found < InpHistJours; back++)
+   for(int back = 1; back <= g_histN * 2 + 10 && found < g_histN; back++)
      {
       MqlDateTime t; TimeToStruct((datetime)(ny0 - (long)back * 86400), t);
       if(t.day_of_week == 0 || t.day_of_week == 6) continue;
       long o930 = NyToUtc(t.year, t.mon, t.day, 9, 30);
       int a = Lb(m, n, o930);
       if(a >= n || m[a].t != o930) continue;   // jour sans séance
-      Ctx c; BuildCtx(m, n, t.year, t.mon, t.day, c);
+      Ctx c; BuildCtxFast(m, n, a4, n4, a1, n1, dT, dC, nd, t.year, t.mon, t.day, c);
       Setup s; ScanDay(m, n, c, c.t13 + 60, s);
-      string p = "H" + StringFormat("%02d%02d", t.mon, t.day) + "_";
+      string p = "H" + StringFormat("%02d%02d%02d", t.year % 100, t.mon, t.day) + "_";
       if(g_histo)
         {
          DessinerSetup(p, c, s, false);
-         VLine(p + "v", c.t930, (color)(g_clair ? 0xE0E0E0 : 0x303030), StringFormat("%02d/%02d", t.day, t.mon));
+         VLine(p + "v", c.t930, g_clair ? clrSilver : (color)0x505050, StringFormat("%02d/%02d · 9:30 NY", t.day, t.mon));
         }
-      if(found > 0) rows += ",";
-      rows += SetupJson(c, s, false);
+      // résumé pour le panneau
+      string lab = StringFormat("%02d/%02d ", t.day, t.mon); color col = clrDimGray;
+      if(s.etape == E_TOUCHE)
+        {
+         double rr = MathAbs(g_tp - 2.0) < 0.01 ? s.r2 : (MathAbs(g_tp - 2.5) < 0.01 ? s.r25 : s.r3);
+         lab += (rr > 0 ? "+" : "") + Fr(rr, 1) + "R"; col = rr > 0 ? clrForestGreen : clrFireBrick;
+         nTr++; sumR += rr; if(rr > 0) nWin++;
+        }
+      else if(s.etape == E_EXPIRE) { lab += "manqué"; nMiss++; } // setup valide, 50 % pas touché
+      else if(s.etape == E_IGNORE) lab += "< 10h";        // 50 % touché avant 10:00 NY
+      else if(s.etape == E_PAS_TRADE) lab += "tendance";  // pas de sens du jour
+      else lab += "rien";                                  // pas de Judas ou pas de cassure valide
+      int k = ArraySize(g_hLab);
+      ArrayResize(g_hLab, k + 1); ArrayResize(g_hCol, k + 1); ArrayResize(g_hT, k + 1);
+      g_hLab[k] = lab; g_hCol[k] = col; g_hT[k] = c.t930;
+      nr++; ArrayResize(rows, nr, 256); rows[nr - 1] = SetupJson(c, s, false);
       found++;
      }
-   rows += "]";
-   if(envoyer && found > 0) Envoyer(rows);
+   // envoi à l'application par paquets de 25 jours
+   if(envoyer)
+      for(int i = 0; i < nr; i += 25)
+        {
+         string pk = "[";
+         for(int j = i; j < MathMin(nr, i + 25); j++) pk += (j > i ? "," : "") + rows[j];
+         Envoyer(pk + "]");
+        }
+   g_hStat = "Histo " + I(found) + " séances : " + I(nTr) + " entrées · " + (nTr > 0 ? I((int)MathRound(100.0 * nWin / nTr)) + " % gagnants · " : "")
+             + (sumR >= 0 ? "+" : "") + Fr(sumR, 1) + "R à " + Fr(g_tp, 1) + "R · " + I(nMiss) + " manqués";
+   for(int i = ObjectsTotal(0) - 1; i >= 0; i--) if(StringFind(ObjectName(0, i), PFX + "H") == 0) g_hObj++;
+   string res = "";
+   for(int i = 0; i < MathMin(7, ArraySize(g_hLab)); i++) res += (i > 0 ? " | " : "") + g_hLab[i];
+   if(found < g_histN) g_hStat += " (M1 disponible : " + I(found) + " séances)";
+   Print("Desk Key ", P.nom, " : ", g_hStat, " · ", g_hObj, " objets dessinés", g_histo ? "" : " (historique masqué)", " · ", (GetTickCount64() - t0), " ms · 7 derniers : ", res);
    ChartRedraw();
+  }
+// amène le graphique sur la séance d'un jour de l'historique (toutes unités de temps)
+void AllerAuJour(int i)
+  {
+   if(i < 0 || i >= ArraySize(g_hT)) return;
+   if(!g_histo) { g_histo = true; Historique(false); }
+   int shift = iBarShift(_Symbol, _Period, ToSrv(g_hT[i]), false);
+   if(shift < 0) return;
+   ChartSetInteger(0, CHART_AUTOSCROLL, false);
+   int vis = (int)ChartGetInteger(0, CHART_VISIBLE_BARS);
+   ChartNavigate(0, CHART_END, -(shift - vis / 3));
+   Msg("graphique placé sur le " + StringSubstr(g_hLab[i], 0, 5) + " (" + g_hLab[i] + ")");
   }
 
 //+------------------------------------------------------------------+
@@ -943,14 +1057,14 @@ void Lbl(int row, string text, color c, int size = 9, string font = "Arial")
    ObjectSetString(0, n, OBJPROP_TEXT, text); ObjectSetString(0, n, OBJPROP_FONT, font);
    ObjectSetInteger(0, n, OBJPROP_FONTSIZE, size); ObjectSetInteger(0, n, OBJPROP_COLOR, c); ObjectSetInteger(0, n, OBJPROP_SELECTABLE, false);
   }
-void Btn(string id, int x, int y, int w, string text, color bg, color fg)
+void Btn(string id, int x, int y, int w, string text, color bg, color fg, int size = 9)
   {
    string n = PFX + "B" + id;
    if(ObjectFind(0, n) < 0) ObjectCreate(0, n, OBJ_BUTTON, 0, 0, 0);
    ObjectSetInteger(0, n, OBJPROP_CORNER, InpCoin == 1 ? CORNER_RIGHT_UPPER : CORNER_LEFT_UPPER);
    ObjectSetInteger(0, n, OBJPROP_XDISTANCE, InpCoin == 1 ? PX0 + PW - 10 - x : PX0 + 10 + x); ObjectSetInteger(0, n, OBJPROP_YDISTANCE, y);
    ObjectSetInteger(0, n, OBJPROP_XSIZE, w); ObjectSetInteger(0, n, OBJPROP_YSIZE, 24);
-   ObjectSetString(0, n, OBJPROP_TEXT, text); ObjectSetString(0, n, OBJPROP_FONT, "Arial Bold"); ObjectSetInteger(0, n, OBJPROP_FONTSIZE, 9);
+   ObjectSetString(0, n, OBJPROP_TEXT, text); ObjectSetString(0, n, OBJPROP_FONT, "Arial Bold"); ObjectSetInteger(0, n, OBJPROP_FONTSIZE, size);
    ObjectSetInteger(0, n, OBJPROP_BGCOLOR, bg); ObjectSetInteger(0, n, OBJPROP_COLOR, fg); ObjectSetInteger(0, n, OBJPROP_BORDER_COLOR, clrDimGray);
    ObjectSetInteger(0, n, OBJPROP_STATE, false); ObjectSetInteger(0, n, OBJPROP_SELECTABLE, false);
   }
@@ -988,11 +1102,12 @@ void Panneau()
    int d = G.dir;
    ulong ord = MonOrdre(), pos = MaPosition();
    color ce; string etat = EtatTexte(ce);
-   int rows = g_reduit ? 2 : 15;
+   int rows = g_reduit ? 3 : 16;
+   int nh = MathMin(ArraySize(g_hLab), 7);
    if(ObjectFind(0, bg) < 0) ObjectCreate(0, bg, OBJ_RECTANGLE_LABEL, 0, 0, 0);
    ObjectSetInteger(0, bg, OBJPROP_CORNER, InpCoin == 1 ? CORNER_RIGHT_UPPER : CORNER_LEFT_UPPER);
    ObjectSetInteger(0, bg, OBJPROP_XDISTANCE, InpCoin == 1 ? PX0 + PW : PX0); ObjectSetInteger(0, bg, OBJPROP_YDISTANCE, PY0);
-   ObjectSetInteger(0, bg, OBJPROP_XSIZE, PW); ObjectSetInteger(0, bg, OBJPROP_YSIZE, RowY(rows) - PY0 + (g_reduit ? 34 : 70));
+   ObjectSetInteger(0, bg, OBJPROP_XSIZE, PW); ObjectSetInteger(0, bg, OBJPROP_YSIZE, RowY(rows) - PY0 + (g_reduit ? 34 : (nh > 0 ? 100 : 70)));
    ObjectSetInteger(0, bg, OBJPROP_BGCOLOR, (color)0x1C1712); ObjectSetInteger(0, bg, OBJPROP_BORDER_TYPE, BORDER_FLAT);
    ObjectSetInteger(0, bg, OBJPROP_COLOR, P.couleur); ObjectSetInteger(0, bg, OBJPROP_SELECTABLE, false);
    bool pret = S.etape == E_PRET && ord == 0 && pos == 0 && !g_tradeFait && now < G.t11;
@@ -1000,10 +1115,14 @@ void Panneau()
    Btn("MIN", PW - 46, PY0 + 4, 26, g_reduit ? "+" : "–", clrDimGray, clrWhite);
    if(g_reduit)
      {
-      for(int r = 2; r <= 15; r++) ObjectDelete(0, PFX + "L" + IntegerToString(r));
+      for(int r = 3; r <= 16; r++) ObjectDelete(0, PFX + "L" + IntegerToString(r));
+      ObjectDelete(0, PFX + "BPER");
+      for(int i = 0; i < 7; i++) ObjectDelete(0, PFX + "BD" + I(i));
       ObjectDelete(0, PFX + "BX"); ObjectDelete(0, PFX + "BAUTO"); ObjectDelete(0, PFX + "BT2"); ObjectDelete(0, PFX + "BT25"); ObjectDelete(0, PFX + "BT3"); ObjectDelete(0, PFX + "BHIS"); ObjectDelete(0, PFX + "BANN");
       Lbl(0, "DESK KEY · " + P.nom + (d > 0 ? " · ACHATS" : (d < 0 ? " · VENTES" : " · pas de trade")), P.couleur, 11, "Arial Black");
       Lbl(1, etat, ce, 9, "Arial Bold");
+      string rs = ""; for(int i = 0; i < nh; i++) rs += (i > 0 ? " · " : "") + g_hLab[i];
+      Lbl(2, nh > 0 ? "7 j : " + rs : " ", clrSilver, 8);
       Btn("GO", 0, RowY(rows) + 4, 220, go, pret ? clrForestGreen : clrDimGray, clrWhite);
       ChartRedraw();
       return;
@@ -1048,6 +1167,7 @@ void Panneau()
                 : (g_pushErr != "" ? "Application : " + g_pushErr
                    : (g_lastPushT > 0 ? "Application : setups envoyés (" + TimeToString(g_lastPushT, TIME_MINUTES) + ")" : "Application : en attente"));
    Lbl(14, app, g_pushErr != "" ? clrOrange : clrDimGray, 8);
+   Lbl(15, g_hStat != "" ? g_hStat : " ", clrSilver, 8);
    int by = RowY(rows) + 6;
    Btn("GO", 0, by, 190, go, pret ? clrForestGreen : clrDimGray, clrWhite);
    Btn("X", 196, by, 90, "ANNULER (" + InpToucheAnnul + ")", ord != 0 || g_arme ? clrFireBrick : clrDimGray, clrWhite);
@@ -1056,7 +1176,13 @@ void Panneau()
    Btn("T25", 66, by + 30, 60, "2,5R", MathAbs(g_tp - 2.5) < 0.01 ? P.couleur : clrDimGray, clrWhite);
    Btn("T3", 132, by + 30, 60, "3R", MathAbs(g_tp - 3.0) < 0.01 ? P.couleur : clrDimGray, clrWhite);
    Btn("ANN", 196, by + 30, 90, g_protect ? "ANNONCES : OUI" : "ANNONCES : NON", g_protect ? clrSteelBlue : clrDimGray, clrWhite);
-   if(InpHistJours > 0) Btn("HIS", 292, by + 30, 108, "HISTO " + I(InpHistJours) + " J : " + (g_histo ? "OUI" : "NON"), g_histo ? clrSteelBlue : clrDimGray, clrWhite);
+   Btn("HIS", 292, by + 30, 108, (g_histo ? "MASQUER " : "AFFICHER ") + "HISTO", g_histo ? clrSteelBlue : clrDimGray, clrWhite);
+   Btn("PER", 406, by + 30, 134, "PÉRIODE : " + I(g_histN) + " J", clrSlateGray, clrWhite);
+   for(int i = 0; i < 7; i++)
+     {
+      if(i < nh) Btn("D" + I(i), i * 76, by + 60, 72, g_hLab[i], g_hCol[i], clrWhite, 8);
+      else ObjectDelete(0, PFX + "BD" + I(i));
+     }
    ChartRedraw();
   }
 
@@ -1121,17 +1247,28 @@ int OnInit()
    trade.SetExpertMagicNumber(P.magic);
    trade.SetTypeFillingBySymbol(_Symbol);
    trade.SetDeviationInPoints(50);
-   g_auto = InpAuto;
-   g_tp = (InpTP == 2.0 || InpTP == 2.5 || InpTP == 3.0) ? InpTP : 3.0;
-   g_histo = InpHistJours > 0;
-   g_protect = InpProtection;
+   // changement d'unité de temps : MT5 relance Desk Key sans effacer ses variables.
+   // On garde alors l'objectif, la période, AUTO, ANNONCES, l'armement, et on redessine.
+   bool garder = g_deinit == REASON_CHARTCHANGE;
+   g_deinit = -1;
+   if(!garder)
+     {
+      g_auto = InpAuto;
+      g_tp = (InpTP == 2.0 || InpTP == 2.5 || InpTP == 3.0) ? InpTP : 3.0;
+      g_histN = MathMax(0, MathMin(250, InpHistJours));
+      g_histo = g_histN > 0;
+      g_protect = InpProtection;
+     }
    UpdateServerOffset();
    EventSetTimer(1);
+   if(garder) g_lastBar = 0;                       // redessine la séance du jour
    Tick();
+   if(garder && g_histJour != "") Historique(false); // redessine l'historique, sans renvoi à l'application
    return INIT_SUCCEEDED;
   }
 void OnDeinit(const int reason)
   {
+   g_deinit = reason;
    EventKillTimer();
    ObjectsDeleteAll(0, PFX);
    ChartRedraw();
@@ -1155,6 +1292,14 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       else if(b == "X") Annuler("à votre demande");
       else if(b == "MIN") { g_reduit = !g_reduit; }
       else if(b == "HIS") { g_histo = !g_histo; Historique(false); }
+      else if(b == "PER")
+        {
+         g_histN = g_histN < 30 ? 30 : (g_histN < 90 ? 90 : (g_histN < 250 ? 250 : 7));
+         Msg("historique : calcul de " + I(g_histN) + " séances…"); Panneau();
+         Historique(true);
+         Msg(g_hStat);
+        }
+      else if(StringLen(b) == 2 && StringSubstr(b, 0, 1) == "D") AllerAuJour((int)StringToInteger(StringSubstr(b, 1, 1)));
       else if(b == "ANN") { g_protect = !g_protect; Msg(g_protect ? "protection annonces ACTIVÉE" : "protection annonces désactivée"); }
       else if(b == "AUTO")
         {

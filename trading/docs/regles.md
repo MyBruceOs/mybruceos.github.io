@@ -1,6 +1,6 @@
 # Règles de trading Desk US — référence A
 
-*Version du 27 novembre 2026 (Desk Key 1.03, nouvelle application). Règles validées par le backtest M1 FTMO (décembre 2025 – novembre 2026). Les chiffres détaillés sont dans [backtests.md](backtests.md).*
+*Version du 27 novembre 2026 (Desk Key 1.05, nouvelle application). Règles validées par le backtest M1 FTMO (décembre 2025 – novembre 2026). Les chiffres détaillés sont dans [backtests.md](backtests.md).*
 
 > **Un indice = un profil = un graphique.** On ne mélange jamais les règles de l'US100 et du SP500.
 
@@ -81,7 +81,10 @@ Fichier : `trading/mt5/DeskUS_Key.mq5`.
 - **Touche X** : annule l'ordre en attente ou l'armement.
 - **Bouton –** : réduit le panneau à deux lignes (état du jour + bouton de placement) ; **+** le rouvre.
 - **Bouton ANNONCES** (réglage « Protection annonces FTMO », désactivé par défaut) : aucun ordre de 2 min avant à 2 min après une annonce US du calendrier (ISM, JOLTS, CPI, NFP…). Un ordre armé part après l'annonce, un ordre en attente est retiré puis remis s'il est encore valide. Utile sur un compte FTMO financé standard ; inutile en Challenge, en Vérification et sur un compte Swing. Dans le backtest, seuls 2 trades sur 89 ont été remplis entre 10:00 et 10:02 un jour d'annonce.
-- **Bouton HISTO 7 J** : affiche sur le graphique les setups des 7 derniers jours (niveaux, zone gain/perte, résultat « +3R », « −1R », ou la raison de l'absence de trade).
+- **Bouton AFFICHER / MASQUER HISTO** : affiche sur le graphique les setups de la période choisie (séparateur « jj/mm · 9:30 NY », Judas, entrée, SL, TP, zone gain/perte, résultat « +3R » / « −1R », ou la raison de l'absence de trade). Les dessins restent visibles en M5, M15, H1 ou H4 : le calcul utilise toujours les bougies M1. Quand on change d'unité de temps, Desk Key garde ses réglages du moment (objectif, période, AUTO, ANNONCES, ordre armé) et redessine tout.
+- **Bouton PÉRIODE** : 7 → 30 → 90 → 250 séances (environ un an de bourse), puis retour à 7. Le réglage « Historique » fixe la période au démarrage. Sous les boutons, une ligne résume la période : séances analysées, entrées, % de gagnants, total en R à l'objectif choisi, setups manqués. Le calcul de 250 séances prend quelques secondes.
+  - La limite vient des bougies M1 que MT5 garde : il faut environ 60 jours de plus que la période (tendance H4 et Daily). Si la ligne indique « M1 disponible : N séances », mettre **Outils → Options → Graphiques → Barres max dans le graphique = Illimité**, redémarrer MT5, puis faire défiler le graphique M1 vers la gauche pour charger l'historique.
+- **Rangée des 7 jours** (sous les boutons) : un bouton par jour, du plus récent au plus ancien ; un clic amène le graphique sur la séance de ce jour, quelle que soit l'unité de temps. Vert = gagnant, rouge = perdant, gris = pas de trade : « manqué » (setup valide, 50 % pas touché avant 11:00 NY), « < 10h » (50 % touché avant 10:00 NY), « tendance » (pas de sens du jour), « rien » (pas de Judas ou pas de cassure valide). En mode réduit, le résumé tient sur une ligne.
 - Boutons **2R / 2,5R / 3R** : choix de l'objectif.
 - Bouton **AUTO** : mode automatique, désactivé par défaut. À n'activer que si la prop firm l'autorise.
 - Gestion faite par Desk Key :
@@ -91,7 +94,7 @@ Fichier : `trading/mt5/DeskUS_Key.mq5`.
 - Chaque profil a son **numéro magique** : US100 = 7710100, SP500 = 7710500. Le commentaire de l'ordre indique le profil (« DeskKey US100 3R »), pour le suivi dans le journal.
 
 ### Envoi vers l'application
-- Desk Key envoie chaque setup (pré-marché, Judas, cassure, entrée, SL, TP 2R / 2,5R / 3R, lot, état, résultat simulé) à l'application Desk US : le jour même en direct, et les 7 derniers jours à l'installation.
+- Desk Key envoie chaque setup (pré-marché, Judas, cassure, entrée, SL, TP 2R / 2,5R / 3R, lot, état, résultat simulé) à l'application Desk US : le jour même en direct, les jours de la période au démarrage, et toute la période à chaque changement avec le bouton PÉRIODE (envoi par paquets de 25 jours). Le Journal de l'application peut ainsi remonter jusqu'à un an.
 - La clé est reprise automatiquement du robot **DeskUS_Bridge 1.05** (fichier commun `DeskUS\cle.txt`) ; sinon, la coller dans le réglage « Clé Desk US » de Desk Key.
 - Les trades pris avec Desk Key sont reliés à leur setup dans le journal (résultat réel à côté du résultat de la règle).
 
