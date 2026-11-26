@@ -1,6 +1,6 @@
 # Règles de trading Desk US — référence A
 
-*Version du 27 novembre 2026 (Desk Key 1.02, nouvelle application). Règles validées par le backtest M1 FTMO (décembre 2025 – novembre 2026). Les chiffres détaillés sont dans [backtests.md](backtests.md).*
+*Version du 27 novembre 2026 (Desk Key 1.03, nouvelle application). Règles validées par le backtest M1 FTMO (décembre 2025 – novembre 2026). Les chiffres détaillés sont dans [backtests.md](backtests.md).*
 
 > **Un indice = un profil = un graphique.** On ne mélange jamais les règles de l'US100 et du SP500.
 
@@ -80,6 +80,7 @@ Fichier : `trading/mt5/DeskUS_Key.mq5`.
   - entre 10:00 et 11:00 NY : l'ordre limite part **tout de suite**, avec le lot calculé.
 - **Touche X** : annule l'ordre en attente ou l'armement.
 - **Bouton –** : réduit le panneau à deux lignes (état du jour + bouton de placement) ; **+** le rouvre.
+- **Bouton ANNONCES** (réglage « Protection annonces FTMO », désactivé par défaut) : aucun ordre de 2 min avant à 2 min après une annonce US du calendrier (ISM, JOLTS, CPI, NFP…). Un ordre armé part après l'annonce, un ordre en attente est retiré puis remis s'il est encore valide. Utile sur un compte FTMO financé standard ; inutile en Challenge, en Vérification et sur un compte Swing. Dans le backtest, seuls 2 trades sur 89 ont été remplis entre 10:00 et 10:02 un jour d'annonce.
 - **Bouton HISTO 7 J** : affiche sur le graphique les setups des 7 derniers jours (niveaux, zone gain/perte, résultat « +3R », « −1R », ou la raison de l'absence de trade).
 - Boutons **2R / 2,5R / 3R** : choix de l'objectif.
 - Bouton **AUTO** : mode automatique, désactivé par défaut. À n'activer que si la prop firm l'autorise.

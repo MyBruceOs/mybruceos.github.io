@@ -14,12 +14,12 @@
 //|    leur résultat), et envoie les niveaux à l'application.        |
 //+------------------------------------------------------------------+
 #property copyright "Desk US"
-#property version   "1.02"
+#property version   "1.03"
 #property description "Règle A Desk US (US100 / SP500) : détection, dessin, historique et exécution en une touche."
 
 #include <Trade\Trade.mqh>
 
-#define DK_VERSION "1.02"
+#define DK_VERSION "1.03"
 
 enum ENUM_DK_PROFIL
   {
@@ -51,6 +51,8 @@ input bool           InpAuto        = false;           // Mode automatique (plac
 input bool           InpSuivreFibo  = true;            // Déplacer l'ordre quand la jambe s'allonge (comme le backtest)
 input bool           InpSortie13h   = true;            // Fermer la position à 13:00 NY (19:00 Paris)
 input bool           InpFiltreH1    = false;           // US100 : pas de trade si le H1 va contre (filtre optionnel)
+input bool           InpProtection  = false;           // Protection annonces FTMO (aucun ordre autour des annonces US)
+input int            InpProtMin     = 2;               // Protection : minutes avant et après chaque annonce
 input int            InpHistJours   = 7;               // Setups des N derniers jours affichés (0 = aucun)
 input bool           InpEnvoyer     = true;            // Envoyer les setups à l'application Desk US
 input string         InpKey         = "";              // Clé Desk US (vide = reprise du robot DeskUS_Bridge)
@@ -59,6 +61,7 @@ input int            InpCoin        = 0;               // Coin du panneau (0 = h
 
 const string URL_SETUP = "https://xakrdapoxthvvqpyjuji.supabase.co/rest/v1/rpc/desk_setup_push";
 const string API_KEY   = "sb_publishable_Hzn2bTrae-TflG_HCzLVWg_QYF4l0ec";
+const string URL_EVENTS = "https://xakrdapoxthvvqpyjuji.supabase.co/rest/v1/rpc/desk_events_read";
 
 //--- Profil (règles figées, issues des backtests) -------------------
 struct Profil
@@ -138,6 +141,10 @@ string   g_lastPush = "";
 datetime g_lastPushT = 0;
 string   g_pushErr  = "";
 string   g_histJour = "";
+bool     g_protect  = false;   // protection annonces active
+long     g_evT[];              // annonces du jour (UTC)
+string   g_evNom[];
+string   g_evJour   = "";
 
 //+------------------------------------------------------------------+
 //| Heures                                                           |
@@ -478,6 +485,62 @@ string EtapeCode(int e)
   }
 
 //+------------------------------------------------------------------+
+//| Annonces économiques US du jour (calendrier de l'application)    |
+//+------------------------------------------------------------------+
+string JsonStr(string obj, string key)
+  {
+   int a = StringFind(obj, "\"" + key + "\":\"");
+   if(a < 0) return "";
+   a += StringLen(key) + 4;
+   int z = StringFind(obj, "\"", a);
+   return z > a ? StringSubstr(obj, a, z - a) : "";
+  }
+void ChargerAnnonces(Ctx &c)
+  {
+   string jour = StringFormat("%04d-%02d-%02d", c.y, c.mo, c.d);
+   if(jour == g_evJour || MQLInfoInteger(MQL_TESTER)) return;
+   string body = "{\"p_from\":\"" + jour + "\",\"p_to\":\"" + jour + "\"}";
+   char data[], result[]; string rh;
+   int len = StringToCharArray(body, data, 0, WHOLE_ARRAY, CP_UTF8);
+   if(len > 0) ArrayResize(data, len - 1);
+   int code = WebRequest("POST", URL_EVENTS, "Content-Type: application/json\r\napikey: " + API_KEY + "\r\n", 5000, data, result, rh);
+   if(code < 200 || code >= 300) return;   // nouvel essai au prochain contexte
+   g_evJour = jour;
+   ArrayResize(g_evT, 0); ArrayResize(g_evNom, 0);
+   string txt = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
+   string objs[];
+   int n = StringSplit(txt, '}', objs);
+   for(int i = 0; i < n; i++)
+     {
+      string tm = JsonStr(objs[i], "time"), nom = JsonStr(objs[i], "name");
+      if(StringLen(tm) != 5) continue;
+      int h = (int)StringToInteger(StringSubstr(tm, 0, 2)), mi = (int)StringToInteger(StringSubstr(tm, 3, 2));
+      int k = ArraySize(g_evT);
+      ArrayResize(g_evT, k + 1); ArrayResize(g_evNom, k + 1);
+      g_evT[k] = NyToUtc(c.y, c.mo, c.d, h, mi); g_evNom[k] = nom;
+     }
+  }
+// vrai si un ordre ne doit pas exister à l'instant t (protection active) ; renvoie l'annonce concernée
+bool Bloque(long t, int &idx)
+  {
+   idx = -1;
+   if(!g_protect) return false;
+   for(int i = 0; i < ArraySize(g_evT); i++)
+      if(t >= g_evT[i] - InpProtMin * 60 - 15 && t <= g_evT[i] + InpProtMin * 60) { idx = i; return true; }
+   return false;
+  }
+string AnnoncesTexte()
+  {
+   string s = "";
+   for(int i = 0; i < ArraySize(g_evT); i++)
+     {
+      if(s != "") s += " · ";
+      s += Hm(NyLocal(g_evT[i])) + " NY " + g_evNom[i];
+     }
+   return s;
+  }
+
+//+------------------------------------------------------------------+
 //| Ordres                                                           |
 //+------------------------------------------------------------------+
 ulong MonOrdre()
@@ -549,6 +612,13 @@ bool Placer()
    if(now < G.t10) { g_arme = true; Msg("armé : l'ordre partira à 10:00 NY s'il est encore valide"); return false; }
    if(now >= G.t11) { Msg("fenêtre d'entrée terminée (11:00 NY)"); return false; }
    if(g_tradeFait || MaPosition() != 0) { Msg("déjà un trade aujourd'hui sur " + P.nom); return false; }
+   int ev;
+   if(Bloque(now, ev))
+     {
+      g_arme = true;
+      Msg("annonce " + g_evNom[ev] + " à " + Hm(NyLocal(g_evT[ev])) + " NY : ordre différé à " + Hm(NyLocal(g_evT[ev] + InpProtMin * 60 + 1)) + " NY (protection)");
+      return false;
+     }
    double entry = NormPx(S.entry), sl = NormPx(S.sl), tp = NormPx(TpPrix(S, G.dir, g_tp));
    double lots = Lot(entry, sl);
    if(lots <= 0) { Msg("lot impossible : risque trop faible pour le lot minimum"); return false; }
@@ -583,6 +653,13 @@ void Gerer()
    if(ord != 0)
      {
       if(now >= G.t11) { Annuler("11:00 NY sans remplissage"); return; }
+      int ev;
+      if(Bloque(now, ev) && trade.OrderDelete(ord))
+        {
+         g_arme = true;   // remis automatiquement après l'annonce s'il est encore valide
+         Msg("annonce " + g_evNom[ev] + " : ordre retiré, remis après " + Hm(NyLocal(g_evT[ev] + InpProtMin * 60)) + " NY");
+         return;
+        }
       if(S.etape == E_IGNORE || S.etape == E_EXPIRE || S.etape == E_FINI || S.etape == E_PAS_TRADE) { Annuler("setup plus valide"); return; }
       if(InpSuivreFibo && S.etape == E_PRET && OrderSelect(ord))
         {
@@ -595,7 +672,8 @@ void Gerer()
      }
    if(pos != 0 || g_tradeFait) return;
    static datetime essai = 0;
-   if(S.etape == E_PRET && now >= G.t10 && now < G.t11 && (g_arme || g_auto) && TimeLocal() - essai >= 30)
+   int evb;
+   if(S.etape == E_PRET && now >= G.t10 && now < G.t11 && (g_arme || g_auto) && !Bloque(now, evb) && TimeLocal() - essai >= 30)
      {
       essai = TimeLocal();
       Placer();
@@ -638,7 +716,7 @@ string SetupJson(Ctx &c, Setup &s, bool aujourdhui)
       double vol, px; long pid = TradeDuJour(vol, px);
       if(pid != 0) j += ",\"pris\":{\"id\":" + I(pid) + ",\"vol\":" + N(vol, 2) + ",\"px\":" + N(px, dg) + ",\"tpR\":" + N(g_tp, 1) + "}";
       else if(MonOrdre() != 0) j += ",\"ordre\":true";
-      j += ",\"auto\":" + (g_auto ? "true" : "false");
+      j += ",\"auto\":" + (g_auto ? "true" : "false") + ",\"protection\":" + (g_protect ? "true" : "false");
      }
    return j + "}";
   }
@@ -923,7 +1001,7 @@ void Panneau()
    if(g_reduit)
      {
       for(int r = 2; r <= 15; r++) ObjectDelete(0, PFX + "L" + IntegerToString(r));
-      ObjectDelete(0, PFX + "BX"); ObjectDelete(0, PFX + "BAUTO"); ObjectDelete(0, PFX + "BT2"); ObjectDelete(0, PFX + "BT25"); ObjectDelete(0, PFX + "BT3"); ObjectDelete(0, PFX + "BHIS");
+      ObjectDelete(0, PFX + "BX"); ObjectDelete(0, PFX + "BAUTO"); ObjectDelete(0, PFX + "BT2"); ObjectDelete(0, PFX + "BT25"); ObjectDelete(0, PFX + "BT3"); ObjectDelete(0, PFX + "BHIS"); ObjectDelete(0, PFX + "BANN");
       Lbl(0, "DESK KEY · " + P.nom + (d > 0 ? " · ACHATS" : (d < 0 ? " · VENTES" : " · pas de trade")), P.couleur, 11, "Arial Black");
       Lbl(1, etat, ce, 9, "Arial Bold");
       Btn("GO", 0, RowY(rows) + 4, 220, go, pret ? clrForestGreen : clrDimGray, clrWhite);
@@ -963,7 +1041,9 @@ void Panneau()
    Lbl(10, "État : " + etat, ce, 10, "Arial Bold");
    Lbl(11, g_msg != "" && TimeLocal() - g_msgT < 120 ? "› " + g_msg : " ", clrLightSkyBlue);
    Lbl(12, "Profil " + P.nom + " : stop Judas ± " + Fr(P.marge, 1) + " pts · " + (P.fvg ? "FVG obligatoire" : "sans FVG") + " · " + (P.daily ? "H4 + Daily" : "H4"), clrDimGray, 8);
-   Lbl(13, "Touches : " + InpTouche + " = placer / armer · " + InpToucheAnnul + " = annuler · un seul trade par jour", clrDimGray, 8);
+   string ann = AnnoncesTexte();
+   if(ann != "") Lbl(13, "Annonces : " + ann + " · protection " + (g_protect ? "OUI (pas d'ordre ±" + I(InpProtMin) + " min)" : "NON"), g_protect ? clrLightSkyBlue : clrOrange, 8);
+   else Lbl(13, "Touches : " + InpTouche + " = placer / armer · " + InpToucheAnnul + " = annuler · pas d'annonce US aujourd'hui", clrDimGray, 8);
    string app = !InpEnvoyer ? "Application : envoi désactivé"
                 : (g_pushErr != "" ? "Application : " + g_pushErr
                    : (g_lastPushT > 0 ? "Application : setups envoyés (" + TimeToString(g_lastPushT, TIME_MINUTES) + ")" : "Application : en attente"));
@@ -975,6 +1055,7 @@ void Panneau()
    Btn("T2", 0, by + 30, 60, "2R", MathAbs(g_tp - 2.0) < 0.01 ? P.couleur : clrDimGray, clrWhite);
    Btn("T25", 66, by + 30, 60, "2,5R", MathAbs(g_tp - 2.5) < 0.01 ? P.couleur : clrDimGray, clrWhite);
    Btn("T3", 132, by + 30, 60, "3R", MathAbs(g_tp - 3.0) < 0.01 ? P.couleur : clrDimGray, clrWhite);
+   Btn("ANN", 196, by + 30, 90, g_protect ? "ANNONCES : OUI" : "ANNONCES : NON", g_protect ? clrSteelBlue : clrDimGray, clrWhite);
    if(InpHistJours > 0) Btn("HIS", 292, by + 30, 108, "HISTO " + I(InpHistJours) + " J : " + (g_histo ? "OUI" : "NON"), g_histo ? clrSteelBlue : clrDimGray, clrWhite);
    ChartRedraw();
   }
@@ -1015,6 +1096,7 @@ void Tick()
       Bar m[];
       int n = LoadM1(t930 - 300 - 40 * 86400, t930 - 301, m);
       BuildCtx(m, n, t.year, t.mon, t.day, G);
+      ChargerAnnonces(G);
       g_tradeFait = TradeDejaFait();
       g_arme = false;
       g_lastBar = 0;
@@ -1042,6 +1124,7 @@ int OnInit()
    g_auto = InpAuto;
    g_tp = (InpTP == 2.0 || InpTP == 2.5 || InpTP == 3.0) ? InpTP : 3.0;
    g_histo = InpHistJours > 0;
+   g_protect = InpProtection;
    UpdateServerOffset();
    EventSetTimer(1);
    Tick();
@@ -1072,6 +1155,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       else if(b == "X") Annuler("à votre demande");
       else if(b == "MIN") { g_reduit = !g_reduit; }
       else if(b == "HIS") { g_histo = !g_histo; Historique(false); }
+      else if(b == "ANN") { g_protect = !g_protect; Msg(g_protect ? "protection annonces ACTIVÉE" : "protection annonces désactivée"); }
       else if(b == "AUTO")
         {
          if(!g_auto)

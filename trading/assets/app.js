@@ -188,6 +188,7 @@
     else if (d.ordre) foot += '<span class="tag mt5">Ordre placé</span>';
     if (d.etat === 'rempli') foot += ` <span class="muted">Résultat de la règle (${PREF.tp}R) : <b class="${cls(resOf(d))}">${fmtR(resOf(d))}</b>${d.fini ? '' : ' (en cours)'}</span>`;
     if (d.auto) foot += ' <span class="tag bear">AUTO actif</span>';
+    if (d.protection) foot += ' <span class="tag info">Protection annonces</span>';
     return `<div class="card c6">${head}
       <div class="muted" style="font-size:14px">Tendance : ${trend} → ${dir}</div>
       <div class="steps">${steps.join('')}</div>
@@ -211,7 +212,7 @@
     $('#newsCard').innerHTML = `<h2>Annonces économiques US</h2>
       ${todays.length ? `<table><tbody>${todays.map(line).join('')}</tbody></table>` : '<p class="muted" style="margin:0">Aucune annonce majeure aujourd\'hui.</p>'}
       ${next.length ? `<h3>Prochains jours</h3><table><tbody>${next.map(line).join('')}</tbody></table>` : ''}
-      <p class="hint">Backtest : les annonces de 10:00 NY ne sont pas un motif de perte (elles sont même plutôt favorables au SP500). Elles ne changent pas la règle ; elles expliquent seulement une volatilité plus forte.</p>`;
+      <p class="hint">Backtest : les annonces de 10:00 NY ne sont pas un motif de perte (elles sont même plutôt favorables au SP500). Elles ne changent pas la règle ; elles expliquent seulement une volatilité plus forte.</p><p class="hint">Compte FTMO financé (hors Swing) : activez la <b>protection annonces</b> dans Desk Key (bouton ANNONCES) pour qu'aucun ordre ne soit placé ni rempli de 2 min avant à 2 min après une annonce ; l'ordre est remis ensuite s'il est encore valide.</p>`;
   }
 
   /* ---------- Compte FTMO ---------- */
