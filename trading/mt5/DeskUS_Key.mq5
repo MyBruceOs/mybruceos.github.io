@@ -141,6 +141,7 @@ string   g_lastPush = "";
 datetime g_lastPushT = 0;
 string   g_pushErr  = "";
 string   g_histJour = "";
+int      g_deinit   = -1;      // raison du dernier arrêt (changement d'unité de temps : on garde l'état)
 bool     g_protect  = false;   // protection annonces active
 long     g_evT[];              // annonces du jour (UTC)
 string   g_evNom[];
@@ -1246,18 +1247,28 @@ int OnInit()
    trade.SetExpertMagicNumber(P.magic);
    trade.SetTypeFillingBySymbol(_Symbol);
    trade.SetDeviationInPoints(50);
-   g_auto = InpAuto;
-   g_tp = (InpTP == 2.0 || InpTP == 2.5 || InpTP == 3.0) ? InpTP : 3.0;
-   g_histN = MathMax(0, MathMin(250, InpHistJours));
-   g_histo = g_histN > 0;
-   g_protect = InpProtection;
+   // changement d'unité de temps : MT5 relance Desk Key sans effacer ses variables.
+   // On garde alors l'objectif, la période, AUTO, ANNONCES, l'armement, et on redessine.
+   bool garder = g_deinit == REASON_CHARTCHANGE;
+   g_deinit = -1;
+   if(!garder)
+     {
+      g_auto = InpAuto;
+      g_tp = (InpTP == 2.0 || InpTP == 2.5 || InpTP == 3.0) ? InpTP : 3.0;
+      g_histN = MathMax(0, MathMin(250, InpHistJours));
+      g_histo = g_histN > 0;
+      g_protect = InpProtection;
+     }
    UpdateServerOffset();
    EventSetTimer(1);
+   if(garder) g_lastBar = 0;                       // redessine la séance du jour
    Tick();
+   if(garder && g_histJour != "") Historique(false); // redessine l'historique, sans renvoi à l'application
    return INIT_SUCCEEDED;
   }
 void OnDeinit(const int reason)
   {
+   g_deinit = reason;
    EventKillTimer();
    ObjectsDeleteAll(0, PFX);
    ChartRedraw();
