@@ -13,12 +13,12 @@
 //|  - Tout est dessiné sur le graphique (niveaux + panneau).        |
 //+------------------------------------------------------------------+
 #property copyright "Desk US"
-#property version   "1.00"
+#property version   "1.01"
 #property description "Règle A Desk US (US100 / SP500) : détection, dessin et exécution en une touche."
 
 #include <Trade\Trade.mqh>
 
-#define DK_VERSION "1.00"
+#define DK_VERSION "1.01"
 
 enum ENUM_DK_PROFIL
   {
@@ -91,6 +91,7 @@ struct Setup
    double            L, ext, sw, far, entry, sl;
    long              sweepT, extT, swT, mssT, farT, fillT;
    bool              fvg;
+   bool              ok;       // cassure validée : niveaux d'ordre connus
    double            cassurePts, cassureMinPts;
   };
 
@@ -342,7 +343,7 @@ void ContexteDuJour(int y, int mo, int d)
 void Scan()
   {
    S.etape = E_AVANT; S.info = ""; S.fillT = 0; S.mssT = 0; S.sweepT = 0; S.extT = 0; S.swT = 0;
-   S.cassurePts = 0; S.cassureMinPts = 0; S.fvg = false;
+   S.cassurePts = 0; S.cassureMinPts = 0; S.fvg = false; S.ok = false;
    // pré-marché
    g_preHi = -DBL_MAX; g_preLo = DBL_MAX;
    for(int i = 0; i < g_n && B[i].t < g_t930; i++)
@@ -404,7 +405,7 @@ void Scan()
       if(P.cassureMin > 0 && brk < P.cassureMin * MathAbs(entry - sl))
         { S.info = "cassure refusée : +" + Fr(brk, 1) + " pts, il faut " + Fr(P.cassureMin * MathAbs(entry - sl), 1) + " pts"; continue; }
       // setup validé
-      S.etape = E_PRET; S.info = ""; S.mssT = B[i].t; S.fvg = fvgEnd >= 0;
+      S.etape = E_PRET; S.ok = true; S.info = ""; S.mssT = B[i].t; S.fvg = fvgEnd >= 0;
       S.cassurePts = brk; S.cassureMinPts = P.cassureMin * MathAbs(entry - sl);
       S.sl = sl;
       for(int k = last + 1; k < n && B[k].t < g_t11; k++)
@@ -421,7 +422,7 @@ void Scan()
       if(now >= g_t11) S.etape = E_EXPIRE;
       return;
      }
-   if(now >= g_t11 && S.etape < E_PRET) S.etape = E_FINI;
+   if(now >= g_t11 && !S.ok) S.etape = E_FINI;
   }
 
 //+------------------------------------------------------------------+
@@ -591,9 +592,19 @@ void Mark(string name, long t, double price, int code, color c, string label)
   }
 void Efface(string name) { ObjectDelete(0, PFX + name); ObjectDelete(0, PFX + name + "_t"); }
 
+bool FondClair()
+  {
+   long v = ChartGetInteger(0, CHART_COLOR_BACKGROUND);
+   int r = (int)(v & 0xFF), g = (int)((v >> 8) & 0xFF), b = (int)((v >> 16) & 0xFF);
+   return (r * 299 + g * 587 + b * 114) / 1000 > 128;
+  }
 void Dessiner()
   {
    if(g_t930 == 0) return;
+   bool clair = FondClair();
+   color cPre = clair ? (color)0xF3E8F0 : (color)0x2A2238, cLvl = clair ? clrDimGray : clrSlateGray;
+   color cSw = clair ? clrDarkGoldenrod : clrGold, cFib = clair ? clrSlateBlue : clrMediumPurple;
+   color cTp = clair ? clrGreen : clrLimeGreen, cTp2 = clair ? clrDarkSeaGreen : clrDarkGreen, cEnt = clair ? clrDarkOrange : clrOrange;
    VLine("v930", g_t930, clrGray, "9:30 NY");
    VLine("v10", g_t10, clrGoldenrod, "10:00 NY : début des entrées");
    VLine("v11", g_t11, clrGoldenrod, "11:00 NY : fin des entrées");
@@ -601,28 +612,28 @@ void Dessiner()
    if(P.judasMin > 0) VLine("v950", g_t950, clrOrange, "9:50 NY : Judas valable après"); else Efface("v950");
    if(g_preHi > g_preLo)
      {
-      Rect("pre", g_t800, g_t930, g_preHi, g_preLo, (color)0x2A2238);
-      Seg("preHi", g_t800, g_t13, g_preHi, clrSlateGray, STYLE_DASH, 1, "Haut du pré-marché" + (g_dir < 0 ? " = liquidité visée" : ""));
-      Seg("preLo", g_t800, g_t13, g_preLo, clrSlateGray, STYLE_DASH, 1, "Bas du pré-marché" + (g_dir > 0 ? " = liquidité visée" : ""));
+      Rect("pre", g_t800, g_t930, g_preHi, g_preLo, cPre);
+      Seg("preHi", g_t800, g_t13, g_preHi, cLvl, STYLE_DASH, 1, "Haut du pré-marché" + (g_dir < 0 ? " = liquidité visée" : ""));
+      Seg("preLo", g_t800, g_t13, g_preLo, cLvl, STYLE_DASH, 1, "Bas du pré-marché" + (g_dir > 0 ? " = liquidité visée" : ""));
      }
-   bool judas = S.etape >= E_CASSURE && S.extT > 0;
+   bool judas = S.sweepT > 0 && S.extT > 0;
    if(judas) Mark("ext", S.extT, S.ext, g_dir > 0 ? 233 : 234, clrTomato, "Judas"); else Efface("ext");
-   if(judas && S.swT > 0) Seg("sw", S.swT, (long)MathMax((double)S.mssT, (double)NowUtc()) + 300, S.sw, clrGold, STYLE_SOLID, 1, "Niveau de cassure (MSS)"); else Efface("sw");
-   bool niveaux = S.etape >= E_PRET;
+   if(judas && S.swT > 0) Seg("sw", S.swT, (long)MathMax((double)S.mssT, (double)NowUtc()) + 300, S.sw, cSw, STYLE_SOLID, 1, "Niveau de cassure (MSS)"); else Efface("sw");
+   bool niveaux = S.ok;
    if(niveaux)
      {
-      Mark("mss", S.mssT, S.sw, 159, clrGold, "Cassure validée");
+      Mark("mss", S.mssT, S.sw, 159, cSw, "Cassure validée");
       double r = MathAbs(S.entry - S.sl);
-      Seg("f0", S.extT, g_t13, S.ext, clrMediumPurple, STYLE_DOT, 1, "Fibo 0 % (Judas)");
-      Seg("f100", S.extT, g_t13, S.far, clrMediumPurple, STYLE_DOT, 1, "Fibo 100 %");
-      Seg("entry", S.mssT, g_t13, S.entry, clrOrange, STYLE_SOLID, 2, "Entrée 50 % " + Px(S.entry));
+      Seg("f0", S.extT, g_t13, S.ext, cFib, STYLE_DOT, 1, "Fibo 0 % (Judas)");
+      Seg("f100", S.extT, g_t13, S.far, cFib, STYLE_DOT, 1, "Fibo 100 %");
+      Seg("entry", S.mssT, g_t13, S.entry, cEnt, STYLE_SOLID, 2, "Entrée 50 % " + Px(S.entry));
       Seg("sl", S.mssT, g_t13, S.sl, clrRed, STYLE_SOLID, 2, "SL " + Px(S.sl));
       double tps[3] = {2.0, 2.5, 3.0};
       for(int k = 0; k < 3; k++)
         {
          double tp = S.entry + g_dir * tps[k] * r;
          bool sel = MathAbs(tps[k] - g_tp) < 0.01;
-         Seg("tp" + IntegerToString(k), S.mssT, g_t13, tp, sel ? clrLimeGreen : clrDarkGreen, sel ? STYLE_SOLID : STYLE_DOT, sel ? 2 : 1, "TP " + Fr(tps[k], 1) + "R " + Px(tp));
+         Seg("tp" + IntegerToString(k), S.mssT, g_t13, tp, sel ? cTp : cTp2, sel ? STYLE_SOLID : STYLE_DOT, sel ? 2 : 1, "TP " + Fr(tps[k], 1) + "R " + Px(tp));
         }
      }
    else { Efface("mss"); Efface("f0"); Efface("f100"); Efface("entry"); Efface("sl"); Efface("tp0"); Efface("tp1"); Efface("tp2"); }
@@ -632,14 +643,15 @@ void Dessiner()
 //+------------------------------------------------------------------+
 //| Panneau                                                          |
 //+------------------------------------------------------------------+
-int PX0 = 10, PY0 = 22, PW = 420;
+int PX0 = 10, PY0 = 22, PW = 560;
+int RowY(int row) { return row == 0 ? PY0 + 6 : PY0 + 14 + row * 17; }
 void Lbl(int row, string text, color c, int size = 9, string font = "Arial")
   {
    string n = PFX + "L" + IntegerToString(row);
    if(ObjectFind(0, n) < 0) ObjectCreate(0, n, OBJ_LABEL, 0, 0, 0);
    ObjectSetInteger(0, n, OBJPROP_CORNER, InpCoin == 1 ? CORNER_RIGHT_UPPER : CORNER_LEFT_UPPER);
    ObjectSetInteger(0, n, OBJPROP_ANCHOR, InpCoin == 1 ? ANCHOR_RIGHT_UPPER : ANCHOR_LEFT_UPPER);
-   ObjectSetInteger(0, n, OBJPROP_XDISTANCE, PX0 + 10); ObjectSetInteger(0, n, OBJPROP_YDISTANCE, PY0 + 8 + row * 17);
+   ObjectSetInteger(0, n, OBJPROP_XDISTANCE, PX0 + 10); ObjectSetInteger(0, n, OBJPROP_YDISTANCE, RowY(row));
    ObjectSetString(0, n, OBJPROP_TEXT, text); ObjectSetString(0, n, OBJPROP_FONT, font);
    ObjectSetInteger(0, n, OBJPROP_FONTSIZE, size); ObjectSetInteger(0, n, OBJPROP_COLOR, c); ObjectSetInteger(0, n, OBJPROP_SELECTABLE, false);
   }
@@ -659,44 +671,44 @@ color  CSens(int v) { return v > 0 ? clrMediumSeaGreen : (v < 0 ? clrTomato : cl
 
 void Panneau()
   {
-   string bg = PFX + "BG";
+   string bg = PFX + "PANEL";
    int rows = 14;
    if(ObjectFind(0, bg) < 0) ObjectCreate(0, bg, OBJ_RECTANGLE_LABEL, 0, 0, 0);
    ObjectSetInteger(0, bg, OBJPROP_CORNER, InpCoin == 1 ? CORNER_RIGHT_UPPER : CORNER_LEFT_UPPER);
    ObjectSetInteger(0, bg, OBJPROP_XDISTANCE, InpCoin == 1 ? PX0 + PW : PX0); ObjectSetInteger(0, bg, OBJPROP_YDISTANCE, PY0);
-   ObjectSetInteger(0, bg, OBJPROP_XSIZE, PW); ObjectSetInteger(0, bg, OBJPROP_YSIZE, 8 + rows * 17 + 70);
+   ObjectSetInteger(0, bg, OBJPROP_XSIZE, PW); ObjectSetInteger(0, bg, OBJPROP_YSIZE, RowY(rows) - PY0 + 70);
    ObjectSetInteger(0, bg, OBJPROP_BGCOLOR, (color)0x1C1712); ObjectSetInteger(0, bg, OBJPROP_BORDER_TYPE, BORDER_FLAT);
    ObjectSetInteger(0, bg, OBJPROP_COLOR, P.couleur); ObjectSetInteger(0, bg, OBJPROP_SELECTABLE, false);
 
    long now = NowUtc();
    int d = g_dir;
    Lbl(0, "DESK KEY · " + P.nom + " · règle A", P.couleur, 11, "Arial Black");
-   Lbl(1, "NY " + Hm(NyLocal(now)) + "  ·  Paris " + Hm(ParisLocal(now)) + "  ·  entrées 10:00–11:00 NY (" + Hm(ParisLocal(g_t10)) + "–" + Hm(ParisLocal(g_t11)) + " Paris)", clrSilver);
+   Lbl(1, "NY " + Hm(NyLocal(now)) + " · Paris " + Hm(ParisLocal(now)) + " · entrées " + Hm(ParisLocal(g_t10)) + "–" + Hm(ParisLocal(g_t11)) + " Paris · sortie " + Hm(ParisLocal(g_t13)), clrSilver);
    string tend = "Tendance : H4 " + Sens(g_h4);
    if(P.daily) tend += " · Daily " + Sens(g_d1);
    else tend += " · H1 " + Sens(g_h1) + (InpFiltreH1 ? " (filtre H1 actif)" : "");
    Lbl(2, tend, CSens(d));
    Lbl(3, d > 0 ? "→ ACHATS uniquement" : (d < 0 ? "→ VENTES uniquement" : "→ PAS DE TRADE aujourd'hui : " + g_raison), CSens(d), 10, "Arial Bold");
    if(g_preHi > g_preLo)
-      Lbl(4, "Pré-marché (8:00–9:30 NY) : haut " + Px(g_preHi) + " · bas " + Px(g_preLo) + (d != 0 ? " · cible : le " + (d > 0 ? "bas" : "haut") : ""), clrSilver);
+      Lbl(4, "Pré-marché : haut " + Px(g_preHi) + " · bas " + Px(g_preLo) + (d != 0 ? " · cible : le " + (d > 0 ? "bas" : "haut") : ""), clrSilver);
    else Lbl(4, "Pré-marché : en attente des données", clrSilver);
    // Judas
-   if(S.etape >= E_CASSURE && S.sweepT > 0)
+   if(S.sweepT > 0)
       Lbl(5, "1. Judas OK à " + Hm(ParisLocal(S.sweepT)) + " Paris · extrême " + Px(S.ext) + " à " + Hm(ParisLocal(S.extT)), clrMediumSeaGreen);
-   else Lbl(5, "1. Judas : le prix doit passer " + (d > 0 ? "sous le bas" : (d < 0 ? "au-dessus du haut" : "au-delà")) + " du pré-marché", clrSilver);
+   else Lbl(5, "1. Judas : attendre un passage " + (d > 0 ? "sous le bas" : (d < 0 ? "au-dessus du haut" : "au-delà")) + " du pré-marché", clrSilver);
    // cassure + règle propre au profil
-   string rule = P.judasMin > 0 ? "fond du Judas après 9:50 NY (" + Hm(ParisLocal(g_t950)) + " Paris)" : "cassure nette ≥ 5 % du risque + FVG M1";
-   if(S.etape >= E_PRET)
+   string rule = P.judasMin > 0 ? "Judas après " + Hm(ParisLocal(g_t950)) + " Paris" : "nette ≥ 5 % du risque + FVG";
+   if(S.ok)
      {
       string c = "2. Cassure OK à " + Hm(ParisLocal(S.mssT)) + " Paris · niveau " + Px(S.sw);
       if(P.cassureMin > 0) c += " · +" + Fr(S.cassurePts, 1) + " pts (min " + Fr(S.cassureMinPts, 1) + ")";
       Lbl(6, c, clrMediumSeaGreen);
      }
-   else if(S.etape == E_CASSURE) Lbl(6, "2. Cassure : clôture M1 au-delà de " + Px(S.sw) + " · " + rule, clrGold);
+   else if(S.etape == E_CASSURE && S.swT > 0) Lbl(6, "2. Cassure : clôture M1 au-delà de " + Px(S.sw) + " · " + rule, clrGold);
    else Lbl(6, "2. Cassure M1 · " + rule, clrSilver);
    Lbl(7, S.info != "" ? "   " + S.info : " ", clrOrange);
    // ordre
-   if(S.etape >= E_PRET && S.etape != E_IGNORE)
+   if(S.ok && S.etape != E_IGNORE)
      {
       double r = MathAbs(S.entry - S.sl), lots = Lot(NormPx(S.entry), NormPx(S.sl));
       Lbl(8, "3. " + (d > 0 ? "ACHAT" : "VENTE") + " LIMITE " + Px(S.entry) + " · SL " + Px(S.sl) + " · TP " + Px(TpPrix()) + " (" + Fr(g_tp, 1) + "R)", clrOrange, 10, "Arial Bold");
@@ -727,7 +739,7 @@ void Panneau()
    Lbl(11, g_msg != "" && TimeLocal() - g_msgT < 120 ? "› " + g_msg : " ", clrLightSkyBlue);
    Lbl(12, "Profil " + P.nom + " : stop Judas ± " + Fr(P.marge, 1) + " pts · " + (P.fvg ? "FVG obligatoire" : "sans FVG") + " · " + (P.daily ? "H4 + Daily" : "H4"), clrDimGray, 8);
    Lbl(13, "Touches : " + InpTouche + " = placer / armer · " + InpToucheAnnul + " = annuler · un seul trade par jour", clrDimGray, 8);
-   int by = PY0 + 8 + rows * 17 + 6;
+   int by = RowY(rows) + 6;
    bool pret = S.etape == E_PRET && ord == 0 && pos == 0 && !g_tradeFait && now < g_t11;
    Btn("GO", 0, by, 190, now < g_t10 ? (g_arme ? "ARMÉ OK" : "ARMER (" + InpTouche + ")") : "PLACER L'ORDRE (" + InpTouche + ")", pret ? clrForestGreen : clrDimGray, clrWhite);
    Btn("X", 196, by, 90, "ANNULER (" + InpToucheAnnul + ")", ord != 0 || g_arme ? clrFireBrick : clrDimGray, clrWhite);
@@ -823,8 +835,14 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       else if(b == "X") Annuler("à votre demande");
       else if(b == "AUTO")
         {
-         g_auto = !g_auto;
-         Msg(g_auto ? "mode automatique ACTIVÉ" : "mode automatique désactivé");
+         if(!g_auto)
+           {
+            bool oui = MQLInfoInteger(MQL_TESTER) ||
+                       MessageBox("Activer le mode automatique sur " + P.nom + " ?\n\nDesk Key placera l'ordre sans vous dès qu'un setup est valide.\nVérifiez que votre prop firm autorise les robots.",
+                                  "Desk Key · mode automatique", MB_YESNO | MB_ICONWARNING) == IDYES;
+            if(oui) { g_auto = true; Msg("mode automatique ACTIVÉ"); }
+           }
+         else { g_auto = false; Msg("mode automatique désactivé"); }
         }
       else if(b == "T2") g_tp = 2.0;
       else if(b == "T25") g_tp = 2.5;
