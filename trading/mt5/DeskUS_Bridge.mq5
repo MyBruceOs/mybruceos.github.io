@@ -5,7 +5,7 @@
 //|  Le robot ne passe AUCUN ordre : il lit et il envoie, c'est tout.|
 //+------------------------------------------------------------------+
 #property copyright   "Desk US"
-#property version     "1.02"
+#property version     "1.03"
 #property description "Pont MT5 -> Desk US. Lecture seule : aucun ordre n'est passé."
 
 //--- paramètres (onglet « Entrées »)
@@ -17,7 +17,7 @@ input int    InpDays     = 60;                       // Trades clôturés envoy�
 input string InpUrl      = "https://xakrdapoxthvvqpyjuji.supabase.co/rest/v1/rpc/desk_push"; // Adresse du service
 input string InpApiKey   = "sb_publishable_Hzn2bTrae-TflG_HCzLVWg_QYF4l0ec";                 // Clé publique du service
 
-#define EA_VERSION "1.02"
+#define EA_VERSION "1.03"
 
 string   g_syms[];
 string   g_qsyms[];   // symboles suivis + intermarché (cotations seulement)
@@ -238,7 +238,7 @@ string RatesJson(string sym, ENUM_TIMEFRAMES tf, int count)
    return s + "]";
   }
 
-// M15 (3 jours) pour les niveaux du jour, H1 (10 jours) et D1 (6 mois) pour la tendance
+// M15 (3 jours) pour les niveaux du jour, M5 (24 h) pour l'ouverture, H1 (10 jours) et D1 (6 mois) pour la tendance
 string BarsJson()
   {
    string s = "{";
@@ -247,6 +247,7 @@ string BarsJson()
       string sym = g_syms[k];
       if(k > 0) s += ",";
       s += Q(sym) + ":" + RatesJson(sym, PERIOD_M15, 288);
+      s += "," + Q(sym + "@M5") + ":" + RatesJson(sym, PERIOD_M5, 288);
       s += "," + Q(sym + "@H1") + ":" + RatesJson(sym, PERIOD_H1, 240);
       s += "," + Q(sym + "@D1") + ":" + RatesJson(sym, PERIOD_D1, 120);
      }
