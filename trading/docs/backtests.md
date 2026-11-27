@@ -497,6 +497,30 @@ Compte 3 actifs (second trade sur l'or seulement, stop remonté) : 152 trades, 5
 
 Conclusion : pour l'or, le second trade **avec** le stop du trade 1 remonté améliore tout (résultat, creux, séries, pire journée). Sans cette règle, il aggrave les mauvaises journées. Seulement 10 seconds trades sur l'année : à confirmer sur 2024–2025.
 
+## 4 undecies. Validation sur 3 ans : US100 et SP500 (2024, 2025, 2026) — 27/11/2026
+
+Règles exactes de la référence A, M1 FTMO exporté sur 3 ans, même fenêtre 10:00–11:00 NY, TP 3R. « 2024 » = 22/12/2023 – 21/12/2024, « 2025 » = 22/12/2024 – 21/12/2025, « 2026 » = 22/12/2025 – 25/11/2026.
+
+| | Trades | Gagnants 3R | Résultat 3R | Résultat 2R | Pire creux | Plus longue série de pertes | Mois + / − |
+|---|---|---|---|---|---|---|---|
+| US100 2024 | 73 | 44 % | **+41,8 R** | +35,2 R | −11,7 R | 8 | 9 / 4 |
+| **US100 2025** | 75 | **25 %** | **−19,2 R** | −11,8 R | **−23,8 R** | **10** | **3 / 9** |
+| US100 2026 | 58 | 47 % | +30,8 R | +24,2 R | −4,0 R | 4 | 9 / 2 |
+| SP500 2024 | 33 | 42 % | +17,1 R | +16,4 R | −4,0 R | 4 | 8 / 4 |
+| **SP500 2025** | 40 | **30 %** | **−2,8 R** | −6,5 R | −10,5 R | 7 | 4 / 8 |
+| SP500 2026 | 31 | 55 % | +24,4 R | +17,6 R | −3,0 R | 3 | 10 / 2 |
+| **Les deux, 2025** | 115 | 27 % | **−22,0 R** | | **−29,1 R** | **14** | 5 / 8 |
+| Les deux, 3 ans | 310 | 39 % | +92,1 R | | −29,1 R | 14 | 21 / 14 |
+
+US100 2025 par mois (R) : janv. −3,6 ; févr. −0,5 ; mars +1,5 ; avr. +6,0 ; mai −6,0 ; juin −2,0 ; juil. −4,2 ; août −4,0 ; sept. +2,4 ; oct. −4,0 ; nov. −4,5 ; déc. −0,6.
+
+- **2025 est une année perdante pour les deux indices**, en dehors des bornes « alarme » calculées sur 2026 seul (creux −16 R pour l'US100, série de 12 pertes). 2026 était une très bonne année, pas une année normale.
+- Sur 3 ans, la règle reste gagnante : US100 +53,4 R, SP500 +38,7 R, soit environ +30 R par an à eux deux, mais avec un pire creux réel de **−32,7 R** frais compris (31/12/2024 → 14/11/2025).
+- Monte Carlo sur les 3 ans (US100 + SP500) : résultat médian +25 R par an ; une année sur 10 environ +1 R ; année perdante 9 % du temps ; creux médian −11,8 R, une année sur 10 **−20,2 R**, une année sur 100 **−31,2 R** ; séries de pertes 9 / 13 / 19.
+- Money management (perte max 10 %) : probabilité de toucher −10 % dans l'année : 0,25 % par trade → 0,2 % ; 0,33 % → 1,3 % ; 0,5 % → 10 % ; 0,75 % → 38 % ; 1 % → 67 %.
+- Second trade sur 2024–2025 : US100 18 trades, 4 gagnants, −5,6 R ; SP500 18 trades, 10 gagnants, +9,2 R.
+- **L'or n'est validé que sur 2026** : ses chiffres sont à revoir de la même façon dès que l'export M1 de 3 ans est terminé.
+
 ## 4 septies. Années précédentes (2024, 2025) : il faut du M1
 
 Pour juger l'US100 et le SP500 sur 2024 et 2025, on n'avait que du M5 (3 ans). Calibration : les mêmes règles calculées en M5 sur 2026, comparées au vrai résultat M1 de 2026.

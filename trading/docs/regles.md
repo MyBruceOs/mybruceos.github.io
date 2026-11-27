@@ -77,6 +77,9 @@ Même mécanique que les indices (section 1 : liquidité du pré-marché 8:00–
 
 ## 4. Ce qu'il faut attendre (simulations)
 
+> **Mise à jour du 27/11/2026, validation sur 3 ans** (backtests.md, section 4 undecies) : 2025 a été une année **perdante** pour l'US100 (−19,2 R, 25 % de gagnants) et le SP500 (−2,8 R), avec un creux de **−29 R** pour les deux ensemble et 14 pertes d'affilée. Sur 3 ans, la règle reste gagnante (environ +30 R par an pour les deux indices), mais les creux à attendre sont bien plus profonds que ceux calculés sur 2026 seul : une année sur 10 **−20 R**, une année sur 100 **−31 R**. **Les repères de risque ci-dessous (0,75 % / 1 %) sont à remplacer** : pour rester sous la limite FTMO de 10 %, il faut environ **0,33 % par trade** (1 % de risque de toucher −10 % dans l'année) ; 0,5 % donne 10 % de risque. Les bornes d'alarme de l'application seront recalculées sur 3 ans.
+
+
 Référence A, les deux indices ensemble, TP 3R, 0,05 R de frais par trade :
 - environ **89 trades par an**, un trade sur environ 1 jour de bourse sur 3 ;
 - creux normal sur une année : **−7 à −11 R** ; séries de **6 à 9 pertes** possibles sans que la méthode soit cassée ;
