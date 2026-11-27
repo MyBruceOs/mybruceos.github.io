@@ -45,11 +45,14 @@
 - [ ] Bridge → F7 → Paramètres : « Profondeur de l'export M1 » = **1095** et « Symboles à exporter seulement » = **XAUUSD** (retirer US30.cash), puis laisser MT5 ouvert environ 2 h.
 - [ ] Quand l'export est terminé (« export terminé » dans l'onglet Experts) : Bridge → F7 → « Exporter l'historique » = false.
 
+- **Or validé sur 3 ans (27/11)** : +2,4 / +35,4 / +37,7 R (trade 1 seul), +13,8 / +47,9 / +51,2 R avec le second trade (confirmé hors échantillon). Le feu rouge n'aide pas l'or.
+- **Compte 3 actifs, configuration retenue** : feu rouge sur l'US100 et le SP500, or avec second trade sans feu rouge : 3 ans +211 R (2024 +69,7 ; 2025 +41,9 ; 2026 +99,7), pire creux −13,6 R, 29 mois positifs sur 36 ; risque **0,5 % par trade** (5 % de risque de toucher −10 % dans l'année, pire creux réel −7,4 %), 0,33 % pour une sécurité maximale (backtests.md 4 terdecies).
+
 ## Décidé, à faire après l'analyse de l'or (27/11)
-- **Feu rouge par actif, activé** : pause d'un actif quand la somme de ses 10 derniers setups (résultat de la règle à 3R, pris ou non) est négative ; retour automatique au vert quand elle redevient positive ou nulle. Explication visuelle : https://claude.ai/artifact/CXxoyndBmwbWBnf1v8Lk7z
+- **Feu rouge sur l'US100 et le SP500 (pas sur l'or), activé** : pause d'un actif quand la somme de ses 10 derniers setups (résultat de la règle à 3R, pris ou non) est négative ; retour automatique au vert quand elle redevient positive ou nulle. Explication visuelle : https://claude.ai/artifact/CXxoyndBmwbWBnf1v8Lk7z
   - Desk Key : voyant vert / rouge par actif avec la somme des 10 derniers setups ; en rouge, la touche K et le mode AUTO ne placent pas l'ordre (option « prévenir seulement ») ; notification à chaque changement de couleur ; la règle continue d'être suivie à blanc.
   - Application : voyant et courbe du total des 10 derniers setups par actif, historique des périodes rouges.
-- Profil or (si la validation 3 ans le confirme) dans la base, Desk Key et l'application ; option second trade sur l'or.
+- Profil or (validé sur 3 ans) dans la base, Desk Key et l'application, avec le second trade et le stop du trade 1 remonté.
 - Bornes d'alarme de l'application recalculées sur 3 ans ; repères de risque mis à jour.
 
 ## Plus tard

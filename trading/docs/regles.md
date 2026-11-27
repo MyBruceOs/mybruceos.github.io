@@ -44,7 +44,7 @@
 | Marge du stop | **2 pts** au-delà du Judas. |
 | Résultats du backtest (3R) | 31 trades, 13 % des jours, 55 % de gagnants, +24 440 $, pire baisse −3 000 $. |
 
-## 3 bis. Profil XAUUSD (or) — candidat, en attente de la validation 2024–2025
+## 3 bis. Profil XAUUSD (or) — validé sur 3 ans (2024–2026)
 
 Même mécanique que les indices (section 1 : liquidité du pré-marché 8:00–9:30 NY, Judas après 9:30, cassure M1 au-delà du dernier pivot avant le Judas, entrée limite au 50 %, retracée si la jambe s'allonge, stop derrière le Judas, sortie 13:00 NY), avec ces différences :
 
@@ -60,7 +60,7 @@ Même mécanique que les indices (section 1 : liquidité du pré-marché 8:00–
 | Sortie | 13:00 NY (19:00 Paris). |
 | Résultats du backtest (22/12/2025 – 25/11/2026, 3R) | 53 trades (environ 4 à 5 par mois, de 1 à 8), 55 % de gagnants, +37,7 R, pire baisse −4,5 R, 11 mois positifs et 0 négatif ; 1re moitié +23,2 R, 2de moitié +14,5 R. |
 
-**Option : second trade de continuation (or seulement, à confirmer sur 2024–2025)**
+**Second trade de continuation (or seulement, validé sur 3 ans : +11,4 R en 2024, +12,5 R en 2025, +13,5 R en 2026)**
 
 | Règle | Valeur |
 |---|---|
@@ -77,6 +77,8 @@ Même mécanique que les indices (section 1 : liquidité du pré-marché 8:00–
 
 ## 4. Ce qu'il faut attendre (simulations)
 
+> **Configuration retenue le 27/11/2026 (3 ans, backtests.md 4 terdecies)** : US100 et SP500 avec **feu rouge** (pas de trade sur un indice quand la somme de ses 10 derniers setups est négative ; la règle continue d'être suivie, retour automatique au vert), or avec second trade et **sans** feu rouge. Résultat 2024 / 2025 / 2026 : +69,7 / +41,9 / +99,7 R, pire creux −13,6 R, 29 mois positifs sur 36. **Risque : 0,5 % par trade** (5 % de risque de toucher −10 % dans l'année ; pire creux réel −7,4 %) ; 0,33 % pour une sécurité maximale.
+>
 > **Mise à jour du 27/11/2026, validation sur 3 ans** (backtests.md, section 4 undecies) : 2025 a été une année **perdante** pour l'US100 (−19,2 R, 25 % de gagnants) et le SP500 (−2,8 R), avec un creux de **−29 R** pour les deux ensemble et 14 pertes d'affilée. Sur 3 ans, la règle reste gagnante (environ +30 R par an pour les deux indices), mais les creux à attendre sont bien plus profonds que ceux calculés sur 2026 seul : une année sur 10 **−20 R**, une année sur 100 **−31 R**. **Les repères de risque ci-dessous (0,75 % / 1 %) sont à remplacer** : pour rester sous la limite FTMO de 10 %, il faut environ **0,33 % par trade** (1 % de risque de toucher −10 % dans l'année) ; 0,5 % donne 10 % de risque. Les bornes d'alarme de l'application seront recalculées sur 3 ans.
 
 

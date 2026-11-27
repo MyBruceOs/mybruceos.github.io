@@ -547,6 +547,87 @@ Robustesse (fenêtre de 6 à 20 setups, seuil −2, 0 ou +2 R) : toutes les vari
 
 Variantes moins bonnes : mi-risque au lieu de pause (2025 −14 à −16 R) ; un seul feu pour les deux indices (2025 −17 R).
 
+## 4 terdecies. L'or sur 3 ans, et le compte 3 actifs (2024, 2025, 2026) — 27/11/2026
+
+**Or seul** (séance New York, sens « H4 ou H1 sans conflit », entrées 10:00–12:00 NY, TP 3R) :
+
+| Or | 2024 | 2025 | 2026 | 3 ans | Pire creux | Plus longue série | Mois + / − |
+|---|---|---|---|---|---|---|---|
+| Trade 1 seul | 75 tr., 37 %, **+2,4 R** | 66 tr., 50 %, **+35,4 R** | 53 tr., 55 %, **+37,7 R** | +75,5 R | −13,1 R | 7 | 25 / 7 |
+| **+ second trade, stop du trade 1 remonté** | 91 tr., 43 %, **+13,8 R** | 80 tr., 55 %, **+47,9 R** | 63 tr., 59 %, **+51,2 R** | **+112,9 R** | −14,0 R | 8 | 24 / 8 |
+| idem avec feu rouge | +0,0 R | +33,2 R | +50,2 R | +83,4 R | −16,3 R | 6 | 21 / 11 |
+
+- L'or est positif les 3 années ; 2024 a été une année faible (+2,4 R) mais pas perdante. **2025, l'année difficile des indices, est une très bonne année pour l'or.**
+- Le second trade avec stop remonté est **confirmé hors échantillon** : +11,4 R en 2024 et +12,5 R en 2025, en plus de 2026.
+- Le feu rouge **n'aide pas l'or** : il le tient à l'écart au moment où il repart (3 ans +83 R au lieu de +113 R, creux plus profond).
+
+**Feu rouge par actif sur 3 ans** : US100 +53,4 → +59,3 R, creux −24,7 → −10,0 R ; SP500 +38,7 → +39,1 R, creux −10,5 → −5,1 R ; or +112,9 → +83,4 R, creux −14,0 → −16,3 R. Conclusion : **feu rouge sur l'US100 et le SP500, pas sur l'or.**
+
+**Compte 3 actifs** (or avec second trade) :
+
+| | 2024 | 2025 | 2026 | 3 ans | Pire creux | Plus longue série | Mois + / − |
+|---|---|---|---|---|---|---|---|
+| Sans feu rouge | +72,7 R | +25,9 R | +106,4 R | +205,0 R | −23,9 R | 8 | 29 / 7 |
+| Feu rouge sur les 3 actifs | +55,9 R | +27,2 R | +98,7 R | +181,8 R | −15,6 R | 8 | 28 / 8 |
+| **Feu rouge sur les indices seulement** | **+69,7 R** | **+41,9 R** | **+99,7 R** | **+211,2 R** | **−13,6 R** | 8 | **29 / 7** |
+
+Configuration retenue (dernière ligne) : 456 trades en 3 ans (environ 150 par an), 47 % de gagnants ; frais compris (0,05 R par trade) +188,4 R et pire creux −14,8 R (25/01/2024 → 01/04/2024).
+
+**Mois par mois (R), configuration retenue** — colonnes : US100 (feu), SP500 (feu), or (second trade), total, et total sans feu rouge :
+
+| Mois | US100 | SP500 | Or | Total | Total sans feu |
+|---|---|---|---|---|---|
+| déc. 2023 | +0,3 | +0,1 | 0,0 | **+0,4** | +0,4 |
+| janv. 2024 | −1,1 | 0,0 | +6,3 | **+5,3** | +5,3 |
+| févr. 2024 | −1,0 | −0,1 | −3,4 | **−4,4** | −4,4 |
+| mars 2024 | −3,7 | −1,0 | −3,5 | **−8,1** | −8,1 |
+| avr. 2024 | +1,0 | +5,0 | +10,1 | **+16,2** | +19,2 |
+| mai 2024 | +16,0 | +3,2 | +5,7 | **+24,9** | +24,9 |
+| juin 2024 | +2,0 | −1,0 | −0,5 | **+0,5** | +0,5 |
+| juil. 2024 | +8,6 | −2,0 | +7,6 | **+14,2** | +14,2 |
+| août 2024 | +3,3 | +4,0 | +0,7 | **+8,0** | +8,0 |
+| sept. 2024 | +7,7 | +3,0 | −5,8 | **+4,9** | +4,9 |
+| oct. 2024 | +3,0 | +0,4 | −1,6 | **+1,8** | +1,8 |
+| nov. 2024 | −2,9 | +2,4 | −1,8 | **−2,4** | −2,4 |
+| déc. 2024 | +5,5 | +6,0 | 0,0 | **+11,5** | +11,5 |
+| janv. 2025 | −3,6 | −2,0 | +1,7 | **−3,9** | −3,9 |
+| févr. 2025 | −1,0 | −1,4 | 0,0 | **−2,4** | −1,8 |
+| mars 2025 | 0,0 | −0,7 | +0,1 | **−0,6** | +0,9 |
+| avr. 2025 | +6,0 | 0,0 | −2,8 | **+3,2** | +3,2 |
+| mai 2025 | −3,0 | 0,0 | +4,0 | **+1,0** | −5,0 |
+| juin 2025 | 0,0 | 0,0 | −4,0 | **−4,0** | −7,0 |
+| juil. 2025 | 0,0 | 0,0 | +8,9 | **+8,9** | +3,2 |
+| août 2025 | 0,0 | 0,0 | +14,1 | **+14,1** | +12,3 |
+| sept. 2025 | −1,0 | 0,0 | +9,3 | **+8,3** | +9,8 |
+| oct. 2025 | −4,0 | 0,0 | +9,2 | **+5,2** | +4,2 |
+| nov. 2025 | 0,0 | +0,6 | +8,4 | **+9,0** | +7,5 |
+| déc. 2025 | 0,0 | +2,1 | +1,1 | **+3,2** | +3,8 |
+| janv. 2026 | +1,8 | +2,4 | +9,3 | **+13,5** | +16,1 |
+| févr. 2026 | −1,0 | −2,0 | +9,8 | **+6,8** | +6,8 |
+| mars 2026 | +0,7 | +1,0 | +2,0 | **+3,6** | +3,6 |
+| avr. 2026 | 0,0 | −2,0 | +4,0 | **+2,0** | +2,0 |
+| mai 2026 | +5,7 | +4,5 | +3,0 | **+13,1** | +16,1 |
+| juin 2026 | +4,4 | +2,0 | 0,0 | **+6,4** | +6,4 |
+| juil. 2026 | +2,0 | +2,0 | +12,5 | **+16,5** | +16,5 |
+| août 2026 | +5,0 | +2,0 | +5,0 | **+12,0** | +12,0 |
+| sept. 2026 | +7,0 | +5,0 | +0,4 | **+12,4** | +12,4 |
+| oct. 2026 | −1,0 | +1,0 | +2,4 | **+2,4** | +2,4 |
+| nov. 2026 | +2,6 | +4,5 | +0,8 | **+7,9** | +7,9 |
+
+Pire mois : mars 2024 (−8,1 R). Meilleur : mai 2024 (+24,9 R). 7 mois négatifs sur 36, aucun en dessous de −8,1 R.
+
+**Variance et risque** (Monte Carlo par blocs de mois tirés dans les 3 ans, feu rouge appliqué sur le chemin simulé, frais compris) : résultat médian +52,9 R par an ; une année sur 10 au pire +22,5 R ; année perdante 1 % ; creux médian −11,8 R, une année sur 10 −17,8 R, une année sur 100 −25,9 R ; séries de pertes 8 / 11 / 14.
+
+| Risque par trade | Gain médian sur un an | Risque de toucher −10 % dans l'année | Pire creux réel sur 3 ans |
+|---|---|---|---|
+| 0,33 % | +17 % | 0,2 % | −4,9 % |
+| **0,5 %** | **+26 %** | **5 %** | **−7,4 %** |
+| 0,6 % | +32 % | 14 % | −8,9 % |
+| 0,75 % | +40 % | 34 % | −11,1 % |
+| 1 % | +53 % | 72 % | −14,8 % |
+
+Le choix « feu rouge sur les indices seulement » a été fait après avoir vu les résultats de l'or : il reste à le confirmer en réel (suivi dans l'application).
+
 ## 4 septies. Années précédentes (2024, 2025) : il faut du M1
 
 Pour juger l'US100 et le SP500 sur 2024 et 2025, on n'avait que du M5 (3 ans). Calibration : les mêmes règles calculées en M5 sur 2026, comparées au vrai résultat M1 de 2026.
