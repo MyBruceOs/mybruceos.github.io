@@ -451,6 +451,37 @@ Pire journée possible : les 3 actifs perdants le même jour = −3 R (−3 % à
 
 Ces chiffres supposent que l'avantage de 2026 se maintient : **à confirmer sur 2024–2025** (export M1 sur 3 ans en cours).
 
+## 4 decies. Second trade de continuation (27/11/2026)
+
+Définition (fixée avant le test, moteur v12) : pendant que le trade 1 est ouvert, le prix dépasse la jambe du trade 1 (impulsion), fait un repli (pivot M1 de 2 bougies) au-dessus du stop du trade 1, puis une bougie M1 clôture au-delà du sommet d'avant le repli (seconde cassure). Ordre limite au 50 % de la nouvelle jambe (retracé si elle s'allonge), stop sous le repli ± la marge du profil, remplissage avant 12:00 NY et tant que le trade 1 est ouvert (pas de second trade si le trade 1 a déjà touché son stop ou son TP). Deux objectifs : le TP 3R du trade 1, ou 1R. Sortie 13:00 NY.
+
+| | US100 | SP500 | Or |
+|---|---|---|---|
+| Jours de trade 1 où la seconde cassure se forme | 21 % | 52 % | 40 % |
+| Jours où le second trade est rempli | **5 %** (3 trades) | **26 %** (8 trades) | **19 %** (10 trades) |
+| Objectif = TP du trade 1 (R visé moyen) | 2,6 R | 2,1 R | 3,1 R |
+| Gagnants / résultat, objectif = TP du trade 1 | 67 %, +3,3 R | 50 %, +2,7 R | **60 %, +9,7 R** |
+| Gagnants / résultat, objectif 1R | 67 %, +1,0 R | 50 %, 0,0 R | 70 %, +4,0 R |
+| Quand le trade 1 perd, le second trade perd aussi | — | 2 sur 2 | 3 sur 3 |
+
+Heures de remplissage : 10:39 à 11:48 NY. Sur les 16 jours où le trade 1 gagne, le second trade (objectif du trade 1) transforme 3 journées gagnantes en journées nulles ou légèrement perdantes. **Sur les 5 jours où le trade 1 perd, le second trade perd aussi, à chaque fois.**
+
+Effet sur le portefeuille 3 actifs (1 an) :
+
+| | Sans second trade | Avec (objectif du trade 1) | Avec (objectif 1R) |
+|---|---|---|---|
+| Trades | 142 | 163 (+21) | 163 |
+| Total | +92,9 R | +108,7 R | +97,9 R |
+| Pire creux | −9 R | **−10 R** | −10 R |
+| Plus longue série de pertes | 9 | 10 | 10 |
+| Journées à −2 R | 7 | 12 | 12 |
+| Mois négatifs | 0 | 0 | 0 |
+
+- L'objectif « TP du trade 1 » est nettement meilleur que 1R.
+- Le gain vient surtout de l'or (+9,7 R sur 10 trades) ; sur les indices, c'est marginal (US100 : 3 trades ; SP500 : +2,7 R mais pire creux et pire journée aggravés).
+- Le second trade renforce les mauvaises journées : à 1 % par trade, le creux d'avril passerait de −9,5 % à environ −10,5 % frais compris, soit l'échec d'un challenge.
+- Échantillons très petits (3 à 10 trades par actif) : **pas mis en place**. À retester sur 2024–2025, éventuellement pour l'or seul.
+
 ## 4 septies. Années précédentes (2024, 2025) : il faut du M1
 
 Pour juger l'US100 et le SP500 sur 2024 et 2025, on n'avait que du M5 (3 ans). Calibration : les mêmes règles calculées en M5 sur 2026, comparées au vrai résultat M1 de 2026.
