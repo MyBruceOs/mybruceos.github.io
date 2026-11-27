@@ -547,6 +547,24 @@ Robustesse (fenêtre de 6 à 20 setups, seuil −2, 0 ou +2 R) : toutes les vari
 
 Variantes moins bonnes : mi-risque au lieu de pause (2025 −14 à −16 R) ; un seul feu pour les deux indices (2025 −17 R).
 
+## 4 septdecies. Monte-Carlo du challenge FTMO (phase 1 et phase 2) — 27/11/2026
+
+20 000 parcours, tirés par blocs de mois dans les 3 ans réels de la configuration retenue (feu rouge sur les indices tel qu'il s'est allumé, or avec second trade, frais 0,05 R par trade). Règles supposées : phase 1 +10 %, phase 2 +5 %, perte du jour 5 % et perte max 10 % du capital de départ, au moins 4 jours de trading, pas de limite de temps ; risque en % du capital de départ ; pertes d'une journée comptées avant ses gains (prudent). Durées en séances de bourse (5 par semaine, 21 par mois). Page interactive : https://claude.ai/artifact/7fiv2m6ytSdhsvFKCzFe5Q
+
+| Risque par trade | Phase 1 | Phase 2 | Les deux | Durée médiane des deux | Plus rapide · 9 sur 10 avant · plus long | Compte financé perdu en 12 mois | Gain médian financé sur 12 mois |
+|---|---|---|---|---|---|---|---|
+| 0,25 % | 100 % | 100 % | 100 % | 236 séances (11 mois) | 69 · 379 · 971 | 0 % | +16 % |
+| 0,5 % | 100 % | 100 % | 99 % | 116 séances (5,5 mois) | 30 · 220 · 556 | 0 % | +31 % |
+| 0,75 % | 98 % | 98 % | 96 % | 77 séances (3,7 mois) | 14 · 156 · 457 | 2 % | +47 % |
+| 1 % | 95 % | 96 % | 91 % | 57 séances (2,7 mois) | 13 · 117 · 355 | 5 % | +63 % |
+| 1,25 % | 92 % | 93 % | 86 % | 45 séances (2,1 mois) | 12 · 93 · 319 | 9 % | +80 % |
+| 1,5 % | 90 % | 91 % | 82 % | 37 séances (1,8 mois) | 11 · 76 · 210 | 12 % | +97 % |
+| 2 % | 82 % | 86 % | 71 % | 29 séances (1,4 mois) | 11 · 55 · 155 | 21 % | +131 % |
+
+- Contrôle sur le vrai chemin (phase 1 commencée à chacune des 755 séances) : 0,5 % → 100 % réussis ; 0,75 % → 99 % ; 1 % → 96 % ; 1,5 % → 81 %.
+- Perte du jour : la pire journée des 3 ans fait −2,21 R ; elle ne déclenche la limite de 5 % qu'au-delà de 2,26 % de risque. Trois pertes pleines le même jour (−3,15 R, jamais vu en 3 ans) la déclencheraient au-delà de 1,59 %.
+- Au-delà de 1 %, chaque gain de temps se paie cher : de 1 % à 1,5 %, 20 séances de moins pour les deux phases, mais 9 points de risque d'échec en plus. Ces chiffres supposent que la règle garde l'avantage des 3 dernières années.
+
 ## 4 sexdecies. Mois négatifs, disettes et fréquence des trades (3 actifs, configuration retenue) — 27/11/2026
 
 Compte tel qu'il se trade : US100 et SP500 avec feu rouge, or avec second trade ; 755 séances du 22/12/2023 au 25/11/2026 ; 456 trades.
