@@ -28,6 +28,8 @@
 - [x] Notifications sur le téléphone (application MT5) : fonctionnent.
 - [x] Desk Key 1.08 installé ; notifications Telegram OK (27/11, 2:36 Paris), par le relais du serveur Desk US car MT5 renvoie l'erreur 1009 / 5203 vers api.telegram.org.
 
+- [ ] Quand l'export est terminé (« export terminé » dans l'onglet Experts) : Bridge → F7 → « Exporter l'historique » = false.
+
 ## Plus tard
 - Installer MT5, Desk Key et le Bridge sur le **VPS de l'utilisateur** (MT5 allumé 24 h/24 : sortie de 13:00 NY assurée même PC éteint).
 - Plusieurs comptes FTMO : voir [backlog.md](backlog.md).
