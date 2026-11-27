@@ -343,6 +343,43 @@ Par mois (New York, H4, sans FVG, 3R) : 9 mois positifs sur 12 ; pire mois −3 
 - Diversification : seuls 9 des 43 jours de trade de l'or sont aussi des jours de trade US100 ou SP500.
 - Résultat comparable au SP500 (31 trades, +24,4 R, pire baisse −3 R) sur la même année. **À confirmer sur 2024 et 2025** avec l'export M1 sur 3 ans avant d'en faire un profil Desk Key.
 
+### Or : variantes (TP 2R, biais H1, fenêtre d'entrée, sortie)
+
+**Volatilité de l'or heure par heure** (range moyen d'une heure, M1 FTMO, jours de semaine) :
+
+| Heure NY (Paris) | Range moyen | % du pic |
+|---|---|---|
+| 20:00–23:00 (2:00–5:00), séance asiatique | 21–26 $ | 61–73 % |
+| 2:00–5:00 (8:00–11:00), Londres | 19–21 $ | 53–60 % |
+| 8:00 (14:00), annonces de 8:30 | 25 $ | 71 % |
+| 9:00 (15:00) | 32 $ | 91 % |
+| **10:00 (16:00)** | **35 $** | **100 %** |
+| 11:00 (17:00) | 30 $ | 87 % |
+| 12:00 (18:00) | 24 $ | 69 % |
+| 13:00–16:00 (19:00–22:00) | 17–21 $ | 49–59 % |
+
+Le pic est au même moment que l'US100 (10:00 NY), mais l'or reste plus actif hors de New York (Londres 53–60 % du pic contre environ 40 % pour l'US100). La fenêtre utile va de 9:00 à 12:00 NY ; après 13:00 NY l'or redevient calme.
+
+| Or, séance New York (sans FVG obligatoire, stop Judas ± 1 $) | Trades | Gagnants | Total | 1re moitié | 2de moitié | Pire baisse |
+|---|---|---|---|---|---|---|
+| H4, entrées 10:00–11:00, TP 2R | 43 | 51 % | +15,3 R | +11,6 | +3,7 | −3,0 R |
+| H4, entrées 10:00–11:00, TP 3R | 43 | 49 % | +23,5 R | +16,6 | +7,0 | −3,0 R |
+| H1 seul, entrées 10:00–11:00, TP 2R | 41 | 54 % | +16,3 R | +7,6 | +8,7 | −4,7 R |
+| H1 seul, entrées 10:00–11:00, TP 3R | 41 | 51 % | +24,0 R | +10,6 | +13,4 | −4,7 R |
+| **H4, entrées 10:00–12:00, TP 3R** | **53** | **53 %** | **+30,4 R** | +21,8 | +8,6 | **−3,0 R** |
+| H4, entrées 10:00–12:00, TP 2R | 53 | 55 % | +20,0 R | +14,8 | +5,1 | −3,0 R |
+| **H1 seul, entrées 10:00–12:00, TP 3R** | 46 | 52 % | +30,9 R | +15,3 | +15,6 | −3,7 R |
+| H1 seul, entrées 10:00–12:00, TP 2R | 46 | 54 % | +21,0 R | +10,3 | +10,7 | −3,0 R |
+| H1 + H4, entrées 10:00–12:00, TP 3R | 34 | 59 % | +30,1 R | +16,0 | +14,1 | −3,0 R |
+| Entrées 9:30–10:00 (H4) | 13 | 23 % | −1,0 R (3R), −4,0 R (2R) | | | |
+
+- **Fenêtre 10:00–12:00 NY** : +10 trades par an (53 au lieu de 43), et les entrées de 11:00 à 12:00 gagnent 7 fois sur 10. À garder pour l'or.
+- **Biais H1 seul** : même fréquence que le H4 (41 à 46 trades), un peu plus de gagnants (51 à 54 %), et des moitiés d'année plus équilibrées. Le H4 reste le choix de la méthode (meilleure 1re moitié), le H1 est une alternative aussi solide.
+- **TP 2R** : plus de gagnants (54–55 %) mais environ 10 R de moins sur l'année ; 3R reste meilleur.
+- **Sortie** : 13:00, 14:00 ou 16:00 NY donnent presque le même résultat (à 1–2 R près) ; sortir à 12:00 est moins bien. On garde 13:00 NY.
+- **Entrées avant 10:00 NY** : perdantes, comme sur l'US100.
+- La fréquence de l'or n'est pas plus élevée que celle des indices (un trade par jour au maximum, et il faut un Judas sur le pré-marché dans le sens du biais).
+
 ## 4 septies. Années précédentes (2024, 2025) : il faut du M1
 
 Pour juger l'US100 et le SP500 sur 2024 et 2025, on n'avait que du M5 (3 ans). Calibration : les mêmes règles calculées en M5 sur 2026, comparées au vrai résultat M1 de 2026.
