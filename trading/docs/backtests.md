@@ -266,6 +266,23 @@ Données : M1 FTMO `US30.cash`, 22/12/2025 – 25/11/2026, même méthode que l'
 
 **Conclusion : on n'ajoute pas l'US30.** La règle A ne tient pas sur cet indice.
 
+### US30 en M5 (structure M5, exécution M1)
+Moteur v10 : Judas, pivot, cassure, FVG et Fibonacci sur bougies M5 ; remplissage et sortie (SL / TP) lus sur M1 à l'intérieur de la bougie M5. En M5, plus de la moitié des setups ne sont pas remplis avant 11:00 NY (21 sur 36) : on a aussi testé une fenêtre de remplissage 10:00–12:00 NY.
+
+| US30 M5, fenêtre 10:00–12:00 | Trades | Gagnants 3R | Résultat 3R | 1re moitié (3R) | 2de moitié (3R) | Pire baisse |
+|---|---|---|---|---|---|---|
+| Règles US100 (H4, FVG, cassure nette) | 22 | 45 % | +2 930 $ | −6 500 $ | +9 430 $ | −7 080 $ |
+| Règles US100 + Daily (au lieu du H4) | 24 | 54 % | +4 810 $ | −5 520 $ | +10 330 $ | −6 330 $ |
+| Règles SP500 (H4 + Daily, Judas après 9:50) | 14 | 43 % | −880 $ | −4 800 $ | +3 920 $ | −4 000 $ |
+| Sans FVG ni filtre de Judas, Daily | 31 | 52 % | +6 410 $ | −6 580 $ | +12 990 $ | −7 930 $ |
+| Fenêtre 10:00–11:00, règles US100 | 14 | 43 % | +4 290 $ | −4 000 $ | +8 290 $ | −3 000 $ |
+
+- Le M5 **filtre bien le bruit** : 43 à 54 % de gagnants à 3R au lieu de 23 à 32 % en M1, et des baisses deux fois plus petites.
+- Mais **toutes les versions perdent sur la première moitié de l'année** (décembre–mai) et gagnent sur la seconde : le résultat dépend de la période, pas de la règle. Et l'échantillon est petit (14 à 31 trades par an).
+- Sortie à 14:00 au lieu de 13:00 : moins bien partout.
+
+**Conclusion : US30 toujours rejeté**, y compris en M5. À retester dans quelques mois avec les nouveaux mois (si la seconde moitié se confirme, le M5 avec le Daily serait le candidat).
+
 ## 5. Idées testées et rejetées
 
 | Idée | Effet |
