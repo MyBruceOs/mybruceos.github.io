@@ -45,6 +45,13 @@
 - [ ] Bridge → F7 → Paramètres : « Profondeur de l'export M1 » = **1095** et « Symboles à exporter seulement » = **XAUUSD** (retirer US30.cash), puis laisser MT5 ouvert environ 2 h.
 - [ ] Quand l'export est terminé (« export terminé » dans l'onglet Experts) : Bridge → F7 → « Exporter l'historique » = false.
 
+## Décidé, à faire après l'analyse de l'or (27/11)
+- **Feu rouge par actif, activé** : pause d'un actif quand la somme de ses 10 derniers setups (résultat de la règle à 3R, pris ou non) est négative ; retour automatique au vert quand elle redevient positive ou nulle. Explication visuelle : https://claude.ai/artifact/CXxoyndBmwbWBnf1v8Lk7z
+  - Desk Key : voyant vert / rouge par actif avec la somme des 10 derniers setups ; en rouge, la touche K et le mode AUTO ne placent pas l'ordre (option « prévenir seulement ») ; notification à chaque changement de couleur ; la règle continue d'être suivie à blanc.
+  - Application : voyant et courbe du total des 10 derniers setups par actif, historique des périodes rouges.
+- Profil or (si la validation 3 ans le confirme) dans la base, Desk Key et l'application ; option second trade sur l'or.
+- Bornes d'alarme de l'application recalculées sur 3 ans ; repères de risque mis à jour.
+
 ## Plus tard
 - Installer MT5, Desk Key et le Bridge sur le **VPS de l'utilisateur** (MT5 allumé 24 h/24 : sortie de 13:00 NY assurée même PC éteint).
 - Plusieurs comptes FTMO : voir [backlog.md](backlog.md).
