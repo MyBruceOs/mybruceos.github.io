@@ -71,6 +71,7 @@
       }
       // 2. la séance
       const d = P[k * T + t];
+      if (o.onDay) o.onDay(DNx[d] + DG[d] * o.slip, DG[d] * (1 + o.slip), t);   // compte propre branché sur les mêmes séances
       let nf = 0;
       for (let i = 0; i < M; i++) {
         const s = S[i], a = A[i];
@@ -93,6 +94,7 @@
       if (!nf) noFund++;
       // 3. fin de mois
       if (t % 21 === 20) {
+        if (o.onMonth) { const take = o.onMonth((t + 1) / 21, wallet); if (take > 0) wallet -= Math.min(take, wallet); }   // répartition des versements
         if (payMonth <= 0) { monthsNoPay++; if (firstPay >= 0) gaps++; }
         if (rec) rec.push(wallet - o.budget, nf);
         payMonth = 0;
