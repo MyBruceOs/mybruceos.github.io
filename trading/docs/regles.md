@@ -1,8 +1,8 @@
 # Règles de trading Desk US — référence A
 
-*Version du 27 novembre 2026 (Desk Key 1.08, nouvelle application). Règles validées par le backtest M1 FTMO (décembre 2025 – novembre 2026). Les chiffres détaillés sont dans [backtests.md](backtests.md).*
+*Version du 27 novembre 2026 (Desk Key 1.09 : or, second trade, feu rouge ; application mise à jour). Règles validées par le backtest M1 FTMO (décembre 2025 – novembre 2026). Les chiffres détaillés sont dans [backtests.md](backtests.md).*
 
-> **Un indice = un profil = un graphique.** On ne mélange jamais les règles de l'US100 et du SP500.
+> **Un actif = un profil = un graphique.** On ne mélange jamais les règles de l'US100, du SP500 et de l'or.
 
 ---
 
@@ -44,7 +44,43 @@
 | Marge du stop | **2 pts** au-delà du Judas. |
 | Résultats du backtest (3R) | 31 trades, 13 % des jours, 55 % de gagnants, +24 440 $, pire baisse −3 000 $. |
 
+## 3 bis. Profil XAUUSD (or) — validé sur 3 ans (2024–2026)
+
+Même mécanique que les indices (section 1 : liquidité du pré-marché 8:00–9:30 NY, Judas après 9:30, cassure M1 au-delà du dernier pivot avant le Judas, entrée limite au 50 %, retracée si la jambe s'allonge, stop derrière le Judas, sortie 13:00 NY), avec ces différences :
+
+| Règle | Valeur |
+|---|---|
+| Séance | **New York** uniquement. La séance de Londres a été testée et ne marche pas avec cette règle. |
+| Sens du jour | **H4 ou H1, sans conflit** : à 9:25 NY, si le H4 ou le H1 donne un sens et que l'autre ne le contredit pas (même sens ou neutre), on prend ce sens. Si l'un dit achat et l'autre vente, ou si les deux sont neutres : pas de trade. |
+| Fenêtre d'entrée | L'ordre doit être rempli **entre 10:00 et 12:00 NY** (16:00–18:00 Paris), une heure de plus que les indices : l'or reste très volatil jusqu'à 12:00 NY. Touché avant 10:00 : pas de trade. Pas rempli à 12:00 : annulé. |
+| FVG M1 | Non exigé (presque toujours présent sur l'or, il ne change rien). |
+| Cassure nette / Judas après 9:50 | Non. |
+| Marge du stop | **1 $** au-delà du Judas (stop moyen 7 à 18 $ selon la volatilité). |
+| Objectif | **3R** (2R donne plus de gagnants mais environ 10 R de moins par an). |
+| Sortie | 13:00 NY (19:00 Paris). |
+| Résultats du backtest (22/12/2025 – 25/11/2026, 3R) | 53 trades (environ 4 à 5 par mois, de 1 à 8), 55 % de gagnants, +37,7 R, pire baisse −4,5 R, 11 mois positifs et 0 négatif ; 1re moitié +23,2 R, 2de moitié +14,5 R. |
+
+**Second trade de continuation (or seulement, validé sur 3 ans : +11,4 R en 2024, +12,5 R en 2025, +13,5 R en 2026)**
+
+| Règle | Valeur |
+|---|---|
+| Quand | Seulement pendant que le trade 1 est ouvert (pas après son stop ni son TP), ordre rempli avant 12:00 NY (18:00 Paris). |
+| Setup | Le prix dépasse le haut de la jambe du trade 1 (impulsion), fait un repli qui forme un creux plus haut (pivot M1 de 2 bougies) au-dessus du stop du trade 1, puis une bougie M1 clôture au-dessus du sommet d'avant le repli (seconde cassure). Inverse pour une vente. |
+| Entrée | Limite au **50 %** de la nouvelle jambe (creux du repli → plus haut), retracée si la jambe s'allonge. |
+| Stop | Sous le creux du repli, **1 $** de marge. |
+| Objectif | **Le même prix que le TP du trade 1** (3R du trade 1), pas 1R. |
+| **Gestion obligatoire** | Dès que le second trade est rempli, **remonter le stop du trade 1 au stop du second trade**. Sans cette règle, le second trade double les pertes des mauvaises journées. |
+| Risque | Même risque que le trade 1. |
+| Backtest 2026 | 10 seconds trades (environ 1 par mois), 6 gagnants ; or : +51,2 R au lieu de +37,7 R, pire creux −4,0 R au lieu de −4,5 R ; compte 3 actifs : +106,4 R au lieu de +92,9 R, pire creux −8,5 R au lieu de −9 R. |
+
+À ne pas faire sur l'or : entrer entre 9:30 et 10:00 NY (23 % de gagnants), trader la séance de Londres, sortir à 12:00. Second trade sur l'US100 ou le SP500 : non (trop rare ou neutre, et aggrave le creux).
+
 ## 4. Ce qu'il faut attendre (simulations)
+
+> **Configuration retenue le 27/11/2026 (3 ans, backtests.md 4 terdecies)** : US100 et SP500 avec **feu rouge** (pas de trade sur un indice quand la somme de ses 10 derniers setups est négative ; la règle continue d'être suivie, retour automatique au vert), or avec second trade et **sans** feu rouge. Résultat 2024 / 2025 / 2026 : +69,7 / +41,9 / +99,7 R, pire creux −13,6 R, 29 mois positifs sur 36. **Risque : 0,5 % par trade** (5 % de risque de toucher −10 % dans l'année ; pire creux réel −7,4 %) ; 0,33 % pour une sécurité maximale.
+>
+> **Mise à jour du 27/11/2026, validation sur 3 ans** (backtests.md, section 4 undecies) : 2025 a été une année **perdante** pour l'US100 (−19,2 R, 25 % de gagnants) et le SP500 (−2,8 R), avec un creux de **−29 R** pour les deux ensemble et 14 pertes d'affilée. Sur 3 ans, la règle reste gagnante (environ +30 R par an pour les deux indices), mais les creux à attendre sont bien plus profonds que ceux calculés sur 2026 seul : une année sur 10 **−20 R**, une année sur 100 **−31 R**. **Les repères de risque ci-dessous (0,75 % / 1 %) sont à remplacer** : pour rester sous la limite FTMO de 10 %, il faut environ **0,33 % par trade** (1 % de risque de toucher −10 % dans l'année) ; 0,5 % donne 10 % de risque. Les bornes d'alarme de l'application seront recalculées sur 3 ans.
+
 
 Référence A, les deux indices ensemble, TP 3R, 0,05 R de frais par trade :
 - environ **89 trades par an**, un trade sur environ 1 jour de bourse sur 3 ;
@@ -52,12 +88,20 @@ Référence A, les deux indices ensemble, TP 3R, 0,05 R de frais par trade :
 - **signal d'alarme** : plus de 13 pertes d'affilée ou un creux de plus de −17 R, il faut alors arrêter et analyser ;
 - si l'avantage réel n'est que la moitié du backtest : environ +25 R par an, avec un creux médian de −10 R.
 
+Avec l'or en plus (les 3 actifs sur le même compte, si l'or est validé) :
+- environ **142 trades par an** sur 113 jours ; 3 actifs le même jour seulement 2 fois dans l'année, 2 trades le même jour 25 fois (les deux perdants 7 fois) ; pire journée −2 R (−3 R possible) ;
+- historique 2026 : +92,9 R, **12 mois positifs sur 12**, pire creux **−9 R** (9 pertes d'affilée du 6 avril au 5 mai, réparties sur les 3 actifs) ;
+- simulations : creux d'une année sur 10 **−11,6 R**, une année sur 100 **−16,8 R** ; séries de 6 à 9 pertes normales, 13 au pire ;
+- **money management** (limite FTMO de 10 %) : à **1 % par trade**, un challenge démarré début avril 2026 serait descendu à **−9,5 %** (frais compris) avant de réussir, à 0,5 % de l'échec. Au cours de l'année, les 212 challenges démarrés à chaque séance auraient tous réussi à 1 % (32 jours en médiane) ; à 1,5 %, 17 auraient échoué. Repères : **0,75 % par trade en challenge** (pire creux historique environ −7 %), **0,5 % sur un compte financé**. Le même compte peut porter les 3 actifs : les séparer sur plusieurs comptes ne réduit pas le risque.
+
 ## 5. Ce qui ne sert pas (testé et rejeté)
 
 - Entrer au 61,8 %, entrer du bon côté du prix d'ouverture, break-even ou sortie partielle à 1R.
 - Fondamentaux en filtre, divergence SMT, jour de la semaine.
 - Stop élargi sur l'US100, entrées entre 9:30 et 10:00 NY.
 - Annonces de 10:00 NY : pas un motif de perte. Les jours d'annonce sont même favorables au SP500.
+- Dow Jones (US30) : rejeté, en M1 comme en M5, avec les concepts ICT / SMC testés (OTE, SMT, premium / discount, draw on liquidity).
+- Or : séance de Londres, killzone ICT de New York (7:30–9:00), entrées avant 10:00 NY, OTE 70,5 %.
 
 ---
 
@@ -91,13 +135,28 @@ Fichier : `trading/mt5/DeskUS_Key.mq5`.
   - **–** / **+** ou saisie directe de la valeur dans la case blanche (Entrée pour valider) ;
   - le réglage est **commun au compte** : changé sur le graphique US100, il s'applique aussi au SP500 dans la seconde. Il est gardé quand MT5 redémarre. Si on modifie le risque dans les paramètres du robot (F7), c'est cette valeur qui reprend la main ;
   - un ordre en attente est remis tout de suite avec le nouveau lot ; une position ouverte n'est pas touchée ;
-  - la ligne au-dessus des boutons donne le risque en % du capital de départ, la perte si les deux indices perdent le même jour (comparée à la limite FTMO du jour) et le nombre de pertes avant la perte max. Vert : confortable ; orange : agressif ; rouge : deux pertes le même jour peuvent dépasser la limite du jour. Les limites se règlent dans les paramètres (5 % et 10 % par défaut).
+  - la ligne au-dessus des boutons donne le risque en % du capital de départ, la perte si les trois actifs perdent le même jour (comparée à la limite FTMO du jour) et le nombre de pertes avant la perte max. Vert : confortable ; orange : agressif ; rouge : trois pertes le même jour peuvent dépasser la limite du jour. Les limites se règlent dans les paramètres (5 % et 10 % par défaut).
 - Bouton **AUTO** : mode automatique, désactivé par défaut. À n'activer que si la prop firm l'autorise.
 - Gestion faite par Desk Key :
   - l'ordre suit le 50 % quand la jambe s'allonge, avec le lot recalculé ;
   - il est annulé à 11:00 NY s'il n'est pas rempli : l'ordre porte une **date d'expiration à 11:00 NY chez FTMO**, il est donc annulé par le serveur même si MT5 est fermé (si le serveur refuse l'expiration, Desk Key l'annule lui-même) ;
   - la position est fermée à 13:00 NY (réglage modifiable).
-- Chaque profil a son **numéro magique** : US100 = 7710100, SP500 = 7710500. Le commentaire de l'ordre indique le profil (« DeskKey US100 3R »), pour le suivi dans le journal.
+- Chaque profil a son **numéro magique** : US100 = 7710100, SP500 = 7710500, or = 7710900 (second trade de l'or : 7710901). Le commentaire de l'ordre indique le profil (« DeskKey US100 3R », « DeskKey XAUUSD 2e »), pour le suivi dans le journal.
+
+### Feu rouge (US100, SP500) — Desk Key 1.09
+- Chaque matin, Desk Key additionne le résultat des **10 derniers setups** de l'indice (entrées touchées dans la fenêtre, à 3R, pris ou non), calculé sur l'historique M1 (environ 120 séances de plus que la période affichée).
+- Somme **négative** : **feu rouge**. La touche K, le bouton et le mode AUTO ne placent pas d'ordre ; le setup est suivi et dessiné à blanc, et envoyé à l'application. Somme positive ou nulle (ou moins de 10 setups connus) : feu vert. Le retour au vert est automatique.
+- Ligne « Feu » du panneau (sous le sens du jour) : couleur et somme des 10 derniers setups. Dans la rangée des 7 jours et l'historique, un **●** marque les jours sous feu rouge ; la ligne de statistiques donne aussi le total « sous feu vert ».
+- **Désactivable** : bouton **FEU ROUGE : ON / OFF** du panneau (gardé au redémarrage) ou paramètre « Feu rouge ». Désactivé, Desk Key prévient seulement (panneau, notification) et laisse trader.
+- Notification à chaque changement de couleur (début de séance).
+- Pas de feu rouge sur l'or (backtests.md 4 terdecies).
+
+### Or (XAUUSD) et second trade — Desk Key 1.09
+- Mettre Desk Key sur un **graphique M1 XAUUSD** : le profil or se choisit tout seul (symbole contenant XAU ou GOLD).
+- Règles du profil : section 3 bis. Fenêtre d'entrée **10:00–12:00 NY** : l'ordre expire chez FTMO à 12:00 NY ; panneau, dessins et notifications suivent cette heure.
+- **Second trade** (bouton **2e TRADE : OUI / NON**, paramètre « Second trade », activé par défaut) : pendant que le trade 1 est en position, Desk Key suit la continuation (ligne 4 du panneau : impulsion → repli → cassure du repli). Quand le setup est prêt : notification « SECOND TRADE PRÊT », puis **touche K** (ou AUTO) pour placer la limite au 50 % de la nouvelle jambe, stop sous le repli ± 1 $, objectif = TP du trade 1, expiration à 12:00 NY. K pressée avant que le setup soit prêt : le second trade est armé.
+- Au **remplissage du second trade**, Desk Key **remonte le stop du trade 1** au stop du second trade. Le second trade est annulé si le trade 1 se ferme avant, ou à 12:00 NY. Les deux positions sont fermées à 13:00 NY.
+- Même risque en argent que le trade 1 (lot recalculé sur son propre stop).
 
 ### Notifications
 Desk Key prévient à chaque étape importante, une seule fois par jour et par événement (même si MT5 redémarre) :
@@ -141,7 +200,9 @@ Le bouton **TESTER LES NOTIFS** du panneau envoie un message de test sur tous le
 - **Journal** : un jour = une ligne par actif, avec les niveaux, le résultat de la règle et le trade réel ; filtres (pris, ratés…) et export CSV.
 - **Suivi du test** : win rate, R, séries de pertes et creux de chaque actif comparés aux bornes du backtest (« dans la norme », « à surveiller », « alarme »).
 - **Règles** : règles et résultats de backtest de chaque actif.
-- **Ajouter un actif** : quand un nouvel actif (Dow Jones, XAUUSD…) est validé en backtest, son profil est ajouté dans la base (`desk_profiles`) et un profil correspondant est ajouté à Desk Key ; l'application l'affiche toute seule dans tous les onglets.
+- **Ajouter un actif** : quand un nouvel actif est validé en backtest, son profil est ajouté dans la base (`desk_profiles`) et un profil correspondant est ajouté à Desk Key ; l'application l'affiche toute seule dans tous les onglets (c'est ce qui a été fait pour l'or).
+- **Feu rouge dans l'application** (1.09) : colonne « Feu » du journal (● Vert / ● Rouge, somme des 10 setups précédents au survol, détail en cliquant la ligne), filtres « Sous feu vert » / « Sous feu rouge », total « Règle telle que tradée (sans le feu rouge) » ; ligne « Feu » sur la carte de chaque indice dans Aujourd'hui, et alerte en haut quand un indice est sous feu rouge ; Mon compte : la courbe de la règle ne compte pas les entrées sous feu rouge ; Suivi : la règle complète reste suivie (bornes du backtest sur 3 ans), avec le total « tradé » à côté.
+- **Or dans l'application** : carte du jour avec l'étape du second trade ; journal : résultat de la règle = trade 1 avec stop remonté + second trade (mention « 2 trades »), détail des deux trades réels.
 
 ### Différences possibles avec le backtest
 - Le backtest utilise les prix Bid. En réel, un achat limite se remplit quand l'Ask touche le prix : avec le spread, quelques remplissages « de justesse » n'auront pas lieu.

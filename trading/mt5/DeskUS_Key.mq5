@@ -2,9 +2,12 @@
 //|                                                  DeskUS_Key.mq5  |
 //|  Desk Key : la règle A du backtest Desk US, en une touche.       |
 //|                                                                  |
-//|  - Un graphique = un indice. Le profil (US100 ou SP500) fixe     |
-//|    toutes les règles ; les deux ne se mélangent jamais (symbole  |
+//|  - Un graphique = un actif. Le profil (US100, SP500 ou or) fixe  |
+//|    toutes les règles ; ils ne se mélangent jamais (symbole       |
 //|    vérifié, numéro magique propre à chaque profil).              |
+//|  - Feu rouge (US100, SP500) : pas de trade quand les 10 derniers |
+//|    setups de l'indice sont négatifs (règle suivie à blanc).      |
+//|  - Or : second trade de continuation, stop du trade 1 remonté.   |
 //|  - Détecte le setup en direct, exactement comme le backtest :    |
 //|    tendance -> Judas sur le pré-marché -> cassure M1 -> limite   |
 //|    au 50 % (Fibo retracé) -> SL derrière le Judas -> TP en R.    |
@@ -14,18 +17,19 @@
 //|    leur résultat), et envoie les niveaux à l'application.        |
 //+------------------------------------------------------------------+
 #property copyright "Desk US"
-#property version   "1.08"
-#property description "Règle A Desk US (US100 / SP500) : détection, dessin, historique et exécution en une touche."
+#property version   "1.09"
+#property description "Règle A Desk US (US100 / SP500 / or) : détection, dessin, historique, feu rouge et exécution en une touche."
 
 #include <Trade\Trade.mqh>
 
-#define DK_VERSION "1.08"
+#define DK_VERSION "1.09"
 
 enum ENUM_DK_PROFIL
   {
    PROFIL_AUTO  = 0, // Automatique (d'après le nom du symbole)
    PROFIL_US100 = 1, // US100 (Nasdaq)
-   PROFIL_SP500 = 2  // SP500
+   PROFIL_SP500 = 2, // SP500
+   PROFIL_OR    = 3  // Or (XAUUSD)
   };
 
 enum ENUM_DK_RISQUE
@@ -41,7 +45,7 @@ enum ENUM_DK_HEURE
    HEURE_NY7  = 1  // Serveur = New York + 7 h (pour le testeur de stratégie)
   };
 
-input ENUM_DK_PROFIL InpProfil      = PROFIL_AUTO;     // Profil (un graphique = un indice)
+input ENUM_DK_PROFIL InpProfil      = PROFIL_AUTO;     // Profil (un graphique = un actif)
 input ENUM_DK_RISQUE InpRisqueMode  = RISQUE_MONTANT;  // Calcul du lot
 input double         InpRisque      = 1000;            // Risque par trade (montant ou %) ou lot fixe · modifiable dans le panneau
 input double         InpFtmoJour    = 5;               // FTMO : perte max du jour (% du capital de départ), pour l'avertissement du risque
@@ -54,6 +58,8 @@ input bool           InpAuto        = false;           // Mode automatique (plac
 input bool           InpSuivreFibo  = true;            // Déplacer l'ordre quand la jambe s'allonge (comme le backtest)
 input bool           InpSortie13h   = true;            // Fermer la position à 13:00 NY (19:00 Paris)
 input bool           InpFiltreH1    = false;           // US100 : pas de trade si le H1 va contre (filtre optionnel)
+input bool           InpFeuRouge    = true;            // US100, SP500 : feu rouge (pas de trade si les 10 derniers setups < 0 R) · bouton FEU
+input bool           InpSecond      = true;            // Or : second trade de continuation (stop du trade 1 remonté) · bouton 2e TRADE
 input bool           InpProtection  = false;           // Protection annonces FTMO (aucun ordre autour des annonces US)
 input int            InpProtMin     = 2;               // Protection : minutes avant et après chaque annonce
 input int            InpHistJours   = 7;               // Historique : nombre de séances au démarrage (0 à 250, bouton PÉRIODE)
@@ -83,6 +89,11 @@ struct Profil
    double            cassureMin; // cassure nette : clôture au-delà du sommet d'au moins X R
    int               judasMin;   // le fond du Judas doit se former au moins N min après 9:30 NY
    bool              daily;      // le Daily doit être d'accord avec le H4
+   int               tendance;   // 0 = H4, 1 = H4 + Daily d'accord, 2 = H4 ou H1 sans conflit
+   int               finH, finM; // fin des entrées (heure de New York)
+   bool              feu;        // feu rouge appliqué à ce profil
+   bool              second;     // second trade de continuation
+   string            unite;      // unité de prix affichée (pts, $)
    long              magic;
    color             couleur;
   };
@@ -94,7 +105,8 @@ struct Bar { long t; double o, h, l, c; };
 struct Ctx
   {
    int               y, mo, d;
-   long              t800, t925, t930, t950, t10, t11, t13;
+   long              t800, t925, t930, t950, t10, t11, t12, t13;
+   long              tF;         // fin des entrées du profil (11:00 NY indices, 12:00 NY or)
    int               h4, d1, h1, dir;
    string            raison;
    bool              ok;
@@ -127,6 +139,13 @@ struct Setup
    double            r2, r25, r3;  // résultat simulé (R) à 2R, 2,5R, 3R
    long              exitT;        // sortie (objectif choisi)
    bool              fini;         // résultat définitif
+   // second trade (or) : 0 rien, 1 attente de l'impulsion, 2 attente du repli, 3 attente de la cassure du repli,
+   // 4 prêt (limite au 50 % de la nouvelle jambe), 5 rempli, 6 annulé
+   int               s2etat;
+   string            s2info;
+   double            s2PL, s2SH, s2e, s2sl, s2tp, s2rr, s2r, s2t1;
+   long              s2T0, s2fillT, s2exitT;
+   bool              s2fini;
   };
 
 //--- État global ------------------------------------------------------
@@ -169,7 +188,17 @@ double   g_capital  = 0;       // capital de départ (dépôts)
 int      g_notif    = 0;       // notifications déjà envoyées aujourd'hui (bits)
 string   g_notifJour = "";
 ulong    g_posSuivie = 0;      // position Desk Key en cours (pour la notification de sortie)
-ulong    g_ordSuivi  = 0;      // ordre en attente (pour la notification d'expiration à 11:00 NY)
+ulong    g_ordSuivi  = 0;      // ordre en attente (pour la notification d'expiration à la fin des entrées)
+bool     g_feuOn    = true;    // feu rouge appliqué (bouton FEU) ; désactivé = prévenir seulement
+bool     g_feuRouge = false;   // feu du jour : rouge si les 10 derniers setups (R à 3R) sont négatifs
+double   g_feuS     = 0;       // somme des 10 derniers setups (R à 3R)
+int      g_feuN     = 0;       // setups pris en compte (10 au plus)
+bool     g_feuCalc  = false;   // feu calculé pour la séance
+bool     g_second   = true;    // second trade activé (or, bouton 2e TRADE)
+bool     g_arme2    = false;   // second trade armé (manuel)
+bool     g_t2Fait   = false;   // second trade déjà pris aujourd'hui
+ulong    g_pos2Suivie = 0;     // position du second trade (notifications)
+CTrade   trade2;               // second trade (numéro magique du profil + 1)
 // déclarations (fonctions définies plus bas)
 string Sens(int v);
 double RisqueVoulu();
@@ -179,6 +208,10 @@ void   NotifierUneFois(int bit, string texte, bool fort);
 void   Notifier(string texte, bool fort);
 void   Panneau();
 string LireCle();
+bool   FeuBloque();
+void   SuivreNotifs2(long now, ulong pos1);
+string FeuTexte();
+double ResRegle(Setup &s);
 
 //+------------------------------------------------------------------+
 //| Heures                                                           |
@@ -341,13 +374,43 @@ int Aggregate(Bar &m[], int n, long secs, long off, long fin, Bar &out[], int ke
   }
 
 //+------------------------------------------------------------------+
+//| Sens du jour selon le profil (copie des filtres du backtest)     |
+//+------------------------------------------------------------------+
+void Direction(Ctx &c, int nc)
+  {
+   c.dir = 0; c.raison = "";
+   if(P.tendance == 1)
+     {
+      if(nc < 15) c.raison = "historique Daily insuffisant";
+      else if(c.h4 == 0) c.raison = "H4 sans tendance";
+      else if(c.d1 != c.h4) c.raison = "H4 et Daily pas d'accord";
+      else c.dir = c.h4;
+     }
+   else if(P.tendance == 2)   // or : H4 ou H1, sans conflit
+     {
+      if(c.h4 != 0 && c.h1 != 0 && c.h4 != c.h1) c.raison = "H4 et H1 en conflit";
+      else if(c.h4 != 0) c.dir = c.h4;
+      else if(c.h1 != 0) c.dir = c.h1;
+      else c.raison = "H4 et H1 sans tendance";
+     }
+   else
+     {
+      if(c.h4 == 0) c.raison = "H4 sans tendance";
+      else c.dir = c.h4;
+     }
+   if(c.dir != 0 && InpFiltreH1 && P.tendance == 0 && c.h1 == -c.dir) { c.raison = "H1 contre le trade (filtre)"; c.dir = 0; }
+   c.ok = true;
+  }
+
+//+------------------------------------------------------------------+
 //| Contexte d'une journée (m = M1 couvrant au moins 40 jours avant) |
 //+------------------------------------------------------------------+
 void BuildCtx(Bar &m[], int n, int y, int mo, int d, Ctx &c)
   {
    c.y = y; c.mo = mo; c.d = d;
    c.t800 = NyToUtc(y, mo, d, 8, 0);  c.t930 = NyToUtc(y, mo, d, 9, 30); c.t925 = c.t930 - 300; c.t950 = c.t930 + 20 * 60;
-   c.t10  = NyToUtc(y, mo, d, 10, 0); c.t11  = NyToUtc(y, mo, d, 11, 0); c.t13  = NyToUtc(y, mo, d, 13, 0);
+   c.t10  = NyToUtc(y, mo, d, 10, 0); c.t11  = NyToUtc(y, mo, d, 11, 0); c.t12 = NyToUtc(y, mo, d, 12, 0); c.t13  = NyToUtc(y, mo, d, 13, 0);
+   c.tF   = NyToUtc(y, mo, d, P.finH, P.finM);
    Bar h4[], h1[];
    int n4 = Aggregate(m, n, 14400, 7200, c.t925, h4, 60);
    int n1 = Aggregate(m, n, 3600, 0, c.t925, h1, 60);
@@ -380,21 +443,7 @@ void BuildCtx(Bar &m[], int n, int y, int mo, int d, Ctx &c)
       sN /= 10.0; sP /= 10.0;
       c.d1 = (px > sN && sN > sP) ? 1 : ((px < sN && sN < sP) ? -1 : 0);
      }
-   c.dir = 0; c.raison = "";
-   if(P.daily)
-     {
-      if(nc < 15) c.raison = "historique Daily insuffisant";
-      else if(c.h4 == 0) c.raison = "H4 sans tendance";
-      else if(c.d1 != c.h4) c.raison = "H4 et Daily pas d'accord";
-      else c.dir = c.h4;
-     }
-   else
-     {
-      if(c.h4 == 0) c.raison = "H4 sans tendance";
-      else c.dir = c.h4;
-     }
-   if(c.dir != 0 && InpFiltreH1 && !P.daily && c.h1 == -c.dir) { c.raison = "H1 contre le trade (filtre)"; c.dir = 0; }
-   c.ok = true;
+   Direction(c, nc);
   }
 
 // même calcul que BuildCtx, à partir d'agrégats déjà calculés (historique long)
@@ -412,7 +461,8 @@ void BuildCtxFast(Bar &m[], int n, Bar &a4[], int n4, Bar &a1[], int n1, long &d
   {
    c.y = y; c.mo = mo; c.d = d;
    c.t800 = NyToUtc(y, mo, d, 8, 0);  c.t930 = NyToUtc(y, mo, d, 9, 30); c.t925 = c.t930 - 300; c.t950 = c.t930 + 20 * 60;
-   c.t10  = NyToUtc(y, mo, d, 10, 0); c.t11  = NyToUtc(y, mo, d, 11, 0); c.t13  = NyToUtc(y, mo, d, 13, 0);
+   c.t10  = NyToUtc(y, mo, d, 10, 0); c.t11  = NyToUtc(y, mo, d, 11, 0); c.t12 = NyToUtc(y, mo, d, 12, 0); c.t13  = NyToUtc(y, mo, d, 13, 0);
+   c.tF   = NyToUtc(y, mo, d, P.finH, P.finM);
    c.h4 = TrendDe(a4, n4, 14400, c.t925);
    c.h1 = TrendDe(a1, n1, 3600, c.t925);
    int nc = 0; while(nc < nd && dT[nc] < c.t930) nc++;
@@ -426,21 +476,7 @@ void BuildCtxFast(Bar &m[], int n, Bar &a4[], int n4, Bar &a1[], int n1, long &d
       sN /= 10.0; sP /= 10.0;
       c.d1 = (px > sN && sN > sP) ? 1 : ((px < sN && sN < sP) ? -1 : 0);
      }
-   c.dir = 0; c.raison = "";
-   if(P.daily)
-     {
-      if(nc < 15) c.raison = "historique Daily insuffisant";
-      else if(c.h4 == 0) c.raison = "H4 sans tendance";
-      else if(c.d1 != c.h4) c.raison = "H4 et Daily pas d'accord";
-      else c.dir = c.h4;
-     }
-   else
-     {
-      if(c.h4 == 0) c.raison = "H4 sans tendance";
-      else c.dir = c.h4;
-     }
-   if(c.dir != 0 && InpFiltreH1 && !P.daily && c.h1 == -c.dir) { c.raison = "H1 contre le trade (filtre)"; c.dir = 0; }
-   c.ok = true;
+   Direction(c, nc);
   }
 
 //+------------------------------------------------------------------+
@@ -464,12 +500,105 @@ double SimR(Bar &b[], int n, int k, int d, double entry, double sl, double tpR, 
   }
 
 //+------------------------------------------------------------------+
+//| Second trade de l'or (copie de second() du backtest)              |
+//| Pendant que le trade 1 est ouvert : impulsion au-delà de la jambe |
+//| du trade 1, repli (pivot 2 bougies) au-dessus du stop 1, clôture  |
+//| au-delà du sommet du repli -> limite au 50 % de la nouvelle jambe,|
+//| stop sous le repli ± marge, objectif = TP du trade 1, rempli      |
+//| avant 12:00 NY. Au remplissage, le stop du trade 1 est remonté au |
+//| stop du second trade.                                             |
+//+------------------------------------------------------------------+
+void Second(Bar &E[], int n, int k, int d, double e1, double sl1, double far1, Ctx &c, long now, Setup &s)
+  {
+   double risk1 = MathAbs(e1 - sl1), tp1 = e1 + d * g_tp * risk1;
+   int phase = 0, extI = k; double ext = far1, PL = 0, SH = 0, legX = 0, e2 = 0, sl2 = 0;
+   s.s2etat = 1; s.s2tp = tp1;
+   for(int j = k + 1; j < n && E[j].t < c.t13; j++)
+     {
+      double fav = d > 0 ? E[j].h : E[j].l;
+      if(d > 0 ? E[j].l <= sl1 : E[j].h >= sl1) { s.s2etat = 6; s.s2info = "trade 1 au stop avant le second trade"; return; }
+      if(d > 0 ? E[j].h >= tp1 : E[j].l <= tp1) { s.s2etat = 6; s.s2info = "trade 1 au TP avant le second trade"; return; }
+      if(phase == 0) { if(d > 0 ? fav > far1 : fav < far1) { phase = 1; ext = fav; extI = j; s.s2etat = 2; } continue; }
+      if(phase == 1 || phase == 2)
+        {
+         if(d > 0 ? fav > ext : fav < ext) { ext = fav; extI = j; }
+         if(phase == 1)
+           {
+            int p = j - 2;
+            if(p - 2 > extI - 1 && p > k + 2 && p - 2 >= 0)
+              {
+               bool piv = d > 0
+                          ? (E[p].l < E[p - 1].l && E[p].l < E[p - 2].l && E[p].l <= E[p + 1].l && E[p].l <= E[p + 2].l)
+                          : (E[p].h > E[p - 1].h && E[p].h > E[p - 2].h && E[p].h >= E[p + 1].h && E[p].h >= E[p + 2].h);
+               double adv = d > 0 ? E[p].l : E[p].h;
+               if(piv && (d > 0 ? adv > sl1 : adv < sl1))
+                 {
+                  double sh = adv;
+                  for(int z = extI; z <= p; z++) { double fz = d > 0 ? E[z].h : E[z].l; if(d > 0 ? fz > sh : fz < sh) sh = fz; }
+                  PL = adv; SH = sh; phase = 2; s.s2etat = 3; s.s2PL = PL; s.s2SH = SH;
+                 }
+              }
+            continue;
+           }
+         // phase 2 : attendre la clôture au-delà du sommet du repli
+         if(d > 0 ? E[j].l < PL : E[j].h > PL) { phase = 1; s.s2etat = 2; continue; }   // repli plus profond : nouveau creux
+         if(d > 0 ? E[j].c > SH : E[j].c < SH)
+           {
+            legX = ext; e2 = PL + (legX - PL) * 0.5; sl2 = PL - d * P.marge; phase = 3;
+            s.s2etat = 4; s.s2T0 = E[j].t; s.s2e = e2; s.s2sl = sl2; s.s2PL = PL; s.s2SH = SH;
+            s.s2rr = MathAbs(e2 - sl2) > 0 ? (tp1 - e2) * d / MathAbs(e2 - sl2) : 0;
+           }
+         continue;
+        }
+      // phase 3 : limite au 50 % de la nouvelle jambe, retracée si la jambe s'allonge, remplie avant 12:00 NY
+      if(E[j].t >= c.t12) { s.s2etat = 6; s.s2info = "second trade : pas de remplissage avant 12:00 NY"; return; }
+      if(d > 0 ? E[j].l <= e2 : E[j].h >= e2)
+        {
+         double risk2 = MathAbs(e2 - sl2);
+         if(risk2 <= 0) { s.s2etat = 6; return; }
+         double tpR = (tp1 - e2) * d / risk2;
+         s.s2etat = 5; s.s2fillT = E[j].t; s.s2e = e2; s.s2sl = sl2; s.s2rr = NormalizeDouble(tpR, 2);
+         long ex2 = 0; bool f2 = true;
+         s.s2r = tpR > 0 ? SimR(E, n, j, d, e2, sl2, tpR, c.t13, ex2, f2) : 0;
+         if(tpR <= 0) { f2 = true; ex2 = E[j].t; }
+         s.s2exitT = ex2;
+         // trade 1 avec son stop remonté au stop du second trade
+         double stop1 = d > 0 ? MathMax(sl1, sl2) : MathMin(sl1, sl2), lastC = E[j].c, exP = 0; bool sortie = false;
+         if(d > 0 ? E[j].l <= sl2 : E[j].h >= sl2) { exP = stop1; sortie = true; }
+         for(int q = j + 1; !sortie && q < n && E[q].t < c.t13; q++)
+           {
+            if(d > 0 ? E[q].l <= stop1 : E[q].h >= stop1) { exP = stop1; sortie = true; break; }
+            if(d > 0 ? E[q].h >= tp1 : E[q].l <= tp1) { exP = tp1; sortie = true; break; }
+            lastC = E[q].c;
+           }
+         bool f1 = sortie || (n > 0 && E[n - 1].t >= c.t13 - 60);
+         if(!sortie) exP = lastC;
+         s.s2t1 = NormalizeDouble((exP - e1) * d / risk1, 2);
+         s.s2fini = f1 && f2;
+         return;
+        }
+      if(d > 0 ? fav > legX : fav < legX) { legX = fav; ext = legX; e2 = PL + (legX - PL) * 0.5; s.s2e = e2; s.s2rr = MathAbs(e2 - sl2) > 0 ? (tp1 - e2) * d / MathAbs(e2 - sl2) : 0; }
+     }
+   if(s.s2etat == 4 && now >= c.t12) { s.s2etat = 6; s.s2info = "second trade : pas de remplissage avant 12:00 NY"; }
+   if(s.s2etat >= 1 && s.s2etat <= 3 && now >= c.t12) { s.s2etat = 6; s.s2info = "pas de second trade (pas de continuation avant 12:00 NY)"; }
+  }
+// résultat de la règle au TP choisi : trade 1, plus le second trade de l'or s'il a été rempli
+double ResRegle(Setup &s)
+  {
+   double r1 = MathAbs(g_tp - 2.0) < 0.01 ? s.r2 : (MathAbs(g_tp - 2.5) < 0.01 ? s.r25 : s.r3);
+   if(s.s2etat == 5) return NormalizeDouble(s.s2t1 + s.s2r, 2);
+   return r1;
+  }
+
+//+------------------------------------------------------------------+
 //| Recherche du setup d'une journée (copie de setup() du backtest)  |
 //+------------------------------------------------------------------+
 void ScanDay(Bar &b[], int n, Ctx &c, long now, Setup &s)
   {
    s.etape = E_AVANT; s.info = ""; s.ok = false; s.fillT = 0; s.fillI = -1; s.mssT = 0; s.sweepT = 0; s.extT = 0; s.swT = 0;
    s.cassurePts = 0; s.cassureMinPts = 0; s.fvg = false; s.r2 = 0; s.r25 = 0; s.r3 = 0; s.exitT = 0; s.fini = false;
+   s.s2etat = 0; s.s2info = ""; s.s2PL = 0; s.s2SH = 0; s.s2e = 0; s.s2sl = 0; s.s2tp = 0; s.s2rr = 0; s.s2r = 0; s.s2t1 = 0;
+   s.s2T0 = 0; s.s2fillT = 0; s.s2exitT = 0; s.s2fini = false;
    s.preHi = -DBL_MAX; s.preLo = DBL_MAX;
    for(int i = Lb(b, n, c.t800); i < n && b[i].t < c.t930; i++) { s.preHi = MathMax(s.preHi, b[i].h); s.preLo = MathMin(s.preLo, b[i].l); }
    if(now < c.t930 || s.preHi < s.preLo) { s.etape = E_AVANT; return; }
@@ -524,7 +653,7 @@ void ScanDay(Bar &b[], int n, Ctx &c, long now, Setup &s)
       s.etape = E_PRET; s.ok = true; s.info = ""; s.mssT = b[i].t; s.fvg = fvgEnd >= 0;
       s.cassurePts = brk; s.cassureMinPts = P.cassureMin * MathAbs(entry - sl);
       s.sl = sl;
-      for(int k = last + 1; k < n && b[k].t < c.t11; k++)
+      for(int k = last + 1; k < n && b[k].t < c.tF; k++)
         {
          if(d < 0 ? b[k].h >= entry : b[k].l <= entry)
            {
@@ -537,12 +666,14 @@ void ScanDay(Bar &b[], int n, Ctx &c, long now, Setup &s)
             s.r3  = SimR(b, n, k, d, entry, sl, 3.0, c.t13, ex, f3);
             long exSel; bool fs; SimR(b, n, k, d, entry, sl, g_tp, c.t13, exSel, fs);
             s.exitT = exSel; s.fini = f2 && f25 && f3;
+            bool slNow = d > 0 ? b[k].l <= sl : b[k].h >= sl;
+            if(P.second && g_second && !slNow) Second(b, n, k, d, entry, sl, far, c, now, s);
             return;
            }
          if(d < 0 ? b[k].l < far : b[k].h > far) { far = d < 0 ? b[k].l : b[k].h; farT = b[k].t; entry = far + (ext - far) * 0.5; }
         }
       s.far = far; s.farT = farT; s.entry = entry;
-      if(now >= c.t11) { s.etape = E_EXPIRE; s.fini = true; }
+      if(now >= c.tF) { s.etape = E_EXPIRE; s.fini = true; }
       return;
      }
    if(now >= c.t11 && !s.ok) { s.etape = E_FINI; s.fini = true; }
@@ -623,28 +754,32 @@ string AnnoncesTexte()
 //+------------------------------------------------------------------+
 //| Ordres                                                           |
 //+------------------------------------------------------------------+
-ulong MonOrdre()
+ulong MonOrdreM(long magic)
   {
    for(int i = OrdersTotal() - 1; i >= 0; i--)
      {
       ulong tk = OrderGetTicket(i);
       if(tk == 0) continue;
-      if(OrderGetString(ORDER_SYMBOL) == _Symbol && OrderGetInteger(ORDER_MAGIC) == P.magic) return tk;
+      if(OrderGetString(ORDER_SYMBOL) == _Symbol && OrderGetInteger(ORDER_MAGIC) == magic) return tk;
      }
    return 0;
   }
-ulong MaPosition()
+ulong MaPositionM(long magic)
   {
    for(int i = PositionsTotal() - 1; i >= 0; i--)
      {
       ulong tk = PositionGetTicket(i);
       if(tk == 0) continue;
-      if(PositionGetString(POSITION_SYMBOL) == _Symbol && PositionGetInteger(POSITION_MAGIC) == P.magic) return tk;
+      if(PositionGetString(POSITION_SYMBOL) == _Symbol && PositionGetInteger(POSITION_MAGIC) == magic) return tk;
      }
    return 0;
   }
+ulong MonOrdre()    { return MonOrdreM(P.magic); }
+ulong MaPosition()  { return MaPositionM(P.magic); }
+ulong MonOrdre2()   { return MonOrdreM(P.magic + 1); }      // second trade (or)
+ulong MaPosition2() { return MaPositionM(P.magic + 1); }
 // trade Desk Key du jour : identifiant de position, volume, prix (0 si aucun)
-long TradeDuJour(double &vol, double &px)
+long TradeDuJourM(long magic, double &vol, double &px)
   {
    vol = 0; px = 0;
    if(!HistorySelect(ToSrv(G.t930 - 3600), TimeTradeServer() + 60)) return 0;
@@ -652,7 +787,7 @@ long TradeDuJour(double &vol, double &px)
      {
       ulong tk = HistoryDealGetTicket(i);
       if(tk == 0) continue;
-      if(HistoryDealGetString(tk, DEAL_SYMBOL) == _Symbol && HistoryDealGetInteger(tk, DEAL_MAGIC) == P.magic
+      if(HistoryDealGetString(tk, DEAL_SYMBOL) == _Symbol && HistoryDealGetInteger(tk, DEAL_MAGIC) == magic
          && HistoryDealGetInteger(tk, DEAL_ENTRY) == DEAL_ENTRY_IN)
         {
          vol = HistoryDealGetDouble(tk, DEAL_VOLUME); px = HistoryDealGetDouble(tk, DEAL_PRICE);
@@ -661,7 +796,9 @@ long TradeDuJour(double &vol, double &px)
      }
    return 0;
   }
+long TradeDuJour(double &vol, double &px) { return TradeDuJourM(P.magic, vol, px); }
 bool TradeDejaFait() { double v, p; return TradeDuJour(v, p) != 0 || MaPosition() != 0; }
+bool Trade2DejaFait() { double v, p; return TradeDuJourM(P.magic + 1, v, p) != 0 || MaPosition2() != 0; }
 
 double Lot(double entry, double sl)
   {
@@ -710,6 +847,15 @@ void ChargerRisque()
    SauverRisque();
   }
 void SauverRisque() { GlobalVariableSet(GvNom("rm"), g_rMode); GlobalVariableSet(GvNom("rv"), g_rVal); }
+bool ChargerOption(string k, bool inp)
+  {
+   string gk = GvNom(P.nom + "_" + k), gi = GvNom(P.nom + "_" + k + "_in");
+   bool v = inp;
+   if(GlobalVariableCheck(gk) && GlobalVariableCheck(gi) && (GlobalVariableGet(gi) != 0) == inp) v = GlobalVariableGet(gk) != 0;
+   GlobalVariableSet(gi, inp ? 1 : 0); GlobalVariableSet(gk, v ? 1 : 0);
+   return v;
+  }
+void SauverOption(string k, bool v) { GlobalVariableSet(GvNom(P.nom + "_" + k), v ? 1 : 0); }
 // un changement fait sur l'autre graphique (autre indice) est repris ici
 bool SuivreRisque()
   {
@@ -756,7 +902,7 @@ double CapitalDepart()
    g_capital = sum > 0 ? sum : AccountInfoDouble(ACCOUNT_BALANCE);
    return g_capital;
   }
-// ligne du panneau : risque en argent, pire jour (les 2 indices perdants), pertes avant la perte max
+// ligne du panneau : risque en argent, pire jour (les 3 actifs perdants), pertes avant la perte max
 string RisqueAnalyse(color &c)
   {
    double cap = CapitalDepart(), eq = AccountInfoDouble(ACCOUNT_EQUITY);
@@ -766,9 +912,9 @@ string RisqueAnalyse(color &c)
    if(r <= 0 || cap <= 0) return "Risque : " + RisqueTexte();
    double jour = cap * InpFtmoJour / 100.0, plancher = cap * (1 - InpFtmoMax / 100.0);
    int avant = (int)MathFloor((eq - plancher) / r);
-   double pire = 2 * r / cap * 100.0;
-   if(r >= jour || 2 * r >= jour) c = clrTomato; else if(2 * r >= 0.5 * jour || avant <= 6) c = clrOrange; else c = clrMediumSeaGreen;
-   return "Risque " + Fr(r / cap * 100.0, 2) + " % · 2 pertes le même jour : −" + Fr(pire, 1) + " % (limite jour " + Fr(InpFtmoJour, 0) + " %) · "
+   double pire = 3 * r / cap * 100.0;
+   if(r >= jour || 3 * r >= jour) c = clrTomato; else if(3 * r >= 0.5 * jour || avant <= 6) c = clrOrange; else c = clrMediumSeaGreen;
+   return "Risque " + Fr(r / cap * 100.0, 2) + " % · 3 pertes le même jour : −" + Fr(pire, 1) + " % (limite jour " + Fr(InpFtmoJour, 0) + " %) · "
           + I(MathMax(0, avant)) + " pertes avant la perte max";
   }
 
@@ -783,6 +929,12 @@ string RisqueAnalyse(color &c)
 #define N_SORTIE  32
 #define N_ANNULE  64
 #define N_AVANT10 128
+#define N_FEU     256
+#define N_S2PRET  512
+#define N_S2ORDRE 1024
+#define N_S2REMPLI 2048
+#define N_S2SORTIE 4096
+#define N_S2ANNULE 8192
 string UrlEnc(string s)
   {
    uchar b[]; int n = StringToCharArray(s, b, 0, WHOLE_ARRAY, CP_UTF8);
@@ -951,22 +1103,59 @@ void Marquer(int bit)
   }
 void NotifierUneFois(int bit, string texte, bool fort) { if(DejaNotifie(bit)) return; Marquer(bit); Notifier(texte, fort); }
 string ModeTexte() { return g_auto ? "AUTO : l'ordre part tout seul" : "manuel : touche " + InpTouche; }
+string HnY(long utc) { return Hm(NyLocal(utc)) + " NY"; }
+//--- feu rouge (US100, SP500) ----------------------------------------
+bool FeuBloque() { return P.feu && g_feuOn && g_feuCalc && g_feuRouge; }
+string FeuTexte()
+  {
+   if(!P.feu) return "";
+   if(!g_feuCalc) return "Feu : pas encore calculé (il faut l'historique M1 des derniers mois)";
+   string base = "10 derniers setups " + (g_feuS >= 0 ? "+" : "") + Fr(g_feuS, 1) + " R" + (g_feuN < 10 ? " (" + I(g_feuN) + " seulement)" : "");
+   if(g_feuRouge) return (g_feuOn ? "FEU ROUGE · pas de trade aujourd'hui (règle suivie à blanc) · " : "FEU ROUGE désactivé (prévenir seulement) · ") + base;
+   return "Feu vert · " + base + (g_feuOn ? "" : " · feu rouge désactivé");
+  }
+// somme des 10 derniers setups (entrées, résultat à 3R) avant l'instant t ; e* triés du plus récent au plus ancien
+void FeuDe(long &eT[], double &eR[], int ne, long t, double &somme, int &cnt)
+  {
+   somme = 0; cnt = 0;
+   for(int i = 0; i < ne && cnt < 10; i++) if(eT[i] < t) { somme += eR[i]; cnt++; }
+  }
+string FeuJson(double somme, int cnt)
+  {
+   return "\"feu\":{\"c\":" + Q(cnt >= 10 && somme < 0 ? "rouge" : "vert") + ",\"s\":" + N(somme, 2) + ",\"n\":" + I(cnt) + ",\"on\":" + (g_feuOn ? "true" : "false") + "}";
+  }
+// une notification quand le feu change de couleur (début de séance)
+void SuivreFeu()
+  {
+   if(!P.feu || !g_feuCalc) return;
+   string gv = GvNom(P.nom + "_feu_c");
+   int avant = GlobalVariableCheck(gv) ? (int)GlobalVariableGet(gv) : 0;
+   int maint = g_feuRouge ? 1 : 0;
+   if(maint != avant)
+      NotifierUneFois(N_FEU, g_feuRouge ? "FEU ROUGE · les 10 derniers setups font " + Fr(g_feuS, 1) + " R : " + (g_feuOn ? "pas de trade sur " + P.nom + " jusqu'au retour au vert (la règle est suivie à blanc)" : "feu désactivé, Desk Key prévient seulement")
+                                        : "FEU VERT · les 10 derniers setups font +" + Fr(g_feuS, 1) + " R : trading repris sur " + P.nom, true);
+   GlobalVariableSet(gv, maint);
+  }
 // suit les étapes du setup et la position du jour
 void SuivreNotifs()
   {
    if(!G.ok || g_jour == "") return;
    long now = NowUtc();
    if(InpNotifTout && G.dir != 0 && now >= G.t925 && now < G.t11)
-      NotifierUneFois(N_SENS, (G.dir > 0 ? "ACHATS" : "VENTES") + " uniquement aujourd'hui (H4 " + Sens(G.h4) + (P.daily ? ", Daily " + Sens(G.d1) : "") + ")", false);
+      NotifierUneFois(N_SENS, (G.dir > 0 ? "ACHATS" : "VENTES") + " uniquement aujourd'hui (H4 " + Sens(G.h4) + (P.tendance == 1 ? ", Daily " + Sens(G.d1) : (P.tendance == 2 ? ", H1 " + Sens(G.h1) : "")) + ")"
+                      + (FeuBloque() ? " · FEU ROUGE : pas d'ordre aujourd'hui" : ""), false);
    if(InpNotifTout && S.sweepT > 0 && now < G.t11)
       NotifierUneFois(N_JUDAS, "Judas fait à " + Hm(ParisLocal(S.sweepT)) + " Paris · attente de la cassure", false);
-   if(S.etape == E_PRET && now < G.t11)
+   if(S.etape == E_PRET && now < G.tF)
      {
       double e = NormPx(S.entry), sl = NormPx(S.sl), lots = Lot(e, sl);
-      NotifierUneFois(N_PRET, "SETUP PRÊT · " + (G.dir > 0 ? "ACHAT" : "VENTE") + " limite " + Px(e) + " · SL " + Px(sl) + " · TP " + Px(NormPx(TpPrix(S, G.dir, g_tp))) + " (" + Fr(g_tp, 1) + "R) · "
-                      + Fr(lots, 2) + " lot · risque " + Fr(RisqueArgent(e, sl, lots), 0) + " " + AccountInfoString(ACCOUNT_CURRENCY) + " · "
-                      + (now < G.t10 ? "départ 10:00 NY (" + Hm(ParisLocal(G.t10)) + " Paris) · " : "") + ModeTexte()
-                      + (g_protect ? " · protection annonces ON" : ""), true);
+      if(FeuBloque())
+         NotifierUneFois(N_PRET, "setup du jour (" + (G.dir > 0 ? "achat" : "vente") + " limite " + Px(e) + ") · FEU ROUGE : pas d'ordre, la règle est suivie à blanc", false);
+      else
+         NotifierUneFois(N_PRET, "SETUP PRÊT · " + (G.dir > 0 ? "ACHAT" : "VENTE") + " limite " + Px(e) + " · SL " + Px(sl) + " · TP " + Px(NormPx(TpPrix(S, G.dir, g_tp))) + " (" + Fr(g_tp, 1) + "R) · "
+                         + Fr(lots, 2) + " lot · risque " + Fr(RisqueArgent(e, sl, lots), 0) + " " + AccountInfoString(ACCOUNT_CURRENCY) + " · "
+                         + (now < G.t10 ? "départ 10:00 NY (" + Hm(ParisLocal(G.t10)) + " Paris) · " : "") + "entrées jusqu'à " + HnY(G.tF) + " · " + ModeTexte()
+                         + (g_protect ? " · protection annonces ON" : "") + (P.feu && g_feuRouge && !g_feuOn ? " · feu rouge désactivé" : ""), true);
      }
    if(S.etape == E_IGNORE && DejaNotifie(N_PRET))
       NotifierUneFois(N_AVANT10, "setup annulé : le 50 % a été touché avant 10:00 NY (pas de trade, comme le backtest)", false);
@@ -975,7 +1164,7 @@ void SuivreNotifs()
    else if(g_ordSuivi != 0 && pos == 0)
      {
       g_ordSuivi = 0;
-      if(now >= G.t11 - 5) NotifierUneFois(N_ANNULE, "ordre expiré à 11:00 NY sans remplissage (pas de trade aujourd'hui)", false);
+      if(now >= G.tF - 5) NotifierUneFois(N_ANNULE, "ordre expiré à " + HnY(G.tF) + " sans remplissage (pas de trade aujourd'hui)", false);
      }
    if(pos != 0) g_ordSuivi = 0;
    if(pos != 0 && g_posSuivie == 0)
@@ -1004,14 +1193,48 @@ void SuivreNotifs()
       NotifierUneFois(N_SORTIE, "SORTIE · " + why + " · résultat " + (net >= 0 ? "+" : "") + Fr(net, 0) + " " + AccountInfoString(ACCOUNT_CURRENCY)
                       + " · équité " + Fr(AccountInfoDouble(ACCOUNT_EQUITY), 0), true);
      }
+   SuivreNotifs2(now, pos);
+  }
+// second trade de l'or : prêt, en position (stop du trade 1 remonté), sortie
+void SuivreNotifs2(long now, ulong pos1)
+  {
+   if(!P.second || !g_second) return;
+   if(S.s2etat == 4 && now < G.t12 && pos1 != 0 && MonOrdre2() == 0 && MaPosition2() == 0 && !g_t2Fait)
+     {
+      double e = NormPx(S.s2e), sl = NormPx(S.s2sl), lots = Lot(e, sl);
+      NotifierUneFois(N_S2PRET, "SECOND TRADE PRÊT · " + (G.dir > 0 ? "ACHAT" : "VENTE") + " limite " + Px(e) + " · SL " + Px(sl) + " · TP " + Px(NormPx(S.s2tp)) + " (le TP du trade 1, " + Fr(S.s2rr, 1) + "R) · "
+                      + Fr(lots, 2) + " lot · au remplissage, le stop du trade 1 passe à " + Px(sl) + " · "
+                      + (g_auto ? "AUTO : l'ordre part tout seul" : "touche " + InpTouche + " pour le placer") + " · jusqu'à 12:00 NY", true);
+     }
+   ulong p2 = MaPosition2();
+   if(p2 != 0 && g_pos2Suivie == 0)
+     {
+      g_pos2Suivie = p2;
+      if(PositionSelectByTicket(p2))
+         NotifierUneFois(N_S2REMPLI, "SECOND TRADE EN POSITION · " + Fr(PositionGetDouble(POSITION_VOLUME), 2) + " lot à " + Px(PositionGetDouble(POSITION_PRICE_OPEN)) + " · SL " + Px(PositionGetDouble(POSITION_SL))
+                         + " · TP " + Px(PositionGetDouble(POSITION_TP)) + " · stop du trade 1 remonté au même niveau", true);
+     }
+   if(p2 == 0 && g_pos2Suivie != 0)
+     {
+      ulong id = g_pos2Suivie; g_pos2Suivie = 0;
+      double net = 0;
+      if(HistorySelectByPosition(id))
+         for(int i = 0; i < HistoryDealsTotal(); i++)
+           {
+            ulong tk = HistoryDealGetTicket(i);
+            if(tk != 0) net += HistoryDealGetDouble(tk, DEAL_PROFIT) + HistoryDealGetDouble(tk, DEAL_COMMISSION) + HistoryDealGetDouble(tk, DEAL_SWAP) + HistoryDealGetDouble(tk, DEAL_FEE);
+           }
+      NotifierUneFois(N_S2SORTIE, "SORTIE DU SECOND TRADE · résultat " + (net >= 0 ? "+" : "") + Fr(net, 0) + " " + AccountInfoString(ACCOUNT_CURRENCY) + " · équité " + Fr(AccountInfoDouble(ACCOUNT_EQUITY), 0), true);
+     }
   }
 
 bool Placer()
   {
    long now = NowUtc();
    if(S.etape != E_PRET) { Msg("pas de setup prêt"); return false; }
+   if(FeuBloque()) { g_arme = false; Msg("FEU ROUGE : pas d'ordre aujourd'hui sur " + P.nom + " (bouton FEU pour le désactiver)"); return false; }
    if(now < G.t10) { g_arme = true; Msg("armé : l'ordre partira à 10:00 NY s'il est encore valide"); return false; }
-   if(now >= G.t11) { Msg("fenêtre d'entrée terminée (11:00 NY)"); return false; }
+   if(now >= G.tF) { Msg("fenêtre d'entrée terminée (" + HnY(G.tF) + ")"); return false; }
    if(g_tradeFait || MaPosition() != 0) { Msg("déjà un trade aujourd'hui sur " + P.nom); return false; }
    int ev;
    if(Bloque(now, ev))
@@ -1032,16 +1255,16 @@ bool Placer()
    string cmt = "DeskKey " + P.nom + " " + Fr(g_tp, 1) + "R";
    double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK), bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
    bool ok;
-   // ordre limite : expiration à 11:00 NY chez FTMO, pour qu'il soit annulé même si MT5 est fermé
+   // ordre limite : expiration à la fin des entrées chez FTMO, pour qu'il soit annulé même si MT5 est fermé
    bool marche = G.dir > 0 ? ask <= entry : bid >= entry;
-   bool expire = !marche && ExpirationPossible() && G.t11 - now >= 120;
+   bool expire = !marche && ExpirationPossible() && G.tF - now >= 120;
    ENUM_ORDER_TYPE_TIME tt = expire ? ORDER_TIME_SPECIFIED : ORDER_TIME_GTC;
-   datetime ex = expire ? ToSrv(G.t11) : 0;
+   datetime ex = expire ? ToSrv(G.tF) : 0;
    if(G.dir > 0) ok = marche ? trade.Buy(lots, _Symbol, 0, sl, tp, cmt) : trade.BuyLimit(lots, entry, _Symbol, sl, tp, tt, ex, cmt);
    else          ok = marche ? trade.Sell(lots, _Symbol, 0, sl, tp, cmt) : trade.SellLimit(lots, entry, _Symbol, sl, tp, tt, ex, cmt);
    if(!ok && expire && trade.ResultRetcode() == TRADE_RETCODE_INVALID_EXPIRATION)
      {
-      Print("Desk Key : expiration refusée par le serveur, ordre placé sans expiration (annulation par Desk Key à 11:00 NY)");
+      Print("Desk Key : expiration refusée par le serveur, ordre placé sans expiration (annulation par Desk Key à " + HnY(G.tF) + ")");
       if(G.dir > 0) ok = trade.BuyLimit(lots, entry, _Symbol, sl, tp, ORDER_TIME_GTC, 0, cmt);
       else          ok = trade.SellLimit(lots, entry, _Symbol, sl, tp, ORDER_TIME_GTC, 0, cmt);
       expire = false;
@@ -1049,14 +1272,56 @@ bool Placer()
    if(ok && (trade.ResultRetcode() == TRADE_RETCODE_DONE || trade.ResultRetcode() == TRADE_RETCODE_PLACED))
      {
       g_arme = false;
-      Msg((G.dir > 0 ? "ACHAT" : "VENTE") + " " + Fr(lots, 2) + " lot à " + Px(entry) + " · SL " + Px(sl) + " · TP " + Px(tp) + (expire ? " · expire à 11:00 NY chez FTMO" : ""));
+      Msg((G.dir > 0 ? "ACHAT" : "VENTE") + " " + Fr(lots, 2) + " lot à " + Px(entry) + " · SL " + Px(sl) + " · TP " + Px(tp) + (expire ? " · expire à " + HnY(G.tF) + " chez FTMO" : ""));
       NotifierUneFois(N_ORDRE, "ORDRE PLACÉ · " + (G.dir > 0 ? "achat" : "vente") + " limite " + Px(entry) + " · " + Fr(lots, 2) + " lot · SL " + Px(sl) + " · TP " + Px(tp)
-                      + (expire ? " · expire chez FTMO à 11:00 NY (même si MT5 est fermé)" : " · annulé par Desk Key à 11:00 NY"), false);
+                      + (expire ? " · expire chez FTMO à " + HnY(G.tF) + " (même si MT5 est fermé)" : " · annulé par Desk Key à " + HnY(G.tF)), false);
       return true;
      }
    Msg("refusé par le serveur : " + trade.ResultRetcodeDescription());
    static datetime dernierRefus = 0;
    if(TimeLocal() - dernierRefus > 600) { dernierRefus = TimeLocal(); Notifier("ORDRE REFUSÉ par le serveur : " + trade.ResultRetcodeDescription() + " · vérifiez MT5 (Algo Trading activé ?)", true); }
+   return false;
+  }
+// second trade de l'or : limite au 50 % de la nouvelle jambe, stop sous le repli, objectif = TP du trade 1, avant 12:00 NY
+bool PlacerT2()
+  {
+   long now = NowUtc();
+   if(!P.second || !g_second) return false;
+   if(S.s2etat == 5 || S.s2etat == 6) { Msg("second trade : " + (S.s2info != "" ? S.s2info : "pas de setup possible aujourd'hui")); return false; }
+   if(S.s2etat != 4) { g_arme2 = true; Msg("second trade armé : l'ordre partira dès que le setup sera prêt (avant 12:00 NY)"); return false; }
+   if(now >= G.t12) { Msg("second trade : fenêtre terminée (12:00 NY)"); return false; }
+   if(MaPosition() == 0) { Msg("second trade : seulement pendant que le trade 1 est ouvert"); return false; }
+   if(g_t2Fait || MaPosition2() != 0 || MonOrdre2() != 0) { Msg("second trade déjà pris aujourd'hui"); return false; }
+   int ev;
+   if(Bloque(now, ev)) { g_arme2 = true; Msg("annonce " + g_evNom[ev] + " : second trade différé (protection)"); return false; }
+   double entry = NormPx(S.s2e), sl = NormPx(S.s2sl), tp = NormPx(S.s2tp);
+   if((tp - entry) * G.dir <= 0 || (entry - sl) * G.dir <= 0) { Msg("second trade : niveaux incohérents, pas d'ordre"); return false; }
+   double lots = Lot(entry, sl);
+   if(lots <= 0) { Msg("second trade : risque trop faible pour le lot minimum"); return false; }
+   string cmt = "DeskKey " + P.nom + " 2e";
+   double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK), bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   bool marche = G.dir > 0 ? ask <= entry : bid >= entry;
+   bool expire = !marche && ExpirationPossible() && G.t12 - now >= 120;
+   ENUM_ORDER_TYPE_TIME tt = expire ? ORDER_TIME_SPECIFIED : ORDER_TIME_GTC;
+   datetime ex = expire ? ToSrv(G.t12) : 0;
+   bool ok;
+   if(G.dir > 0) ok = marche ? trade2.Buy(lots, _Symbol, 0, sl, tp, cmt) : trade2.BuyLimit(lots, entry, _Symbol, sl, tp, tt, ex, cmt);
+   else          ok = marche ? trade2.Sell(lots, _Symbol, 0, sl, tp, cmt) : trade2.SellLimit(lots, entry, _Symbol, sl, tp, tt, ex, cmt);
+   if(!ok && expire && trade2.ResultRetcode() == TRADE_RETCODE_INVALID_EXPIRATION)
+     {
+      if(G.dir > 0) ok = trade2.BuyLimit(lots, entry, _Symbol, sl, tp, ORDER_TIME_GTC, 0, cmt);
+      else          ok = trade2.SellLimit(lots, entry, _Symbol, sl, tp, ORDER_TIME_GTC, 0, cmt);
+      expire = false;
+     }
+   if(ok && (trade2.ResultRetcode() == TRADE_RETCODE_DONE || trade2.ResultRetcode() == TRADE_RETCODE_PLACED))
+     {
+      g_arme2 = false;
+      Msg("second trade : " + (G.dir > 0 ? "achat" : "vente") + " " + Fr(lots, 2) + " lot à " + Px(entry) + " · SL " + Px(sl) + " · TP " + Px(tp));
+      NotifierUneFois(N_S2ORDRE, "SECOND TRADE PLACÉ · " + (G.dir > 0 ? "achat" : "vente") + " limite " + Px(entry) + " · " + Fr(lots, 2) + " lot · SL " + Px(sl) + " · TP " + Px(tp)
+                      + (expire ? " · expire chez FTMO à 12:00 NY" : " · annulé par Desk Key à 12:00 NY"), false);
+      return true;
+     }
+   Msg("second trade refusé par le serveur : " + trade2.ResultRetcodeDescription());
    return false;
   }
 void Annuler(string pourquoi)
@@ -1069,6 +1334,57 @@ void Annuler(string pourquoi)
      }
    g_arme = false;
   }
+void Annuler2(string pourquoi)
+  {
+   ulong tk = MonOrdre2();
+   if(tk != 0 && trade2.OrderDelete(tk))
+     {
+      Msg("second trade annulé (" + pourquoi + ")");
+      if(pourquoi != "à votre demande") NotifierUneFois(N_S2ANNULE, "second trade annulé : " + pourquoi, false);
+     }
+   g_arme2 = false;
+  }
+// second trade : placement, suivi du 50 %, stop du trade 1 remonté, annulation, sortie de 13:00 NY
+void GererT2()
+  {
+   if(!P.second) return;
+   static datetime essaiSl = 0, essai2 = 0;
+   long now = NowUtc();
+   ulong pos1 = MaPosition(), ord2 = MonOrdre2(), pos2 = MaPosition2();
+   if(pos2 != 0) g_t2Fait = true;
+   if(pos2 != 0 && InpSortie13h && now >= G.t13 && now < G.t13 + 6 * 3600) { if(trade2.PositionClose(pos2)) Msg("second trade fermé à 13:00 NY"); return; }
+   // au remplissage du second trade : stop du trade 1 remonté au stop du second trade
+   if(pos2 != 0 && pos1 != 0 && PositionSelectByTicket(pos2))
+     {
+      double sl2 = PositionGetDouble(POSITION_SL);
+      if(sl2 > 0 && PositionSelectByTicket(pos1))
+        {
+         double sl1 = PositionGetDouble(POSITION_SL), tp1 = PositionGetDouble(POSITION_TP);
+         bool mieux = G.dir > 0 ? (sl1 <= 0 || sl2 > sl1 + _Point / 2) : (sl1 <= 0 || sl2 < sl1 - _Point / 2);
+         if(mieux && TimeLocal() - essaiSl >= 10)
+           {
+            essaiSl = TimeLocal();
+            if(trade.PositionModify(pos1, sl2, tp1)) { Msg("stop du trade 1 remonté à " + Px(sl2) + " (second trade rempli)"); }
+            else Msg("stop du trade 1 : modification refusée (" + trade.ResultRetcodeDescription() + ")");
+           }
+        }
+     }
+   if(ord2 != 0)
+     {
+      if(now >= G.t12) { Annuler2("12:00 NY sans remplissage"); return; }
+      if(pos1 == 0) { Annuler2("trade 1 fermé"); return; }
+      if(!g_second || S.s2etat == 6) { Annuler2("setup du second trade plus valide"); return; }
+      if(InpSuivreFibo && S.s2etat == 4 && OrderSelect(ord2))
+        {
+         double px = OrderGetDouble(ORDER_PRICE_OPEN), ts = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+         if(MathAbs(px - NormPx(S.s2e)) >= ts && trade2.OrderDelete(ord2)) { Msg("second trade : la jambe s'allonge, ordre déplacé au nouveau 50 %"); PlacerT2(); }
+        }
+      return;
+     }
+   if(!g_second || pos2 != 0 || g_t2Fait || pos1 == 0) return;
+   int ev;
+   if(S.s2etat == 4 && now < G.t12 && (g_arme2 || g_auto) && !Bloque(now, ev) && TimeLocal() - essai2 >= 30) { essai2 = TimeLocal(); PlacerT2(); }
+  }
 
 void Gerer()
   {
@@ -1079,7 +1395,7 @@ void Gerer()
      { if(trade.PositionClose(pos)) Msg("position fermée à 13:00 NY"); return; }
    if(ord != 0)
      {
-      if(now >= G.t11) { Annuler("11:00 NY sans remplissage"); return; }
+      if(now >= G.tF) { Annuler(HnY(G.tF) + " sans remplissage"); return; }
       int ev;
       if(Bloque(now, ev) && trade.OrderDelete(ord))
         {
@@ -1105,7 +1421,7 @@ void Gerer()
    if(pos != 0 || g_tradeFait) return;
    static datetime essai = 0;
    int evb;
-   if(S.etape == E_PRET && now >= G.t10 && now < G.t11 && (g_arme || g_auto) && !Bloque(now, evb) && TimeLocal() - essai >= 30)
+   if(S.etape == E_PRET && now >= G.t10 && now < G.tF && (g_arme || g_auto) && !FeuBloque() && !Bloque(now, evb) && TimeLocal() - essai >= 30)
      {
       essai = TimeLocal();
       Placer();
@@ -1130,7 +1446,7 @@ string SetupJson(Ctx &c, Setup &s, bool aujourdhui)
    int dg = _Digits;
    string j = "{\"profile\":" + Q(P.nom) + ",\"date\":" + Q(StringFormat("%04d-%02d-%02d", c.y, c.mo, c.d)) + ",\"v\":" + Q(DK_VERSION) + ",\"sym\":" + Q(_Symbol);
    j += ",\"dir\":" + I(c.dir) + ",\"h4\":" + I(c.h4) + ",\"d1\":" + I(c.d1) + ",\"h1\":" + I(c.h1) + ",\"raison\":" + Q(c.raison);
-   j += ",\"etat\":" + Q(EtapeCode(s.etape)) + ",\"info\":" + Q(s.info) + ",\"fini\":" + (s.fini ? "true" : "false");
+   j += ",\"etat\":" + Q(EtapeCode(s.etape)) + ",\"info\":" + Q(s.info) + ",\"fini\":" + (s.fini ? "true" : "false") + ",\"fin\":" + I(c.tF);
    if(s.preHi >= s.preLo) j += ",\"pre\":{\"hi\":" + N(s.preHi, dg) + ",\"lo\":" + N(s.preLo, dg) + "}";
    if(s.sweepT > 0) j += ",\"judas\":{\"t\":" + I(s.sweepT) + ",\"ext\":" + N(s.ext, dg) + ",\"text\":" + I(s.extT) + "}";
    if(s.ok)
@@ -1142,12 +1458,30 @@ string SetupJson(Ctx &c, Setup &s, bool aujourdhui)
      }
    if(s.fillT > 0) j += ",\"fill\":" + I(s.fillT);
    if(s.etape == E_TOUCHE) j += ",\"res\":{\"2\":" + N(s.r2, 2) + ",\"2.5\":" + N(s.r25, 2) + ",\"3\":" + N(s.r3, 2) + "}";
+   // second trade (or) : étape, niveaux, résultat du second trade et du trade 1 avec le stop remonté
+   if(s.s2etat > 0)
+     {
+      string e2 = s.s2etat == 1 ? "impulsion" : (s.s2etat == 2 ? "repli" : (s.s2etat == 3 ? "cassure" : (s.s2etat == 4 ? "pret" : (s.s2etat == 5 ? "rempli" : "annule"))));
+      j += ",\"s2\":{\"etat\":" + Q(e2) + ",\"info\":" + Q(s.s2info) + ",\"tpR\":" + N(g_tp, 1);
+      if(s.s2etat >= 3) j += ",\"pl\":" + N(s.s2PL, dg) + ",\"sh\":" + N(s.s2SH, dg);
+      if(s.s2etat >= 4 && s.s2T0 > 0) j += ",\"t0\":" + I(s.s2T0) + ",\"e\":" + N(s.s2e, dg) + ",\"sl\":" + N(s.s2sl, dg) + ",\"tp\":" + N(s.s2tp, dg) + ",\"rr\":" + N(s.s2rr, 2);
+      if(s.s2etat == 5) j += ",\"fill\":" + I(s.s2fillT) + ",\"r\":" + N(s.s2r, 2) + ",\"t1\":" + N(s.s2t1, 2) + ",\"fini\":" + (s.s2fini ? "true" : "false");
+      j += "}";
+     }
    if(aujourdhui)
      {
       if(s.ok) j += ",\"lot\":" + N(Lot(NormPx(s.entry), NormPx(s.sl)), 2) + ",\"tpR\":" + N(g_tp, 1);
       double vol, px; long pid = TradeDuJour(vol, px);
       if(pid != 0) j += ",\"pris\":{\"id\":" + I(pid) + ",\"vol\":" + N(vol, 2) + ",\"px\":" + N(px, dg) + ",\"tpR\":" + N(g_tp, 1) + "}";
       else if(MonOrdre() != 0) j += ",\"ordre\":true";
+      if(P.second)
+        {
+         double v2, p2; long pid2 = TradeDuJourM(P.magic + 1, v2, p2);
+         if(pid2 != 0) j += ",\"pris2\":{\"id\":" + I(pid2) + ",\"vol\":" + N(v2, 2) + ",\"px\":" + N(p2, dg) + "}";
+         else if(MonOrdre2() != 0) j += ",\"ordre2\":true";
+         j += ",\"second\":" + (g_second ? "true" : "false");
+        }
+      if(P.feu && g_feuCalc) j += "," + FeuJson(g_feuS, g_feuN);
       j += ",\"auto\":" + (g_auto ? "true" : "false") + ",\"protection\":" + (g_protect ? "true" : "false");
       j += ",\"rMode\":" + I(g_rMode) + ",\"rVal\":" + N(g_rVal, 2) + ",\"rUsd\":" + N(RisqueVoulu(), 0);
      }
@@ -1263,6 +1597,7 @@ void DessinerSetup(string p, Ctx &c, Setup &s, bool complet)
    if(!s.ok)
      {
       Efface(p + "mss"); Efface(p + "f0"); Efface(p + "f100"); Efface(p + "entry"); Efface(p + "sl"); Efface(p + "tp0"); Efface(p + "tp1"); Efface(p + "tp2"); Efface(p + "bw"); Efface(p + "bl"); Efface(p + "res");
+      Efface(p + "e2"); Efface(p + "sl2"); Efface(p + "res2");
       if(!complet)
         {
          string why = s.etape == E_PAS_TRADE ? "pas de trade : " + c.raison : (s.sweepT > 0 ? "Judas sans cassure valide" : "pas de Judas");
@@ -1272,7 +1607,7 @@ void DessinerSetup(string p, Ctx &c, Setup &s, bool complet)
      }
    Efface(p + "why");
    double r = MathAbs(s.entry - s.sl);
-   long tEnd = complet ? c.t13 : (s.exitT > 0 ? s.exitT : c.t11);
+   long tEnd = complet ? c.t13 : (s.exitT > 0 ? s.exitT : c.tF);
    Mark(p + "mss", s.mssT, s.sw, 159, cSw, "Cassure validée");
    if(complet)
      {
@@ -1295,8 +1630,8 @@ void DessinerSetup(string p, Ctx &c, Setup &s, bool complet)
       long tx = s.exitT > 0 ? s.exitT : c.t13;
       Rect(p + "bw", s.fillT, tx, s.entry, TpPrix(s, c.dir, g_tp), clair ? (color)0xB8E6B8 : (color)0x1E4A1E);
       Rect(p + "bl", s.fillT, tx, s.entry, s.sl, clair ? (color)0xB8B8EE : (color)0x1E1E4A);
-      double rr = MathAbs(g_tp - 2.0) < 0.01 ? s.r2 : (MathAbs(g_tp - 2.5) < 0.01 ? s.r25 : s.r3);
-      string lab = (rr > 0 ? "+" : "") + Fr(rr, 1) + "R" + (s.fini ? "" : " (en cours)");
+      double rr = ResRegle(s);
+      string lab = (rr > 0 ? "+" : "") + Fr(rr, 1) + "R" + (s.s2etat == 5 ? " (2 trades)" : "") + (s.fini && (s.s2etat != 5 || s.s2fini) ? "" : " (en cours)");
       Txt(p + "res", tx, c.dir > 0 ? TpPrix(s, c.dir, g_tp) : s.sl, lab, rr > 0 ? cTp : clrRed, 11, ANCHOR_LEFT_LOWER);
      }
    else
@@ -1304,11 +1639,21 @@ void DessinerSetup(string p, Ctx &c, Setup &s, bool complet)
       Efface(p + "bw"); Efface(p + "bl");
       if(!complet)
         {
-         string lab = s.etape == E_IGNORE ? "touché avant 10:00 NY : pas de trade" : "pas de remplissage avant 11:00 NY";
+         string lab = s.etape == E_IGNORE ? "touché avant 10:00 NY : pas de trade" : "pas de remplissage avant " + HnY(c.tF);
          Txt(p + "res", tEnd, s.entry, lab, clrGray, 8, ANCHOR_LEFT);
         }
       else Efface(p + "res");
      }
+   // second trade (or) : 50 % de la nouvelle jambe, stop (et stop du trade 1 remonté), résultat
+   if(s.s2etat >= 4 && s.s2T0 > 0)
+     {
+      long t2e = s.s2etat == 5 ? (complet ? c.t13 : (s.s2exitT > 0 ? s.s2exitT : c.t13)) : (complet ? c.t12 : c.t12);
+      Seg(p + "e2", s.s2T0, t2e, s.s2e, cEnt, STYLE_DASH, 1, complet ? "2e trade 50 % " + Px(s.s2e) : "");
+      Seg(p + "sl2", s.s2T0, t2e, s.s2sl, clrRed, STYLE_DASH, 1, complet ? "Stop 2e trade = stop du trade 1 remonté " + Px(s.s2sl) : "");
+      if(s.s2etat == 5) Txt(p + "res2", t2e, s.s2e, " 2e : " + (s.s2r > 0 ? "+" : "") + Fr(s.s2r, 1) + "R · trade 1 " + (s.s2t1 > 0 ? "+" : "") + Fr(s.s2t1, 1) + "R", s.s2r > 0 ? cTp : clrRed, 8, ANCHOR_LEFT);
+      else Efface(p + "res2");
+     }
+   else { Efface(p + "e2"); Efface(p + "sl2"); Efface(p + "res2"); }
   }
 
 void DessinerJour()
@@ -1317,7 +1662,7 @@ void DessinerJour()
    g_clair = FondClair();
    VLine("v930", G.t930, clrGray, "9:30 NY");
    VLine("v10", G.t10, clrGoldenrod, "10:00 NY : début des entrées");
-   VLine("v11", G.t11, clrGoldenrod, "11:00 NY : fin des entrées");
+   VLine("v11", G.tF, clrGoldenrod, HnY(G.tF) + " : fin des entrées" + (P.second ? " (et du second trade)" : ""));
    VLine("v13", G.t13, clrIndianRed, "13:00 NY : sortie");
    if(P.judasMin > 0) VLine("v950", G.t950, clrOrange, "9:50 NY : Judas valable après"); else Efface("v950");
    DessinerSetup("J_", G, S, true);
@@ -1330,12 +1675,13 @@ void Historique(bool envoyer)
    ObjectsDeleteAll(0, PFX + "H");
    ArrayResize(g_hLab, 0); ArrayResize(g_hCol, 0); ArrayResize(g_hT, 0); g_hObj = 0;
    g_hStat = "";
-   if(g_histN <= 0) { ChartRedraw(); return; }
+   int extra = P.feu ? 120 : 0;   // séances de plus pour le feu rouge : il faut les 10 derniers setups avant chaque jour
+   if(g_histN <= 0 && extra == 0) { ChartRedraw(); return; }
    g_clair = FondClair();
    ulong t0 = GetTickCount64();
    Bar m[];
    long now = NowUtc();
-   int n = LoadM1(now - (long)(g_histN * 7 / 5 + 60) * 86400, G.t800 - 60, m);
+   int n = LoadM1(now - (long)((g_histN + extra) * 7 / 5 + 60) * 86400, G.t800 - 60, m);
    if(n < 1000) { Print("Desk Key ", P.nom, " : historique M1 insuffisant (", n, " bougies) — Outils > Options > Graphiques > Barres max = Illimité"); return; }
    // agrégats H4 / H1 et clôtures journalières, calculés une seule fois
    Bar a4[], a1[];
@@ -1356,11 +1702,13 @@ void Historique(bool envoyer)
       if(z < 0) continue;
       nd++; ArrayResize(dT, nd, 512); ArrayResize(dC, nd, 512); dT[nd - 1] = o930; dC[nd - 1] = m[z].c;
      }
-   string rows[]; int nr = 0;
-   int found = 0, nTr = 0, nWin = 0, nMiss = 0; double sumR = 0;
+   string rows[]; long rowT[]; double rowR[]; bool rowE[]; int nr = 0;
+   long eT[]; double eR[]; int ne = 0, neOld = 0;   // entrées (du plus récent au plus ancien) : 9:30 NY et résultat à 3R
+   int found = 0, scanned = 0, nMiss = 0;
    long ny0 = NyLocal(G.t930);
-   for(int back = 1; back <= g_histN * 2 + 10 && found < g_histN; back++)
+   for(int back = 1; back <= (g_histN + extra) * 2 + 10; back++)
      {
+      if(scanned >= g_histN && (extra == 0 || neOld >= 10 || scanned >= g_histN + extra)) break;
       MqlDateTime t; TimeToStruct((datetime)(ny0 - (long)back * 86400), t);
       if(t.day_of_week == 0 || t.day_of_week == 6) continue;
       long o930 = NyToUtc(t.year, t.mon, t.day, 9, 30);
@@ -1368,6 +1716,14 @@ void Historique(bool envoyer)
       if(a >= n || m[a].t != o930) continue;   // jour sans séance
       Ctx c; BuildCtxFast(m, n, a4, n4, a1, n1, dT, dC, nd, t.year, t.mon, t.day, c);
       Setup s; ScanDay(m, n, c, c.t13 + 60, s);
+      bool montre = scanned < g_histN;
+      scanned++;
+      if(s.etape == E_TOUCHE)
+        {
+         ne++; ArrayResize(eT, ne, 256); ArrayResize(eR, ne, 256); eT[ne - 1] = c.t930; eR[ne - 1] = s.r3;
+         if(!montre) neOld++;
+        }
+      if(!montre) continue;
       string p = "H" + StringFormat("%02d%02d%02d", t.year % 100, t.mon, t.day) + "_";
       if(g_histo)
         {
@@ -1376,11 +1732,11 @@ void Historique(bool envoyer)
         }
       // résumé pour le panneau
       string lab = StringFormat("%02d/%02d ", t.day, t.mon); color col = clrDimGray;
+      double rr = 0;
       if(s.etape == E_TOUCHE)
         {
-         double rr = MathAbs(g_tp - 2.0) < 0.01 ? s.r2 : (MathAbs(g_tp - 2.5) < 0.01 ? s.r25 : s.r3);
+         rr = ResRegle(s);
          lab += (rr > 0 ? "+" : "") + Fr(rr, 1) + "R"; col = rr > 0 ? clrForestGreen : clrFireBrick;
-         nTr++; sumR += rr; if(rr > 0) nWin++;
         }
       else if(s.etape == E_EXPIRE) { lab += "manqué"; nMiss++; } // setup valide, 50 % pas touché
       else if(s.etape == E_IGNORE) lab += "< 10h";        // 50 % touché avant 10:00 NY
@@ -1389,8 +1745,33 @@ void Historique(bool envoyer)
       int k = ArraySize(g_hLab);
       ArrayResize(g_hLab, k + 1); ArrayResize(g_hCol, k + 1); ArrayResize(g_hT, k + 1);
       g_hLab[k] = lab; g_hCol[k] = col; g_hT[k] = c.t930;
-      nr++; ArrayResize(rows, nr, 256); rows[nr - 1] = SetupJson(c, s, false);
+      nr++; ArrayResize(rows, nr, 256); ArrayResize(rowT, nr, 256); ArrayResize(rowR, nr, 256); ArrayResize(rowE, nr, 256);
+      rows[nr - 1] = SetupJson(c, s, false); rowT[nr - 1] = c.t930; rowR[nr - 1] = rr; rowE[nr - 1] = s.etape == E_TOUCHE;
       found++;
+     }
+   // feu rouge : état d'aujourd'hui et de chaque jour de l'historique (10 setups précédents)
+   int nTr = 0, nWin = 0, nVert = 0; double sumR = 0, sumVert = 0;
+   if(P.feu)
+     {
+      FeuDe(eT, eR, ne, G.t930, g_feuS, g_feuN);
+      g_feuRouge = g_feuN >= 10 && g_feuS < 0;
+      g_feuCalc = true;
+     }
+   for(int i = 0; i < nr; i++)
+     {
+      bool rouge = false;
+      if(P.feu)
+        {
+         double sf; int cf; FeuDe(eT, eR, ne, rowT[i], sf, cf);
+         rouge = cf >= 10 && sf < 0;
+         rows[i] = StringSubstr(rows[i], 0, StringLen(rows[i]) - 1) + "," + FeuJson(sf, cf) + "}";
+         if(rouge && i < ArraySize(g_hLab)) g_hLab[i] = StringSubstr(g_hLab[i], 0, 6) + "●" + StringSubstr(g_hLab[i], 6);   // ● = jour sous feu rouge
+        }
+      if(rowE[i])
+        {
+         nTr++; sumR += rowR[i]; if(rowR[i] > 0) nWin++;
+         if(!rouge) { nVert++; sumVert += rowR[i]; }
+        }
      }
    // envoi à l'application par paquets de 25 jours
    if(envoyer)
@@ -1402,11 +1783,12 @@ void Historique(bool envoyer)
         }
    g_hStat = "Histo " + I(found) + " séances : " + I(nTr) + " entrées · " + (nTr > 0 ? I((int)MathRound(100.0 * nWin / nTr)) + " % gagnants · " : "")
              + (sumR >= 0 ? "+" : "") + Fr(sumR, 1) + "R à " + Fr(g_tp, 1) + "R · " + I(nMiss) + " manqués";
+   if(P.feu && nTr > nVert) g_hStat += " · sous feu vert " + I(nVert) + " entrées " + (sumVert >= 0 ? "+" : "") + Fr(sumVert, 1) + "R (● = feu rouge)";
    for(int i = ObjectsTotal(0) - 1; i >= 0; i--) if(StringFind(ObjectName(0, i), PFX + "H") == 0) g_hObj++;
    string res = "";
    for(int i = 0; i < MathMin(7, ArraySize(g_hLab)); i++) res += (i > 0 ? " | " : "") + g_hLab[i];
    if(found < g_histN) g_hStat += " (M1 disponible : " + I(found) + " séances)";
-   Print("Desk Key ", P.nom, " : ", g_hStat, " · ", g_hObj, " objets dessinés", g_histo ? "" : " (historique masqué)", " · ", (GetTickCount64() - t0), " ms · 7 derniers : ", res);
+   Print("Desk Key ", P.nom, " : ", g_hStat, P.feu ? " · " + FeuTexte() : "", " · ", g_hObj, " objets dessinés", g_histo ? "" : " (historique masqué)", " · ", (GetTickCount64() - t0), " ms · 7 derniers : ", res);
    ChartRedraw();
   }
 // amène le graphique sur la séance d'un jour de l'historique (toutes unités de temps)
@@ -1472,9 +1854,21 @@ string EtatTexte(color &ce)
    long now = NowUtc();
    ulong ord = MonOrdre(), pos = MaPosition();
    ce = clrSilver;
-   if(pos != 0) { ce = clrDeepSkyBlue; return "EN POSITION · sortie TP, SL ou 13:00 NY"; }
-   if(ord != 0) { ce = clrDeepSkyBlue; return "ORDRE PLACÉ · annulé à 11:00 NY s'il n'est pas rempli"; }
+   if(pos != 0)
+     {
+      ce = clrDeepSkyBlue;
+      if(P.second && g_second)
+        {
+         if(MaPosition2() != 0) return "EN POSITION · 2 trades (stop du trade 1 remonté) · sortie TP, SL ou 13:00 NY";
+         if(MonOrdre2() != 0) return "EN POSITION · second trade placé (jusqu'à 12:00 NY)";
+         if(S.s2etat == 4 && now < G.t12) { ce = clrLimeGreen; return g_auto ? "EN POSITION · second trade : placement en cours" : "SECOND TRADE PRÊT · appuyez sur " + InpTouche; }
+         if(S.s2etat >= 1 && S.s2etat <= 3 && now < G.t12) return "EN POSITION · attente d'une continuation pour le second trade";
+        }
+      return "EN POSITION · sortie TP, SL ou 13:00 NY";
+     }
+   if(ord != 0) { ce = clrDeepSkyBlue; return "ORDRE PLACÉ · annulé à " + HnY(G.tF) + " s'il n'est pas rempli"; }
    if(g_tradeFait) return "TERMINÉ · trade du jour déjà pris";
+   if(FeuBloque() && (S.etape == E_CASSURE || S.etape == E_PRET || S.etape == E_JUDAS)) { ce = clrTomato; return "FEU ROUGE · setup suivi à blanc, pas d'ordre"; }
    switch(S.etape)
      {
       case E_AVANT:     return "AVANT L'OUVERTURE";
@@ -1486,7 +1880,7 @@ string EtatTexte(color &ce)
          ce = clrLimeGreen; return g_auto ? "AUTO · placement en cours" : "PRÊT · appuyez sur " + InpTouche + " pour placer l'ordre";
       case E_TOUCHE:    return "NIVEAU TOUCHÉ à " + Hm(ParisLocal(S.fillT)) + " Paris (sans ordre de votre part)";
       case E_IGNORE:    return "IGNORÉ · le 50 % a été touché avant 10:00 NY";
-      case E_EXPIRE:    return "EXPIRÉ · pas de remplissage avant 11:00 NY";
+      case E_EXPIRE:    return "EXPIRÉ · pas de remplissage avant " + HnY(G.tF);
      }
    return "PAS DE SETUP AUJOURD'HUI";
   }
@@ -1498,7 +1892,7 @@ void Panneau()
    int d = G.dir;
    ulong ord = MonOrdre(), pos = MaPosition();
    color ce; string etat = EtatTexte(ce);
-   int rows = g_reduit ? 3 : 17;
+   int rows = g_reduit ? 3 : 18;
    int nh = MathMin(ArraySize(g_hLab), 7);
    if(ObjectFind(0, bg) < 0) ObjectCreate(0, bg, OBJ_RECTANGLE_LABEL, 0, 0, 0);
    ObjectSetInteger(0, bg, OBJPROP_CORNER, InpCoin == 1 ? CORNER_RIGHT_UPPER : CORNER_LEFT_UPPER);
@@ -1506,18 +1900,22 @@ void Panneau()
    ObjectSetInteger(0, bg, OBJPROP_XSIZE, PW); ObjectSetInteger(0, bg, OBJPROP_YSIZE, RowY(rows) - PY0 + (g_reduit ? 34 : (nh > 0 ? 130 : 100)));
    ObjectSetInteger(0, bg, OBJPROP_BGCOLOR, (color)0x1C1712); ObjectSetInteger(0, bg, OBJPROP_BORDER_TYPE, BORDER_FLAT);
    ObjectSetInteger(0, bg, OBJPROP_COLOR, P.couleur); ObjectSetInteger(0, bg, OBJPROP_SELECTABLE, false);
-   bool pret = S.etape == E_PRET && ord == 0 && pos == 0 && !g_tradeFait && now < G.t11;
+   bool pret = S.etape == E_PRET && ord == 0 && pos == 0 && !g_tradeFait && now < G.tF && !FeuBloque();
    string go = now < G.t10 ? (g_arme ? "ARMÉ OK" : "ARMER (" + InpTouche + ")") : "PLACER L'ORDRE (" + InpTouche + ")";
+   bool pret2 = P.second && g_second && pos != 0 && S.s2etat == 4 && MonOrdre2() == 0 && MaPosition2() == 0 && !g_t2Fait && now < G.t12;
+   if(P.second && g_second && pos != 0) { go = pret2 ? "PLACER LE 2e TRADE (" + InpTouche + ")" : (g_arme2 ? "2e TRADE ARMÉ" : "ARMER LE 2e TRADE (" + InpTouche + ")"); pret = pret2; }
+   if(FeuBloque() && pos == 0) go = "FEU ROUGE : PAS D'ORDRE";
    Btn("MIN", PW - 46, PY0 + 4, 26, g_reduit ? "+" : "–", clrDimGray, clrWhite);
    if(g_reduit)
      {
-      for(int r = 3; r <= 17; r++) ObjectDelete(0, PFX + "L" + IntegerToString(r));
+      for(int r = 3; r <= 18; r++) ObjectDelete(0, PFX + "L" + IntegerToString(r));
+      ObjectDelete(0, PFX + "BOPT");
       ObjectDelete(0, PFX + "BPER");
       ObjectDelete(0, PFX + "BRM"); ObjectDelete(0, PFX + "BRMOINS"); ObjectDelete(0, PFX + "BRPLUS"); ObjectDelete(0, PFX + "BRINF"); ObjectDelete(0, PFX + "BNT"); ObjectDelete(0, PFX + "ERV"); g_rvAff = "";
       for(int i = 0; i < 7; i++) ObjectDelete(0, PFX + "BD" + I(i));
       ObjectDelete(0, PFX + "BX"); ObjectDelete(0, PFX + "BAUTO"); ObjectDelete(0, PFX + "BT2"); ObjectDelete(0, PFX + "BT25"); ObjectDelete(0, PFX + "BT3"); ObjectDelete(0, PFX + "BHIS"); ObjectDelete(0, PFX + "BANN");
       Lbl(0, "DESK KEY · " + P.nom + (d > 0 ? " · ACHATS" : (d < 0 ? " · VENTES" : " · pas de trade")), P.couleur, 11, "Arial Black");
-      Lbl(1, etat + " · risque " + RisqueTexte(), ce, 9, "Arial Bold");
+      Lbl(1, etat + (P.feu && g_feuCalc && g_feuRouge ? (g_feuOn ? " · FEU ROUGE" : " · feu rouge désactivé") : "") + " · risque " + RisqueTexte(), ce, 9, "Arial Bold");
       string rs = ""; for(int i = 0; i < nh; i++) rs += (i > 0 ? " · " : "") + g_hLab[i];
       Lbl(2, nh > 0 ? "7 j : " + rs : " ", clrSilver, 8);
       Btn("GO", 0, RowY(rows) + 4, 220, go, pret ? clrForestGreen : clrDimGray, clrWhite);
@@ -1525,52 +1923,75 @@ void Panneau()
       return;
      }
    Lbl(0, "DESK KEY · " + P.nom + " · règle A", P.couleur, 11, "Arial Black");
-   Lbl(1, "NY " + Hm(NyLocal(now)) + " · Paris " + Hm(ParisLocal(now)) + " · entrées " + Hm(ParisLocal(G.t10)) + "–" + Hm(ParisLocal(G.t11)) + " Paris · sortie " + Hm(ParisLocal(G.t13)), clrSilver);
+   Lbl(1, "NY " + Hm(NyLocal(now)) + " · Paris " + Hm(ParisLocal(now)) + " · entrées " + Hm(ParisLocal(G.t10)) + "–" + Hm(ParisLocal(G.tF)) + " Paris · sortie " + Hm(ParisLocal(G.t13)), clrSilver);
    string tend = "Tendance : H4 " + Sens(G.h4);
-   if(P.daily) tend += " · Daily " + Sens(G.d1);
+   if(P.tendance == 1) tend += " · Daily " + Sens(G.d1);
+   else if(P.tendance == 2) tend += " · H1 " + Sens(G.h1) + " (H4 ou H1, sans conflit)";
    else tend += " · H1 " + Sens(G.h1) + (InpFiltreH1 ? " (filtre H1 actif)" : "");
    Lbl(2, tend, CSens(d));
    Lbl(3, d > 0 ? "→ ACHATS uniquement" : (d < 0 ? "→ VENTES uniquement" : "→ PAS DE TRADE aujourd'hui : " + G.raison), CSens(d), 10, "Arial Bold");
+   // ligne 4 : feu rouge (indices) ou second trade (or)
+   if(P.feu) Lbl(4, FeuTexte(), !g_feuCalc ? clrSilver : (g_feuRouge ? clrTomato : clrMediumSeaGreen), 9, "Arial Bold");
+   else if(P.second)
+     {
+      string t2 = !g_second ? "Second trade : désactivé (bouton 2e TRADE)" : "Second trade : " ;
+      if(g_second)
+        {
+         if(S.s2etat == 0) t2 += "après l'entrée du trade 1, si le prix continue (avant 12:00 NY)";
+         else if(S.s2etat == 1) t2 += "attente d'une impulsion au-delà de la jambe du trade 1";
+         else if(S.s2etat == 2) t2 += "impulsion faite · attente d'un repli (au-dessus du stop 1)";
+         else if(S.s2etat == 3) t2 += "repli à " + Px(S.s2PL) + " · attente d'une clôture au-delà de " + Px(S.s2SH);
+         else if(S.s2etat == 4) t2 += (d > 0 ? "ACHAT" : "VENTE") + " limite " + Px(S.s2e) + " · SL " + Px(S.s2sl) + " · TP " + Px(S.s2tp) + " (" + Fr(S.s2rr, 1) + "R)";
+         else if(S.s2etat == 5) t2 += "rempli à " + Hm(ParisLocal(S.s2fillT)) + " Paris · " + (S.s2r > 0 ? "+" : "") + Fr(S.s2r, 1) + "R · trade 1 avec stop remonté " + (S.s2t1 > 0 ? "+" : "") + Fr(S.s2t1, 1) + "R";
+         else t2 += S.s2info != "" ? S.s2info : "pas de second trade";
+        }
+      Lbl(4, t2, S.s2etat == 4 ? clrOrange : (S.s2etat == 5 ? clrMediumSeaGreen : clrSilver), 9);
+     }
+   else Lbl(4, " ", clrSilver);
    if(S.preHi >= S.preLo)
-      Lbl(4, "Pré-marché : haut " + Px(S.preHi) + " · bas " + Px(S.preLo) + (d != 0 ? " · cible : le " + (d > 0 ? "bas" : "haut") : ""), clrSilver);
-   else Lbl(4, "Pré-marché : en attente des données", clrSilver);
+      Lbl(5, "Pré-marché : haut " + Px(S.preHi) + " · bas " + Px(S.preLo) + (d != 0 ? " · cible : le " + (d > 0 ? "bas" : "haut") : ""), clrSilver);
+   else Lbl(5, "Pré-marché : en attente des données", clrSilver);
    if(S.sweepT > 0)
-      Lbl(5, "1. Judas OK à " + Hm(ParisLocal(S.sweepT)) + " Paris · extrême " + Px(S.ext) + " à " + Hm(ParisLocal(S.extT)), clrMediumSeaGreen);
-   else Lbl(5, "1. Judas : attendre un passage " + (d > 0 ? "sous le bas" : (d < 0 ? "au-dessus du haut" : "au-delà")) + " du pré-marché", clrSilver);
-   string rule = P.judasMin > 0 ? "Judas après " + Hm(ParisLocal(G.t950)) + " Paris" : "nette ≥ 5 % du risque + FVG";
+      Lbl(6, "1. Judas OK à " + Hm(ParisLocal(S.sweepT)) + " Paris · extrême " + Px(S.ext) + " à " + Hm(ParisLocal(S.extT)), clrMediumSeaGreen);
+   else Lbl(6, "1. Judas : attendre un passage " + (d > 0 ? "sous le bas" : (d < 0 ? "au-dessus du haut" : "au-delà")) + " du pré-marché", clrSilver);
+   string rule = P.judasMin > 0 ? "Judas après " + Hm(ParisLocal(G.t950)) + " Paris" : (P.fvg ? "nette ≥ 5 % du risque + FVG" : "clôture M1 au-delà du sommet");
    if(S.ok)
      {
       string c = "2. Cassure OK à " + Hm(ParisLocal(S.mssT)) + " Paris · niveau " + Px(S.sw);
-      if(P.cassureMin > 0) c += " · +" + Fr(S.cassurePts, 1) + " pts (min " + Fr(S.cassureMinPts, 1) + ")";
-      Lbl(6, c, clrMediumSeaGreen);
+      if(P.cassureMin > 0) c += " · +" + Fr(S.cassurePts, 1) + " " + P.unite + " (min " + Fr(S.cassureMinPts, 1) + ")";
+      Lbl(7, c, clrMediumSeaGreen);
      }
-   else if(S.etape == E_CASSURE && S.swT > 0) Lbl(6, "2. Cassure : clôture M1 au-delà de " + Px(S.sw) + " · " + rule, clrGold);
-   else Lbl(6, "2. Cassure M1 · " + rule, clrSilver);
-   Lbl(7, S.info != "" ? "   " + S.info : " ", clrOrange);
+   else if(S.etape == E_CASSURE && S.swT > 0) Lbl(7, "2. Cassure : clôture M1 au-delà de " + Px(S.sw) + " · " + rule, clrGold);
+   else Lbl(7, "2. Cassure M1 · " + rule, clrSilver);
+   Lbl(8, S.info != "" ? "   " + S.info : " ", clrOrange);
    if(S.ok && S.etape != E_IGNORE)
      {
       double r = MathAbs(S.entry - S.sl), lots = Lot(NormPx(S.entry), NormPx(S.sl));
-      Lbl(8, "3. " + (d > 0 ? "ACHAT" : "VENTE") + " LIMITE " + Px(S.entry) + " · SL " + Px(S.sl) + " · TP " + Px(TpPrix(S, d, g_tp)) + " (" + Fr(g_tp, 1) + "R)", clrOrange, 10, "Arial Bold");
-      Lbl(9, "   Lot " + Fr(lots, 2) + " · risque " + Fr(RisqueArgent(NormPx(S.entry), NormPx(S.sl), lots), 0) + " " + AccountInfoString(ACCOUNT_CURRENCY) + " · " + Fr(r, 1) + " pts", clrWhite);
+      Lbl(9, "3. " + (d > 0 ? "ACHAT" : "VENTE") + " LIMITE " + Px(S.entry) + " · SL " + Px(S.sl) + " · TP " + Px(TpPrix(S, d, g_tp)) + " (" + Fr(g_tp, 1) + "R)", FeuBloque() ? clrGray : clrOrange, 10, "Arial Bold");
+      Lbl(10, "   Lot " + Fr(lots, 2) + " · risque " + Fr(RisqueArgent(NormPx(S.entry), NormPx(S.sl), lots), 0) + " " + AccountInfoString(ACCOUNT_CURRENCY) + " · " + Fr(r, 1) + " " + P.unite, clrWhite);
      }
-   else { Lbl(8, "3. Ordre : en attente du setup", clrSilver); Lbl(9, " ", clrSilver); }
-   Lbl(10, "État : " + etat, ce, 10, "Arial Bold");
-   Lbl(11, g_msg != "" && TimeLocal() - g_msgT < 120 ? "› " + g_msg : " ", clrLightSkyBlue);
-   Lbl(12, "Profil " + P.nom + " : stop Judas ± " + Fr(P.marge, 1) + " pts · " + (P.fvg ? "FVG obligatoire" : "sans FVG") + " · " + (P.daily ? "H4 + Daily" : "H4"), clrDimGray, 8);
+   else { Lbl(9, "3. Ordre : en attente du setup", clrSilver); Lbl(10, " ", clrSilver); }
+   Lbl(11, "État : " + etat, ce, 10, "Arial Bold");
+   Lbl(12, g_msg != "" && TimeLocal() - g_msgT < 120 ? "› " + g_msg : " ", clrLightSkyBlue);
+   Lbl(13, "Profil " + P.nom + " : stop Judas ± " + Fr(P.marge, 1) + " " + P.unite + " · " + (P.fvg ? "FVG obligatoire" : "sans FVG") + " · " + (P.tendance == 1 ? "H4 + Daily" : (P.tendance == 2 ? "H4 ou H1" : "H4"))
+       + " · entrées jusqu'à " + HnY(G.tF) + (P.feu ? " · feu rouge " + (g_feuOn ? "ON" : "OFF") : "") + (P.second ? " · 2e trade " + (g_second ? "ON" : "OFF") : ""), clrDimGray, 8);
    string ann = AnnoncesTexte();
-   if(ann != "") Lbl(13, "Annonces : " + ann + " · protection " + (g_protect ? "OUI (pas d'ordre ±" + I(InpProtMin) + " min)" : "NON"), g_protect ? clrLightSkyBlue : clrOrange, 8);
-   else Lbl(13, "Touches : " + InpTouche + " = placer / armer · " + InpToucheAnnul + " = annuler · pas d'annonce US aujourd'hui", clrDimGray, 8);
+   if(ann != "") Lbl(14, "Annonces : " + ann + " · protection " + (g_protect ? "OUI (pas d'ordre ±" + I(InpProtMin) + " min)" : "NON"), g_protect ? clrLightSkyBlue : clrOrange, 8);
+   else Lbl(14, "Touches : " + InpTouche + " = placer / armer · " + InpToucheAnnul + " = annuler · pas d'annonce US aujourd'hui", clrDimGray, 8);
    string app = !InpEnvoyer ? "Application : envoi désactivé"
                 : (g_pushErr != "" ? "Application : " + g_pushErr
                    : (g_lastPushT > 0 ? "Application : setups envoyés (" + TimeToString(g_lastPushT, TIME_MINUTES) + ")" : "Application : en attente"));
-   Lbl(14, app, g_pushErr != "" ? clrOrange : clrDimGray, 8);
-   Lbl(15, g_hStat != "" ? g_hStat : " ", clrSilver, 8);
+   Lbl(15, app, g_pushErr != "" ? clrOrange : clrDimGray, 8);
+   Lbl(16, g_hStat != "" ? g_hStat : " ", clrSilver, 8);
    color cr; string ra = RisqueAnalyse(cr);
-   Lbl(16, ra, cr, 8);
+   Lbl(17, ra, cr, 8);
    int by = RowY(rows) + 6;
    Btn("GO", 0, by, 190, go, pret ? clrForestGreen : clrDimGray, clrWhite);
    Btn("X", 196, by, 90, "ANNULER (" + InpToucheAnnul + ")", ord != 0 || g_arme ? clrFireBrick : clrDimGray, clrWhite);
    Btn("AUTO", 292, by, 108, g_auto ? "AUTO : OUI" : "AUTO : NON", g_auto ? clrDarkOrange : clrDimGray, clrWhite);
+   if(P.feu) Btn("OPT", 406, by, 134, g_feuOn ? "FEU ROUGE : ON" : "FEU ROUGE : OFF", g_feuOn ? (g_feuRouge ? clrFireBrick : clrSeaGreen) : clrDimGray, clrWhite);
+   else if(P.second) Btn("OPT", 406, by, 134, g_second ? "2e TRADE : OUI" : "2e TRADE : NON", g_second ? clrSteelBlue : clrDimGray, clrWhite);
+   else ObjectDelete(0, PFX + "BOPT");
    Btn("T2", 0, by + 30, 60, "2R", MathAbs(g_tp - 2.0) < 0.01 ? P.couleur : clrDimGray, clrWhite);
    Btn("T25", 66, by + 30, 60, "2,5R", MathAbs(g_tp - 2.5) < 0.01 ? P.couleur : clrDimGray, clrWhite);
    Btn("T3", 132, by + 30, 60, "3R", MathAbs(g_tp - 3.0) < 0.01 ? P.couleur : clrDimGray, clrWhite);
@@ -1604,14 +2025,19 @@ bool ChoisirProfil()
    int pf = InpProfil;
    bool isNq = StringFind(s, "US100") >= 0 || StringFind(s, "NAS100") >= 0 || StringFind(s, "USTEC") >= 0 || StringFind(s, "NDX") >= 0;
    bool isSp = StringFind(s, "US500") >= 0 || StringFind(s, "SPX") >= 0 || StringFind(s, "SP500") >= 0 || StringFind(s, "US.500") >= 0;
-   if(pf == PROFIL_AUTO) pf = isNq ? PROFIL_US100 : (isSp ? PROFIL_SP500 : 0);
+   bool isAu = StringFind(s, "XAU") >= 0 || StringFind(s, "GOLD") >= 0;
+   if(pf == PROFIL_AUTO) pf = isNq ? PROFIL_US100 : (isSp ? PROFIL_SP500 : (isAu ? PROFIL_OR : 0));
    if(pf == PROFIL_US100 && !isNq) { Alert("Desk Key : le profil US100 ne peut pas tourner sur ", _Symbol); return false; }
    if(pf == PROFIL_SP500 && !isSp) { Alert("Desk Key : le profil SP500 ne peut pas tourner sur ", _Symbol); return false; }
+   if(pf == PROFIL_OR && !isAu)    { Alert("Desk Key : le profil or ne peut pas tourner sur ", _Symbol); return false; }
+   P.finH = 11; P.finM = 0; P.feu = false; P.second = false; P.unite = "pts"; P.tendance = 0;
    if(pf == PROFIL_US100)
-     { P.nom = "US100"; P.fvg = true;  P.marge = 3.0; P.cassureMin = 0.05; P.judasMin = 0;  P.daily = false; P.magic = 7710100; P.couleur = clrDodgerBlue; }
+     { P.nom = "US100"; P.fvg = true;  P.marge = 3.0; P.cassureMin = 0.05; P.judasMin = 0;  P.daily = false; P.magic = 7710100; P.couleur = clrDodgerBlue; P.feu = true; }
    else if(pf == PROFIL_SP500)
-     { P.nom = "SP500"; P.fvg = false; P.marge = 2.0; P.cassureMin = 0;    P.judasMin = 20; P.daily = true;  P.magic = 7710500; P.couleur = clrDarkOrange; }
-   else { Alert("Desk Key : symbole ", _Symbol, " non reconnu. Choisissez le profil US100 ou SP500."); return false; }
+     { P.nom = "SP500"; P.fvg = false; P.marge = 2.0; P.cassureMin = 0;    P.judasMin = 20; P.daily = true;  P.tendance = 1; P.magic = 7710500; P.couleur = clrDarkOrange; P.feu = true; }
+   else if(pf == PROFIL_OR)   // validé sur 3 ans (backtests.md 4 terdecies) : séance de New York, H4 ou H1 sans conflit, entrées 10:00–12:00 NY
+     { P.nom = "XAUUSD"; P.fvg = false; P.marge = 1.0; P.cassureMin = 0; P.judasMin = 0; P.daily = false; P.tendance = 2; P.finH = 12; P.magic = 7710900; P.couleur = clrGoldenrod; P.second = true; P.unite = "$"; }
+   else { Alert("Desk Key : symbole ", _Symbol, " non reconnu. Choisissez le profil US100, SP500 ou or."); return false; }
    PFX = "DK_" + P.nom + "_";
    return true;
   }
@@ -1633,9 +2059,10 @@ void Tick()
       BuildCtx(m, n, t.year, t.mon, t.day, G);
       ChargerAnnonces(G);
       g_tradeFait = TradeDejaFait();
-      g_arme = false;
+      g_t2Fait = P.second && Trade2DejaFait();
+      g_arme = false; g_arme2 = false;
       g_lastBar = 0;
-      if(g_histJour != jour) { g_histJour = jour; Historique(true); }
+      if(g_histJour != jour) { g_histJour = jour; g_feuCalc = false; Historique(true); SuivreFeu(); }
      }
    datetime cur = iTime(_Symbol, PERIOD_M1, 0);
    if(cur != g_lastBar)
@@ -1649,6 +2076,7 @@ void Tick()
    SuivreTest();
    SuivreNotifs();   // avant Gerer : « setup prêt » arrive avant « ordre placé »
    Gerer();
+   GererT2();
    EnvoyerJour();
    Panneau();
   }
@@ -1659,6 +2087,9 @@ int OnInit()
    trade.SetExpertMagicNumber(P.magic);
    trade.SetTypeFillingBySymbol(_Symbol);
    trade.SetDeviationInPoints(50);
+   trade2.SetExpertMagicNumber(P.magic + 1);
+   trade2.SetTypeFillingBySymbol(_Symbol);
+   trade2.SetDeviationInPoints(50);
    // changement d'unité de temps : MT5 relance Desk Key sans effacer ses variables.
    // On garde alors l'objectif, la période, AUTO, ANNONCES, l'armement, et on redessine.
    bool garder = g_deinit == REASON_CHARTCHANGE;
@@ -1670,6 +2101,8 @@ int OnInit()
       g_histN = MathMax(0, MathMin(250, InpHistJours));
       g_histo = g_histN > 0;
       g_protect = InpProtection;
+      g_feuOn = ChargerOption("feu", InpFeuRouge);
+      g_second = ChargerOption("second", InpSecond);
      }
    ChargerRisque();
    LireNotifs();
@@ -1677,6 +2110,7 @@ int OnInit()
    EventSetTimer(1);
    if(garder) g_lastBar = 0;
    if(MaPosition() != 0) g_posSuivie = MaPosition();                       // redessine la séance du jour
+   if(P.second && MaPosition2() != 0) g_pos2Suivie = MaPosition2();
    Tick();
    if(garder && g_histJour != "") Historique(false); // redessine l'historique, sans renvoi à l'application
    return INIT_SUCCEEDED;
@@ -1691,13 +2125,19 @@ void OnDeinit(const int reason)
 void OnTimer() { Tick(); }
 void OnTick()  { if(MQLInfoInteger(MQL_TESTER)) Tick(); }
 
+// touche K / bouton : trade 1, ou second trade de l'or quand le trade 1 est pris
+void Touche()
+  {
+   if(P.second && g_second && (g_tradeFait || MaPosition() != 0)) { PlacerT2(); return; }
+   Placer();
+  }
 void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
   {
    if(id == CHARTEVENT_KEYDOWN)
      {
       string k1 = InpTouche, k2 = InpToucheAnnul; StringToUpper(k1); StringToUpper(k2);
-      if(StringLen(k1) > 0 && lparam == StringGetCharacter(k1, 0)) { Placer(); Panneau(); }
-      if(StringLen(k2) > 0 && lparam == StringGetCharacter(k2, 0)) { Annuler("à votre demande"); Panneau(); }
+      if(StringLen(k1) > 0 && lparam == StringGetCharacter(k1, 0)) { Touche(); Panneau(); }
+      if(StringLen(k2) > 0 && lparam == StringGetCharacter(k2, 0)) { Annuler("à votre demande"); Annuler2("à votre demande"); Panneau(); }
      }
    if(id == CHARTEVENT_OBJECT_ENDEDIT && sparam == PFX + "ERV")
      {
@@ -1712,8 +2152,20 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
      {
       string b = StringSubstr(sparam, StringLen(PFX) + 1);
       bool redessiner = false;
-      if(b == "GO") Placer();
-      else if(b == "X") Annuler("à votre demande");
+      if(b == "GO") Touche();
+      else if(b == "X") { Annuler("à votre demande"); Annuler2("à votre demande"); }
+      else if(b == "OPT" && P.feu)
+        {
+         g_feuOn = !g_feuOn; SauverOption("feu", g_feuOn);
+         Msg(g_feuOn ? "feu rouge ACTIVÉ : pas d'ordre quand les 10 derniers setups sont négatifs" : "feu rouge DÉSACTIVÉ : Desk Key prévient seulement");
+        }
+      else if(b == "OPT" && P.second)
+        {
+         g_second = !g_second; SauverOption("second", g_second);
+         if(!g_second) Annuler2("second trade désactivé");
+         Msg(g_second ? "second trade ACTIVÉ" : "second trade désactivé");
+         redessiner = true;
+        }
       else if(b == "MIN") { g_reduit = !g_reduit; }
       else if(b == "HIS") { g_histo = !g_histo; Historique(false); }
       else if(b == "RM") ChangerRisque((g_rMode + 1) % 3, g_rVal);

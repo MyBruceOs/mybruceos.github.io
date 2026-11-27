@@ -248,6 +248,458 @@ Simulations : 20 000 années tirées au hasard parmi les vraies séances. On gar
 
 ![Séries, drawdown et variance](img/variance-drawdown.png)
 
+## 4 sexies. US30 (Dow Jones) : rejeté (27/11/2026)
+
+Données : M1 FTMO `US30.cash`, 22/12/2025 – 25/11/2026, même méthode que l'US100 et le SP500 (entrée remplie entre 10:00 et 11:00 NY, résultats pour 1 000 $ de risque). Marges de stop mises à l'échelle du prix du Dow (environ 50 000) : 6 pts pour les règles US100, 14 pts pour les règles SP500.
+
+| Règles appliquées au US30 | Trades | Gagnants 3R | Résultat 3R | Résultat 2R | 1re moitié (3R) | 2de moitié (3R) |
+|---|---|---|---|---|---|---|
+| Règles US100 (H4, FVG, cassure nette) | 69 | 29 % | +910 $ | +8 940 $ | −9 840 $ | +10 750 $ |
+| Règles SP500 (H4 + Daily, Judas après 9:50) | 43 | 23 % | −13 260 $ | −4 060 $ | −11 430 $ | −1 830 $ |
+| Règles US100 + H1 d'accord | 31 | 32 % | +4 280 $ | +12 860 $ | −5 580 $ | +9 860 $ |
+| Sans filtre de tendance (FVG) | 142 | 32 % | +10 720 $ | +13 910 $ | −2 950 $ | +13 670 $ |
+
+- **Aucune version n'est positive sur les deux moitiés de l'année** (règle de validation : choisir sur la première moitié, vérifier sur la seconde).
+- Win rate à 3R de 23 à 32 %, contre 47 % (US100) et 55 % (SP500).
+- Règles US100 : pire baisse **−17 260 $** (de janvier à mai, dont 10 pertes sur 10 en mars-avril), au-delà de l'alarme fixée pour l'US100 (−16R).
+- Le filtre « cassure nette » ne change presque rien sur le Dow (avec un stop de 6 pts, 5 % du risque est vite dépassé).
+
+**Conclusion : on n'ajoute pas l'US30.** La règle A ne tient pas sur cet indice.
+
+### US30 en M5 (structure M5, exécution M1)
+Moteur v10 : Judas, pivot, cassure, FVG et Fibonacci sur bougies M5 ; remplissage et sortie (SL / TP) lus sur M1 à l'intérieur de la bougie M5. En M5, plus de la moitié des setups ne sont pas remplis avant 11:00 NY (21 sur 36) : on a aussi testé une fenêtre de remplissage 10:00–12:00 NY.
+
+| US30 M5, fenêtre 10:00–12:00 | Trades | Gagnants 3R | Résultat 3R | 1re moitié (3R) | 2de moitié (3R) | Pire baisse |
+|---|---|---|---|---|---|---|
+| Règles US100 (H4, FVG, cassure nette) | 22 | 45 % | +2 930 $ | −6 500 $ | +9 430 $ | −7 080 $ |
+| Règles US100 + Daily (au lieu du H4) | 24 | 54 % | +4 810 $ | −5 520 $ | +10 330 $ | −6 330 $ |
+| Règles SP500 (H4 + Daily, Judas après 9:50) | 14 | 43 % | −880 $ | −4 800 $ | +3 920 $ | −4 000 $ |
+| Sans FVG ni filtre de Judas, Daily | 31 | 52 % | +6 410 $ | −6 580 $ | +12 990 $ | −7 930 $ |
+| Fenêtre 10:00–11:00, règles US100 | 14 | 43 % | +4 290 $ | −4 000 $ | +8 290 $ | −3 000 $ |
+
+- Le M5 **filtre bien le bruit** : 43 à 54 % de gagnants à 3R au lieu de 23 à 32 % en M1, et des baisses deux fois plus petites.
+- Mais **toutes les versions perdent sur la première moitié de l'année** (décembre–mai) et gagnent sur la seconde : le résultat dépend de la période, pas de la règle. Et l'échantillon est petit (14 à 31 trades par an).
+- Sortie à 14:00 au lieu de 13:00 : moins bien partout.
+
+**Entrées dès l'ouverture (9:30 NY, 15:30 Paris) au lieu de 10:00** : on garde les remplissages entre 9:30 et 10:00 au lieu de les annuler.
+
+| | Entrées 9:30–10:00 ajoutées | Leur résultat (3R) | Total 10:00 → 9:30 | 1re moitié |
+|---|---|---|---|---|
+| US100 (référence A) | 12 | 17 % de gagnants, −4 000 $ | +30 790 $ → +26 790 $ (47 % → 41 %) | +10 840 $ → +4 840 $ |
+| SP500 (référence A) | 0 (Judas après 9:50 : impossible avant 10:00) | — | inchangé | inchangé |
+| US30 M1, règles US100 | 11 | +1 000 $ | +910 $ → +1 910 $, pire baisse −17 260 $ → −19 260 $ | −9 840 $ → −6 840 $ |
+| US30 M5, règles US100 + Daily | 1 | −1 000 $ | +4 810 $ → +3 810 $ | inchangé (−5 520 $) |
+
+Entrer dès l'ouverture **dégrade l'US100** et ne sauve pas l'US30 : la règle « remplissage à partir de 10:00 NY » est confirmée.
+
+**Conclusion (première passe) : US30 rejeté** avec les règles des autres indices.
+
+### Recherche d'une méthode US30 avec les concepts ICT / SMC (27/11/2026)
+Protocole : liste de concepts fixée à l'avance, sélection sur la 1re moitié de 2026, vérification sur la 2de moitié, puis **test hors échantillon sur 2 ans** (déc. 2023 – déc. 2025) avec l'historique M5 (moteur v11 `src=M5`, exécution sur bougies M5, prudente : stop avant TP quand les deux tombent dans la même bougie).
+
+Concepts testés : structure M1 / M5 / M15 ; entrée au 50 % (équilibre) ou OTE 70,5 % ; biais aucun / H4 / Daily / H4 + Daily / H1 + H4 ; FVG ; divergence SMT avec le Nasdaq ; premium / discount (range de la veille) ; Judas après 9:50 ; draw on liquidity (liquidité opposée à au moins l'objectif) ; objectif 2R / 3R. Fenêtre de remplissage 10:00–11:00 (M1) ou 10:00–12:00 (M5, M15) ; stop Judas ± 6 pts ; sortie 13:00 NY.
+
+Sur 2026 seul : 1 377 combinaisons, 22 positives sur les deux moitiés, moins que le hasard n'en donnerait : pas de preuve sur une seule année. Sur 3 ans (2024, 2025, 2026, mêmes données M5) :
+
+| Version US30 | Trades / an | Gagnants | Total 3 ans | 2024 | 2025 | 2026 | Pire baisse |
+|---|---|---|---|---|---|---|---|
+| **A : règle A en M5, biais H4, TP 3R** | 41 | 44 % | **+25,9 R** | +10,5 | +11,8 | +3,7 | −9,5 R |
+| A, TP 2R | 41 | 48 % | +27,4 R | +13,9 | +10,4 | +3,1 | −8,5 R |
+| **B2 : M5, H4 + FVG + draw on liquidity ≥ 2R, TP 2R** | 10 | 52 % | +15,0 R | +6,6 | +5,4 | +3,0 | **−2,0 R** |
+| B : M5, H4 + draw on liquidity, TP 2R | 16 | 47 % | +15,6 R | +5,9 | +6,3 | +3,4 | −4,9 R |
+| D : M15, entrée en discount, TP 3R | 23 | 49 % | +12,5 R | +4,4 | +2,7 | +5,5 | −5,2 R |
+| OTE 70,5 % + SMT, TP 2R | 15 | 35 % | −3,8 R | −1,2 | −2,7 | — | −8,0 R |
+| OTE 70,5 % en discount, TP 2R | 30 | 33 % | −4,9 R | −1,9 | −3,0 | — | −10,0 R |
+
+Par semestre, version A : 2024 −2,2 / +12,7 ; 2025 +1,6 / +10,2 ; 2026 −4,1 / +7,8 (R). Gagnant chaque année, mais l'essentiel vient des seconds semestres.
+
+- **Ce qui aide sur le Dow** : la structure en **M5** (moins de bruit que le M1), le biais **H4**, et le **draw on liquidity** (ne prendre le trade que si la liquidité opposée est à au moins 2R), qui lisse fortement la courbe (B2 : pire baisse −2R, 5 semestres positifs sur 6).
+- **Ce qui n'aide pas** : l'entrée OTE 70,5 % (perdante hors échantillon), la divergence SMT, le Judas après 9:50, le premium / discount en M5.
+- **Bilan** : la version A est **positive chacune des 3 années**, mais son avantage (environ +8,6 R par an) est bien plus faible que celui de l'US100 et du SP500, avec des premiers semestres faibles. **Candidat, pas encore validé** : à suivre en observation (signaux sans ordres, ou risque réduit) avant de l'ajouter comme profil. À retester dans quelques mois avec les nouveaux mois (si la seconde moitié se confirme, le M5 avec le Daily serait le candidat).
+
+## 4 octies. XAUUSD (or) : Londres ou New York (27/11/2026)
+
+Données M1 FTMO `XAUUSD`, 22/12/2025 – 25/11/2026. Trois séances testées, chacune avec 4 jeux de règles (règles US100, règles SP500, et les deux sans leur filtre propre ; stop au Judas ± 0,5 ou 1 $) et 5 biais (aucun, H4, Daily, H4 + Daily, H1 + H4) :
+- **Londres** (modèle ICT de l'or) : liquidité = range asiatique (20:00–2:00 NY), Judas après 2:00 NY, entrée au 50 % entre 3:00 et 5:00 NY, sortie 8:00 NY ;
+- **New York comme les indices** : pré-marché 8:00–9:30, Judas après 9:30, entrée 10:00–11:00, sortie 13:00 NY ;
+- **NY killzone ICT** : liquidité = séance de Londres (2:00–7:00), entrée 7:30–9:00, sortie 11:00 NY.
+
+| Or, résultats 3R (1 R = risque d'un trade) | Trades | Gagnants | Total | 1re moitié | 2de moitié | Pire baisse |
+|---|---|---|---|---|---|---|
+| **New York, biais H4, sans FVG obligatoire** | 43 | **49 %** | **+23,5 R** | +16,6 R | +7,0 R | **−3,0 R** |
+| New York, biais H4, FVG (≈ identique : l'or a presque toujours un FVG) | 44 | 48 % | +22,8 R | +16,7 R | +6,1 R | −3,0 R |
+| New York, biais H1 + H4, sans FVG | 29 | 59 % | +23,2 R | +11,2 R | +12,0 R | −3,0 R |
+| New York, règles US100 complètes (cassure nette) | 44 | 45 % | +18,2 R | +13,7 R | +4,5 R | −4,0 R |
+| Londres, meilleure version (H4, sans FVG) | 26 | 38 % | +5,2 R | −0,8 R | +6,0 R | −5,3 R |
+| Londres sans filtre de tendance | 76–83 | 29–32 % | −10 à −17 R | négatif | négatif | jusqu'à −24 R |
+| NY killzone ICT, meilleure version | 85 | 34 % | +18,8 R | +9,7 R | +9,1 R | −7,3 R |
+| NY killzone ICT avec un biais (H4, Daily…) | 15–32 | 21–38 % | −7,5 à +5,8 R | | souvent négatif | jusqu'à −13,9 R |
+
+Par mois (New York, H4, sans FVG, 3R) : 9 mois positifs sur 12 ; pire mois −3 R (juin, 3 pertes). Stop moyen 7 à 18 $ selon la volatilité (49 $ en janvier).
+
+- **Choix sur la 1re moitié de l'année** : New York, biais H4 (+16,6 R) ; **vérification sur la 2de moitié : +7,0 R**. Validé selon la méthode habituelle.
+- **Londres ne marche pas** avec cette mécanique, malgré le modèle ICT classique de l'or : 26 à 83 trades, 29 à 38 % de gagnants.
+- Mêmes règles que les indices : biais H4, Judas sur le pré-marché, cassure M1, entrée au 50 % entre 10:00 et 11:00 NY, sortie 13:00 NY. Le FVG ne change rien sur l'or, la cassure nette (5 % du risque) enlève un peu de résultat.
+- Diversification : seuls 9 des 43 jours de trade de l'or sont aussi des jours de trade US100 ou SP500.
+- Résultat comparable au SP500 (31 trades, +24,4 R, pire baisse −3 R) sur la même année. **À confirmer sur 2024 et 2025** avec l'export M1 sur 3 ans avant d'en faire un profil Desk Key.
+
+### Or : variantes (TP 2R, biais H1, fenêtre d'entrée, sortie)
+
+**Volatilité de l'or heure par heure** (range moyen d'une heure, M1 FTMO, jours de semaine) :
+
+| Heure NY (Paris) | Range moyen | % du pic |
+|---|---|---|
+| 20:00–23:00 (2:00–5:00), séance asiatique | 21–26 $ | 61–73 % |
+| 2:00–5:00 (8:00–11:00), Londres | 19–21 $ | 53–60 % |
+| 8:00 (14:00), annonces de 8:30 | 25 $ | 71 % |
+| 9:00 (15:00) | 32 $ | 91 % |
+| **10:00 (16:00)** | **35 $** | **100 %** |
+| 11:00 (17:00) | 30 $ | 87 % |
+| 12:00 (18:00) | 24 $ | 69 % |
+| 13:00–16:00 (19:00–22:00) | 17–21 $ | 49–59 % |
+
+Le pic est au même moment que l'US100 (10:00 NY), mais l'or reste plus actif hors de New York (Londres 53–60 % du pic contre environ 40 % pour l'US100). La fenêtre utile va de 9:00 à 12:00 NY ; après 13:00 NY l'or redevient calme.
+
+| Or, séance New York (sans FVG obligatoire, stop Judas ± 1 $) | Trades | Gagnants | Total | 1re moitié | 2de moitié | Pire baisse |
+|---|---|---|---|---|---|---|
+| H4, entrées 10:00–11:00, TP 2R | 43 | 51 % | +15,3 R | +11,6 | +3,7 | −3,0 R |
+| H4, entrées 10:00–11:00, TP 3R | 43 | 49 % | +23,5 R | +16,6 | +7,0 | −3,0 R |
+| H1 seul, entrées 10:00–11:00, TP 2R | 41 | 54 % | +16,3 R | +7,6 | +8,7 | −4,7 R |
+| H1 seul, entrées 10:00–11:00, TP 3R | 41 | 51 % | +24,0 R | +10,6 | +13,4 | −4,7 R |
+| **H4, entrées 10:00–12:00, TP 3R** | **53** | **53 %** | **+30,4 R** | +21,8 | +8,6 | **−3,0 R** |
+| H4, entrées 10:00–12:00, TP 2R | 53 | 55 % | +20,0 R | +14,8 | +5,1 | −3,0 R |
+| **H1 seul, entrées 10:00–12:00, TP 3R** | 46 | 52 % | +30,9 R | +15,3 | +15,6 | −3,7 R |
+| H1 seul, entrées 10:00–12:00, TP 2R | 46 | 54 % | +21,0 R | +10,3 | +10,7 | −3,0 R |
+| H1 + H4, entrées 10:00–12:00, TP 3R | 34 | 59 % | +30,1 R | +16,0 | +14,1 | −3,0 R |
+| Entrées 9:30–10:00 (H4) | 13 | 23 % | −1,0 R (3R), −4,0 R (2R) | | | |
+
+- **Fenêtre 10:00–12:00 NY** : +10 trades par an (53 au lieu de 43), et les entrées de 11:00 à 12:00 gagnent 7 fois sur 10. À garder pour l'or.
+- **Biais H1 seul** : même fréquence que le H4 (41 à 46 trades), un peu plus de gagnants (51 à 54 %), et des moitiés d'année plus équilibrées. Le H4 reste le choix de la méthode (meilleure 1re moitié), le H1 est une alternative aussi solide.
+- **TP 2R** : plus de gagnants (54–55 %) mais environ 10 R de moins sur l'année ; 3R reste meilleur.
+- **Sortie** : 13:00, 14:00 ou 16:00 NY donnent presque le même résultat (à 1–2 R près) ; sortir à 12:00 est moins bien. On garde 13:00 NY.
+- **Entrées avant 10:00 NY** : perdantes, comme sur l'US100.
+- La fréquence de l'or n'est pas plus élevée que celle des indices (un trade par jour au maximum, et il faut un Judas sur le pré-marché dans le sens du biais).
+
+## 4 nonies. Or : mélange H4 / H1, et portefeuille 3 actifs (27/11/2026)
+
+**Mélanges H4 / H1 testés** (or, séance New York, entrées 10:00–12:00 NY, TP 3R, sortie 13:00 NY). Définis avant de regarder les résultats ; comme le choix final regarde les deux moitiés de 2026, **la validation se fera sur 2024–2025**.
+
+| Règle de sens du jour | Trades | Gagnants | Total | 1re moitié | 2de moitié | Pire baisse |
+|---|---|---|---|---|---|---|
+| **H4 ou H1, sans conflit** (un des deux donne un sens, l'autre ne le contredit pas) | 53 | 55 % | +37,7 R | +23,2 | +14,5 | −4,5 R |
+| H1, sinon H4 si le H1 est neutre | 56 | 54 % | +38,2 R | +23,2 | +15,0 | −4,5 R |
+| H1 seul | 46 | 52 % | +30,9 R | +15,3 | +15,6 | −3,7 R |
+| H4, sinon H1 si le H4 est neutre | 62 | 50 % | +30,7 R | +21,2 | +9,6 | −4,5 R |
+| H4 seul | 53 | 53 % | +30,4 R | +21,8 | +8,6 | −3,0 R |
+| H1 et H4 d'accord | 34 | 59 % | +30,1 R | +16,0 | +14,1 | −3,0 R |
+
+Retenu : **« H4 ou H1, sans conflit »** (pas de trade quand les deux unités de temps se contredisent).
+
+**Comparaison des actifs** (22/12/2025 – 25/11/2026, TP 3R, 1 R = risque d'un trade) :
+
+| | US100 | SP500 | Or (sans conflit) | Les 3 ensemble |
+|---|---|---|---|---|
+| Trades | 58 | 31 | 53 | 142 (113 jours) |
+| Gagnants | 47 % | 55 % | 55 % | 51 % |
+| Total | +30,8 R | +24,4 R | **+37,7 R** | +92,9 R |
+| Gain moyen par trade | 0,53 R | **0,79 R** | 0,71 R | 0,65 R |
+| Pire baisse | −4,0 R | −3,0 R | −4,5 R | −9,0 R |
+| Plus longue série de pertes | 4 | 3 | 4 | 9 |
+| Plus longue série de gains | 3 | 4 | 6 | 5 |
+| Mois positifs / négatifs | 9 / 2 | 10 / 2 | **11 / 0** | **12 / 0** |
+| 1re moitié / 2de moitié | +10,8 / +19,9 | +8,0 / +16,5 | +23,2 / +14,5 | +42,0 / +51,0 |
+| Pire journée | −1 R | −1 R | −1 R | −2 R |
+
+**Portefeuille 3 actifs, mois par mois (R)** :
+
+| Mois | US100 | SP500 | Or | Total |
+|---|---|---|---|---|
+| déc. 2025 | +1,2 | +1,0 | +1,3 | +3,5 |
+| janv. 2026 | +4,3 | +2,4 | +5,1 | +11,8 |
+| févr. | −1,0 | −2,0 | +8,9 | +5,9 |
+| mars | +0,7 | +1,0 | +1,4 | +3,0 |
+| avr. | 0,0 | −2,0 | +4,0 | +2,0 |
+| mai | +5,7 | +7,5 | +2,5 | +15,7 |
+| juin | +4,4 | +2,0 | 0,0 | +6,4 |
+| juil. | +2,0 | +2,0 | +7,6 | +11,6 |
+| août | +5,0 | +2,0 | +3,3 | +10,3 |
+| sept. | +7,0 | +5,0 | +0,3 | +12,3 |
+| oct. | −1,0 | +1,0 | +2,4 | +2,4 |
+| nov. | +2,6 | +4,5 | +1,0 | +8,1 |
+
+**Variance (Monte Carlo, 10 000 années, tirage de journées, 0,05 R de frais par trade)** :
+
+| | Résultat médian | 1 année sur 10 au pire | Creux médian | Creux 1 année sur 10 | Creux 1 année sur 100 | Séries de pertes (médiane / 9 sur 10 / 99 sur 100) |
+|---|---|---|---|---|---|---|
+| US100 | +27,8 R | +10,4 R | −6,3 R | −10,7 R | −16,3 R | 5 / 8 / 12 |
+| SP500 | +22,6 R | +9,7 R | −4,2 R | −6,9 R | −10,5 R | 4 / 6 / 9 |
+| Or | +34,8 R | +18,4 R | −5,2 R | −8,1 R | −11,9 R | 4 / 6 / 9 |
+| **3 actifs** | **+85,3 R** | **+56,1 R** | −7,7 R | −11,6 R | −16,8 R | 6 / 9 / 13 |
+
+L'or ajoute environ +35 R par an au portefeuille sans augmenter le creux : les creux des trois actifs tombent rarement en même temps.
+
+**Money management sur un seul compte (3 actifs)** — perte max 10 %, perte du jour 5 % :
+
+| Risque par trade | Gain médian sur un an | Risque de toucher −10 % dans l'année | Challenge (+10 % avant −10 %) : réussite, durée médiane (9 fois sur 10) |
+|---|---|---|---|
+| 0,5 % | +43 % | 0,3 % | 100 %, 54 séances (102) |
+| 0,75 % | +64 % | 4,9 % | 99,8 %, 36 séances (76) |
+| 1 % | +85 % | 20 % | 99,1 %, 26 séances (61) |
+| 1,5 % | +128 % | 68 % | 96 %, 17 séances (42) |
+
+Pire journée possible : les 3 actifs perdants le même jour = −3 R (−3 % à 1 %, −4,5 % à 1,5 %) ; limite du jour de 5 % dépassée seulement au-delà de 1,67 % par trade. Sans l'or (US100 + SP500 seuls), le challenge prend environ 1,7 fois plus de temps au même risque.
+
+Ces chiffres supposent que l'avantage de 2026 se maintient : **à confirmer sur 2024–2025** (export M1 sur 3 ans en cours).
+
+## 4 decies. Second trade de continuation (27/11/2026)
+
+Définition (fixée avant le test, moteur v12) : pendant que le trade 1 est ouvert, le prix dépasse la jambe du trade 1 (impulsion), fait un repli (pivot M1 de 2 bougies) au-dessus du stop du trade 1, puis une bougie M1 clôture au-delà du sommet d'avant le repli (seconde cassure). Ordre limite au 50 % de la nouvelle jambe (retracé si elle s'allonge), stop sous le repli ± la marge du profil, remplissage avant 12:00 NY et tant que le trade 1 est ouvert (pas de second trade si le trade 1 a déjà touché son stop ou son TP). Deux objectifs : le TP 3R du trade 1, ou 1R. Sortie 13:00 NY.
+
+| | US100 | SP500 | Or |
+|---|---|---|---|
+| Jours de trade 1 où la seconde cassure se forme | 21 % | 52 % | 40 % |
+| Jours où le second trade est rempli | **5 %** (3 trades) | **26 %** (8 trades) | **19 %** (10 trades) |
+| Objectif = TP du trade 1 (R visé moyen) | 2,6 R | 2,1 R | 3,1 R |
+| Gagnants / résultat, objectif = TP du trade 1 | 67 %, +3,3 R | 50 %, +2,7 R | **60 %, +9,7 R** |
+| Gagnants / résultat, objectif 1R | 67 %, +1,0 R | 50 %, 0,0 R | 70 %, +4,0 R |
+| Quand le trade 1 perd, le second trade perd aussi | — | 2 sur 2 | 3 sur 3 |
+
+Heures de remplissage : 10:39 à 11:48 NY. Sur les 16 jours où le trade 1 gagne, le second trade (objectif du trade 1) transforme 3 journées gagnantes en journées nulles ou légèrement perdantes. **Sur les 5 jours où le trade 1 perd, le second trade perd aussi, à chaque fois.**
+
+Effet sur le portefeuille 3 actifs (1 an) :
+
+| | Sans second trade | Avec (objectif du trade 1) | Avec (objectif 1R) |
+|---|---|---|---|
+| Trades | 142 | 163 (+21) | 163 |
+| Total | +92,9 R | +108,7 R | +97,9 R |
+| Pire creux | −9 R | **−10 R** | −10 R |
+| Plus longue série de pertes | 9 | 10 | 10 |
+| Journées à −2 R | 7 | 12 | 12 |
+| Mois négatifs | 0 | 0 | 0 |
+
+- L'objectif « TP du trade 1 » est nettement meilleur que 1R.
+- Le gain vient surtout de l'or (+9,7 R sur 10 trades) ; sur les indices, c'est marginal (US100 : 3 trades ; SP500 : +2,7 R mais pire creux et pire journée aggravés).
+- Le second trade renforce les mauvaises journées : à 1 % par trade, le creux d'avril passerait de −9,5 % à environ −10,5 % frais compris, soit l'échec d'un challenge.
+- Échantillons très petits (3 à 10 trades par actif) : **pas mis en place**. À retester sur 2024–2025, éventuellement pour l'or seul.
+
+**Or seul, avec une règle de gestion en plus** (moteur v13) : dès que le second trade est rempli, le stop du trade 1 est remonté au stop du second trade (sous le nouveau creux, comme un stop suiveur SMC). Les jours où le second trade perd, le trade 1 sort sur ce stop à +0,61 R, +0,45 R et −0,23 R au lieu de −1 R ; les jours gagnants ne changent pas.
+
+| Or | Trades | Gagnants | Total | 1re / 2de moitié | Pire creux | Plus longue série de pertes | Pire journée |
+|---|---|---|---|---|---|---|---|
+| Trade 1 seul | 53 | 55 % | +37,7 R | +23,2 / +14,5 | −4,5 R | 4 | −1 R |
+| + second trade | 63 | 56 % | +47,4 R | +27,1 / +20,3 | −5,5 R | 5 | −2 R |
+| **+ second trade + stop du trade 1 remonté** | **63** | **59 %** | **+51,2 R** | **+30,1 / +21,1** | **−4,0 R** | **3** | **−1,2 R** |
+| idem, second trade à mi-risque | 63 | 59 % | +46,4 R | +28,2 / +18,2 | −3,5 R | 3 | −1 R |
+
+Or par mois (R), trade 1 seul → avec second trade et stop remonté : déc. +1,3 → +2,1 ; janv. +5,1 → +9,3 ; févr. +8,9 → +9,8 ; mars +1,4 → +2,0 ; avr. +4,0 → +4,0 ; mai +2,5 → +3,0 ; juin 0,0 → 0,0 ; juil. +7,6 → +12,5 ; août +3,3 → +5,0 ; sept. +0,3 → +0,4 ; oct. +2,4 → +2,4 ; nov. +1,0 → +0,8.
+
+Compte 3 actifs (second trade sur l'or seulement, stop remonté) : 152 trades, 53 % de gagnants, **+106,4 R** (au lieu de +92,9 R), pire creux **−8,5 R** (au lieu de −9 R), plus longue série 8, 0 mois négatif. Monte Carlo : résultat médian +97,7 R ; creux d'une année sur 10 −11,5 R, sur 100 −16,8 R (inchangé). À 1 % par trade : creux historique −9,0 % (au lieu de −9,5 %), probabilité de toucher −10 % dans l'année 19 % (au lieu de 21 %) ; à 0,75 % : −6,8 % et 4,3 %.
+
+Conclusion : pour l'or, le second trade **avec** le stop du trade 1 remonté améliore tout (résultat, creux, séries, pire journée). Sans cette règle, il aggrave les mauvaises journées. Seulement 10 seconds trades sur l'année : à confirmer sur 2024–2025.
+
+## 4 undecies. Validation sur 3 ans : US100 et SP500 (2024, 2025, 2026) — 27/11/2026
+
+Règles exactes de la référence A, M1 FTMO exporté sur 3 ans, même fenêtre 10:00–11:00 NY, TP 3R. « 2024 » = 22/12/2023 – 21/12/2024, « 2025 » = 22/12/2024 – 21/12/2025, « 2026 » = 22/12/2025 – 25/11/2026.
+
+| | Trades | Gagnants 3R | Résultat 3R | Résultat 2R | Pire creux | Plus longue série de pertes | Mois + / − |
+|---|---|---|---|---|---|---|---|
+| US100 2024 | 73 | 44 % | **+41,8 R** | +35,2 R | −11,7 R | 8 | 9 / 4 |
+| **US100 2025** | 75 | **25 %** | **−19,2 R** | −11,8 R | **−23,8 R** | **10** | **3 / 9** |
+| US100 2026 | 58 | 47 % | +30,8 R | +24,2 R | −4,0 R | 4 | 9 / 2 |
+| SP500 2024 | 33 | 42 % | +17,1 R | +16,4 R | −4,0 R | 4 | 8 / 4 |
+| **SP500 2025** | 40 | **30 %** | **−2,8 R** | −6,5 R | −10,5 R | 7 | 4 / 8 |
+| SP500 2026 | 31 | 55 % | +24,4 R | +17,6 R | −3,0 R | 3 | 10 / 2 |
+| **Les deux, 2025** | 115 | 27 % | **−22,0 R** | | **−29,1 R** | **14** | 5 / 8 |
+| Les deux, 3 ans | 310 | 39 % | +92,1 R | | −29,1 R | 14 | 21 / 14 |
+
+US100 2025 par mois (R) : janv. −3,6 ; févr. −0,5 ; mars +1,5 ; avr. +6,0 ; mai −6,0 ; juin −2,0 ; juil. −4,2 ; août −4,0 ; sept. +2,4 ; oct. −4,0 ; nov. −4,5 ; déc. −0,6.
+
+- **2025 est une année perdante pour les deux indices**, en dehors des bornes « alarme » calculées sur 2026 seul (creux −16 R pour l'US100, série de 12 pertes). 2026 était une très bonne année, pas une année normale.
+- Sur 3 ans, la règle reste gagnante : US100 +53,4 R, SP500 +38,7 R, soit environ +30 R par an à eux deux, mais avec un pire creux réel de **−32,7 R** frais compris (31/12/2024 → 14/11/2025).
+- Monte Carlo sur les 3 ans (US100 + SP500) : résultat médian +25 R par an ; une année sur 10 environ +1 R ; année perdante 9 % du temps ; creux médian −11,8 R, une année sur 10 **−20,2 R**, une année sur 100 **−31,2 R** ; séries de pertes 9 / 13 / 19.
+- Money management (perte max 10 %) : probabilité de toucher −10 % dans l'année : 0,25 % par trade → 0,2 % ; 0,33 % → 1,3 % ; 0,5 % → 10 % ; 0,75 % → 38 % ; 1 % → 67 %.
+- Second trade sur 2024–2025 : US100 18 trades, 4 gagnants, −5,6 R ; SP500 18 trades, 10 gagnants, +9,2 R.
+- **L'or n'est validé que sur 2026** : ses chiffres sont à revoir de la même façon dès que l'export M1 de 3 ans est terminé.
+
+## 4 duodecies. Ce qui distingue 2025, et un « feu rouge » qui ne touche pas à la règle (27/11/2026)
+
+Ce qui **n'explique pas** 2025 (US100 et SP500, mêmes règles) :
+- le sens : achats et ventes perdent tous les deux (US100 2025 : achats 25 % de gagnants, ventes 26 %) ;
+- la volatilité : range moyen de la séance (9:30–13:00 NY) de l'US100 de 167 à 452 pts en 2025, du même ordre qu'en 2024 (142 à 304) et 2026 ;
+- l'« efficacité » de la séance ((clôture 13:00 − ouverture 9:30) / range) : 0,39 à 0,56 en 2025 contre 0,37 à 0,58 en 2024 ;
+- la justesse du biais H4 (sens de la séance 9:30–13:00 NY) : 53 % des jours en 2024, 50 % en 2025 ;
+- les mesures du trade (profondeur du Judas, taille du stop, jambe, heure) : 2025 entre 2024 et 2026.
+
+2025 ressemble à une **période prolongée où les retournements après le Judas ne tiennent pas**, sans signature simple dans les prix. La seule mesure qui la détecte à temps est **le résultat récent de la règle elle-même**.
+
+**Feu rouge par actif** (la règle ne change pas) : la règle continue d'être suivie chaque jour, trades pris ou non (Desk Key calcule déjà le résultat de chaque setup). Si la somme des **10 derniers setups** de l'actif (en R, à 3R) est **négative**, on ne trade pas cet actif (feu rouge) ; on reprend dès qu'elle redevient positive ou nulle.
+
+| US100 + SP500 | Sans feu rouge | Avec feu rouge (10 derniers < 0 R) |
+|---|---|---|
+| 2024 | 106 trades, +58,9 R, creux −11,8 R | 97 trades, +55,9 R, creux −7,8 R |
+| **2025** | 115 trades, **−22,0 R**, creux **−29,1 R** | **43 trades, −6,0 R, creux −11,7 R** |
+| 2026 | 89 trades, +55,2 R, creux −5,3 R | 82 trades, +48,5 R, creux −5,3 R |
+| **3 ans** | 310 trades, +92,1 R, **creux −29,1 R** | 222 trades, **+98,4 R**, **creux −11,7 R** |
+
+Par actif : US100 2025, 26 trades pris sur 75 (−6,6 R au lieu de −19,2 R) ; SP500 2025, 17 sur 40 (+0,6 R au lieu de −2,8 R). En 2024 et 2026, le feu rouge ne s'allume presque pas (US100 64 sur 73 et 52 sur 58 ; SP500 33 sur 33 et 30 sur 31).
+
+Robustesse (fenêtre de 6 à 20 setups, seuil −2, 0 ou +2 R) : toutes les variantes réduisent le creux sur 3 ans (−10 à −22 R au lieu de −29 R) avec un total de +64 à +105 R (+92 R sans filtre). La variante « 10 setups, seuil 0 » est dans la zone stable ; les chiffres précis varient selon le réglage (2025 entre −3 et −15 R).
+
+Variantes moins bonnes : mi-risque au lieu de pause (2025 −14 à −16 R) ; un seul feu pour les deux indices (2025 −17 R).
+
+## 4 quaterdecies. Or : réduire les séries de pertes et les retournements (27/11/2026)
+
+Demande : trouver, sur l'or, un motif qui réduise les séries de pertes sans changer la fréquence, ou une gestion des gains qui évite les retournements, sans perdre en efficacité. Moteur **v14** (desk-bt-m1) : mêmes trades que v13 (résultats identiques vérifiés), plus le chemin du prix après l'entrée, 34 gestions de sortie du trade 1 (combinées au second trade) et 16 nouvelles mesures par trade. 194 trades d'or sur 3 ans (configuration retenue : second trade, stop du trade 1 remonté).
+
+**1. Les retournements sont rares.** Sur 107 trades finis en perte ou à zéro, 32 avaient atteint +1R, 14 avaient atteint +1,5R, **7 seulement avaient atteint +2R**. La plupart des perdants partent tout de suite dans le mauvais sens : sur 89 pertes pleines, 37 ne sont jamais montées au-delà de +0,3R, et 25 ont touché le stop en 10 minutes ou moins.
+
+**2. Gestion des gains : rien ne bat « stop au Judas, TP 3R, sortie 13:00 ».** Écart en R par rapport à la règle actuelle :
+
+| Gestion du trade 1 | 2024 | 2025 | 2026 | 3 ans | Pire creux de l'or | Pire creux du compte |
+|---|---|---|---|---|---|---|
+| **Actuelle (TP 3R)** | +13,8 | +47,9 | +51,2 | **+112,9 R** | −14,0 R | −13,6 R |
+| Stop à l'entrée à +1R | −5,6 | −3,0 | −13,2 | −21,8 | −12,5 R | −12,6 R |
+| Stop à l'entrée à +1,5R | | | | −11,5 | −16,0 R | −13,6 R |
+| Stop à l'entrée à +2R | +1,0 | +2,0 | −0,7 | +2,3 | −13,0 R | −13,6 R |
+| Stop à +1R quand +2R est atteint | +0,3 | +4,0 | −11,5 | −7,2 | −12,0 R | −13,6 R |
+| Stop suiveur à 1,5R, actif à +2R | | | | −3,2 | −12,1 R | −13,6 R |
+| Moitié sortie à +1R (reste à l'entrée) | −4,7 | −10,4 | −21,3 | −36,4 | −8,2 R | −12,0 R |
+| Moitié sortie à +2R | −1,2 | −4,7 | −7,4 | −13,4 | −13,0 R | −13,6 R |
+| TP 2R / TP 2,5R | | | | −36,6 / −17,3 | −14,6 / −14,7 R | −13,6 R |
+| TP 4R, stop à +1R quand +2R est atteint | −0,2 | +10,5 | −8,0 | +2,3 | −11,4 R | −13,6 R |
+| Sortie à 12:00 NY au lieu de 13:00 | | | | −18,2 | −14,5 R | −14,8 R |
+| Sortie au marché si le trade est sous l'entrée 60 min après | +1,2 | +2,3 | +0,8 | +4,3 | −12,9 R | −12,7 R |
+| idem à 30 min / à 90 min | +5,9 / −2,6 | −14,2 / −3,2 | −2,4 / −1,6 | −10,7 / −7,5 | | |
+
+- Le stop à l'entrée à +1R sauve 22 trades (+19,5 R) mais coupe 16 gagnants qui seraient allés au TP (−41,4 R). La sortie de moitié à +1R sauve 40 trades (+34,4 R) mais en coupe 63 (−70,8 R).
+- Les deux petites améliorations (stop à l'entrée à +2R, sortie à 60 min) ne tiennent pas : leurs voisines (+1,5R, +2,5R ; 30 min, 90 min) font moins bien. C'est du bruit. **On ne change pas la gestion.**
+
+**3. Aucun filtre d'entrée ne réduit les pertes de façon fiable.** 39 mesures (heure, profondeur du Judas, taille du stop, volatilité, Asie, Londres, annonce de 8:30, 30 premières minutes, pente H4, tendance journalière, jour de la semaine, position dans le range de la veille, etc.), chacune testée en écartant les 10 %, 15 %, 20 % ou 25 % des trades les plus hauts ou les plus bas, avec le seuil choisi sur deux années et vérifié sur la troisième (3 fois) : **1 règle sur 312 gagne les 3 années**, et +3,6 R seulement. Avec des résultats mélangés au hasard, le même test en trouve 0,8 en moyenne : c'est le niveau du hasard.
+
+**4. Les séries de pertes de l'or sont du hasard, pas un régime.** Après une perte, le trade suivant perd 50 % du temps ; après un gain, 60 %. Les pertes ne s'enchaînent donc pas plus que prévu. La plus longue série réelle (7) est même plus courte que celle qu'on obtient en mélangeant les trades au hasard (médiane 8, une fois sur 10 au moins 10). C'est pour cela que le feu rouge n'aide pas l'or, et que les règles de taille après une série de pertes de l'or ne marchent pas non plus :
+
+| Règle sur l'or | 3 ans | Pire creux de l'or | Compte 3 ans | Pire creux du compte |
+|---|---|---|---|---|
+| Aucune | +112,9 R | −14,0 R | +211,2 R | −13,6 R |
+| Mi-risque après 2 / 3 / 4 pertes | +102,8 / +105,6 / +106,3 | −13,8 / −15,0 / −17,4 | +201,1 / +204,0 / +204,7 | −11,2 / −12,2 / −12,6 |
+| Pause après 3 / 4 pertes | +98,4 / +99,8 | −16,0 / −20,9 | +196,8 / +198,2 | −11,0 / −13,0 |
+| Mi-risque si les 5 / 10 derniers < 0 | +100,2 / +103,0 | −15,7 / −12,9 | +198,6 / +201,3 | −12,7 / −11,8 |
+
+**5. Ce qui réduit vraiment le pire creux : baisser le risque du compte quand il est en creux.** Règle testée : quand le compte (les 3 actifs) est à 4 R sous son plus haut, tous les trades passent à mi-risque ; on revient au risque normal quand le compte est remonté à 2 R de son plus haut. La règle ne touche ni les entrées ni les sorties, et ne change pas la fréquence.
+
+| Compte 3 actifs | 2024 | 2025 | 2026 | 3 ans | Pire creux |
+|---|---|---|---|---|---|
+| Actuel | +69,7 R (creux −13,6) | +41,9 R (creux −10,0) | +99,7 R (creux −8,6) | +211,2 R | **−13,6 R** |
+| Mi-risque à −4 R (retour à −2 R) | +53,6 R (creux −8,8) | +33,6 R (creux −8,1) | +88,5 R (creux −6,3) | +175,7 R | **−8,8 R** |
+| Mi-risque à −6 R (retour à −3 R) | +57,4 R (−10,2) | +34,1 R (−9,9) | +96,6 R (−7,3) | +188,1 R | −10,2 R |
+
+- Le creux baisse chaque année. Le gain baisse aussi (17 % de R en moins), mais moins que le creux (35 % en moins) : pour le même pire creux, on peut donc risquer plus par trade. Ramenée au même pire creux que l'actuel (−13,6 R), la règle donnerait environ +271 R au lieu de +211 R.
+- Avec la règle à −4 R, 42 % des trades sont passés à mi-risque (12 périodes en 3 ans).
+- Simulation (blocs de mois tirés au hasard dans les 3 ans, frais de 0,05 R par trade, la règle appliquée sur le chemin simulé ; le feu rouge des indices est pris tel qu'il s'est allumé dans l'historique, d'où des chiffres un peu différents de 4 terdecies) :
+
+| Une année simulée | R médian | Creux médian | Creux 1 année sur 10 | Creux 1 année sur 100 | Risque par trade pour 5 % de chances de toucher −10 % | Gain médian à ce risque |
+|---|---|---|---|---|---|---|
+| Actuel | +63,5 R | −10,3 R | −16,2 R | −23,7 R | 0,54 % | +35 % |
+| **Mi-risque à −4 R** | +52,1 R | −7,4 R | −10,3 R | −14,2 R | **0,87 %** | **+45 %** |
+| Mi-risque à −6 R | +54,5 R | −8,4 R | −11,4 R | −15,2 R | 0,80 % | +43 % |
+| Mi-risque à −8 R | +57,2 R | −9,5 R | −12,4 R | −16,2 R | 0,74 % | +42 % |
+
+Les trois réglages améliorent le rapport gain / creux : le résultat ne dépend pas d'un seuil choisi au plus juste. C'est une règle de gestion du risque, pas un motif de marché : elle suppose que la règle reste gagnante, et elle retarde la remontée après un creux.
+
+**Conclusion** : les règles de l'or ne changent pas (stop au Judas ± 1 $, TP 3R, second trade, sortie 13:00). Pour réduire les pires creux, la piste solide est la **réduction automatique du risque du compte en creux**, à décider par l'utilisateur (Desk Key et application), pas un filtre ni une sortie anticipée.
+
+## 4 terdecies. L'or sur 3 ans, et le compte 3 actifs (2024, 2025, 2026) — 27/11/2026
+
+**Or seul** (séance New York, sens « H4 ou H1 sans conflit », entrées 10:00–12:00 NY, TP 3R) :
+
+| Or | 2024 | 2025 | 2026 | 3 ans | Pire creux | Plus longue série | Mois + / − |
+|---|---|---|---|---|---|---|---|
+| Trade 1 seul | 75 tr., 37 %, **+2,4 R** | 66 tr., 50 %, **+35,4 R** | 53 tr., 55 %, **+37,7 R** | +75,5 R | −13,1 R | 7 | 25 / 7 |
+| **+ second trade, stop du trade 1 remonté** | 91 tr., 43 %, **+13,8 R** | 80 tr., 55 %, **+47,9 R** | 63 tr., 59 %, **+51,2 R** | **+112,9 R** | −14,0 R | 8 | 24 / 8 |
+| idem avec feu rouge | +0,0 R | +33,2 R | +50,2 R | +83,4 R | −16,3 R | 6 | 21 / 11 |
+
+- L'or est positif les 3 années ; 2024 a été une année faible (+2,4 R) mais pas perdante. **2025, l'année difficile des indices, est une très bonne année pour l'or.**
+- Le second trade avec stop remonté est **confirmé hors échantillon** : +11,4 R en 2024 et +12,5 R en 2025, en plus de 2026.
+- Le feu rouge **n'aide pas l'or** : il le tient à l'écart au moment où il repart (3 ans +83 R au lieu de +113 R, creux plus profond).
+
+**Feu rouge par actif sur 3 ans** : US100 +53,4 → +59,3 R, creux −24,7 → −10,0 R ; SP500 +38,7 → +39,1 R, creux −10,5 → −5,1 R ; or +112,9 → +83,4 R, creux −14,0 → −16,3 R. Conclusion : **feu rouge sur l'US100 et le SP500, pas sur l'or.**
+
+**Compte 3 actifs** (or avec second trade) :
+
+| | 2024 | 2025 | 2026 | 3 ans | Pire creux | Plus longue série | Mois + / − |
+|---|---|---|---|---|---|---|---|
+| Sans feu rouge | +72,7 R | +25,9 R | +106,4 R | +205,0 R | −23,9 R | 8 | 29 / 7 |
+| Feu rouge sur les 3 actifs | +55,9 R | +27,2 R | +98,7 R | +181,8 R | −15,6 R | 8 | 28 / 8 |
+| **Feu rouge sur les indices seulement** | **+69,7 R** | **+41,9 R** | **+99,7 R** | **+211,2 R** | **−13,6 R** | 8 | **29 / 7** |
+
+Configuration retenue (dernière ligne) : 456 trades en 3 ans (environ 150 par an), 47 % de gagnants ; frais compris (0,05 R par trade) +188,4 R et pire creux −14,8 R (25/01/2024 → 01/04/2024).
+
+**Mois par mois (R), configuration retenue** — colonnes : US100 (feu), SP500 (feu), or (second trade), total, et total sans feu rouge :
+
+| Mois | US100 | SP500 | Or | Total | Total sans feu |
+|---|---|---|---|---|---|
+| déc. 2023 | +0,3 | +0,1 | 0,0 | **+0,4** | +0,4 |
+| janv. 2024 | −1,1 | 0,0 | +6,3 | **+5,3** | +5,3 |
+| févr. 2024 | −1,0 | −0,1 | −3,4 | **−4,4** | −4,4 |
+| mars 2024 | −3,7 | −1,0 | −3,5 | **−8,1** | −8,1 |
+| avr. 2024 | +1,0 | +5,0 | +10,1 | **+16,2** | +19,2 |
+| mai 2024 | +16,0 | +3,2 | +5,7 | **+24,9** | +24,9 |
+| juin 2024 | +2,0 | −1,0 | −0,5 | **+0,5** | +0,5 |
+| juil. 2024 | +8,6 | −2,0 | +7,6 | **+14,2** | +14,2 |
+| août 2024 | +3,3 | +4,0 | +0,7 | **+8,0** | +8,0 |
+| sept. 2024 | +7,7 | +3,0 | −5,8 | **+4,9** | +4,9 |
+| oct. 2024 | +3,0 | +0,4 | −1,6 | **+1,8** | +1,8 |
+| nov. 2024 | −2,9 | +2,4 | −1,8 | **−2,4** | −2,4 |
+| déc. 2024 | +5,5 | +6,0 | 0,0 | **+11,5** | +11,5 |
+| janv. 2025 | −3,6 | −2,0 | +1,7 | **−3,9** | −3,9 |
+| févr. 2025 | −1,0 | −1,4 | 0,0 | **−2,4** | −1,8 |
+| mars 2025 | 0,0 | −0,7 | +0,1 | **−0,6** | +0,9 |
+| avr. 2025 | +6,0 | 0,0 | −2,8 | **+3,2** | +3,2 |
+| mai 2025 | −3,0 | 0,0 | +4,0 | **+1,0** | −5,0 |
+| juin 2025 | 0,0 | 0,0 | −4,0 | **−4,0** | −7,0 |
+| juil. 2025 | 0,0 | 0,0 | +8,9 | **+8,9** | +3,2 |
+| août 2025 | 0,0 | 0,0 | +14,1 | **+14,1** | +12,3 |
+| sept. 2025 | −1,0 | 0,0 | +9,3 | **+8,3** | +9,8 |
+| oct. 2025 | −4,0 | 0,0 | +9,2 | **+5,2** | +4,2 |
+| nov. 2025 | 0,0 | +0,6 | +8,4 | **+9,0** | +7,5 |
+| déc. 2025 | 0,0 | +2,1 | +1,1 | **+3,2** | +3,8 |
+| janv. 2026 | +1,8 | +2,4 | +9,3 | **+13,5** | +16,1 |
+| févr. 2026 | −1,0 | −2,0 | +9,8 | **+6,8** | +6,8 |
+| mars 2026 | +0,7 | +1,0 | +2,0 | **+3,6** | +3,6 |
+| avr. 2026 | 0,0 | −2,0 | +4,0 | **+2,0** | +2,0 |
+| mai 2026 | +5,7 | +4,5 | +3,0 | **+13,1** | +16,1 |
+| juin 2026 | +4,4 | +2,0 | 0,0 | **+6,4** | +6,4 |
+| juil. 2026 | +2,0 | +2,0 | +12,5 | **+16,5** | +16,5 |
+| août 2026 | +5,0 | +2,0 | +5,0 | **+12,0** | +12,0 |
+| sept. 2026 | +7,0 | +5,0 | +0,4 | **+12,4** | +12,4 |
+| oct. 2026 | −1,0 | +1,0 | +2,4 | **+2,4** | +2,4 |
+| nov. 2026 | +2,6 | +4,5 | +0,8 | **+7,9** | +7,9 |
+
+Pire mois : mars 2024 (−8,1 R). Meilleur : mai 2024 (+24,9 R). 7 mois négatifs sur 36, aucun en dessous de −8,1 R.
+
+**Variance et risque** (Monte Carlo par blocs de mois tirés dans les 3 ans, feu rouge appliqué sur le chemin simulé, frais compris) : résultat médian +52,9 R par an ; une année sur 10 au pire +22,5 R ; année perdante 1 % ; creux médian −11,8 R, une année sur 10 −17,8 R, une année sur 100 −25,9 R ; séries de pertes 8 / 11 / 14.
+
+| Risque par trade | Gain médian sur un an | Risque de toucher −10 % dans l'année | Pire creux réel sur 3 ans |
+|---|---|---|---|
+| 0,33 % | +17 % | 0,2 % | −4,9 % |
+| **0,5 %** | **+26 %** | **5 %** | **−7,4 %** |
+| 0,6 % | +32 % | 14 % | −8,9 % |
+| 0,75 % | +40 % | 34 % | −11,1 % |
+| 1 % | +53 % | 72 % | −14,8 % |
+
+Le choix « feu rouge sur les indices seulement » a été fait après avoir vu les résultats de l'or : il reste à le confirmer en réel (suivi dans l'application).
+
+## 4 septies. Années précédentes (2024, 2025) : il faut du M1
+
+Pour juger l'US100 et le SP500 sur 2024 et 2025, on n'avait que du M5 (3 ans). Calibration : les mêmes règles calculées en M5 sur 2026, comparées au vrai résultat M1 de 2026.
+
+| 2026 | Vrai M1 (référence A) | Approximation M5 |
+|---|---|---|
+| US100 | 58 trades, +30,8 R | 19 trades, +0,8 R |
+| SP500 | 31 trades, +24,4 R | 9 trades, +12,0 R |
+
+L'approximation M5 ne retrouve pas les mêmes setups (FVG M1, cassure nette M1, pivots M1) : **elle ne permet pas de juger la règle A**. Pour un vrai test des années précédentes, il faut exporter 3 ans de M1 (réglage « Profondeur de l'export M1 » du Bridge à 1 095 jours).
+
 ## 5. Idées testées et rejetées
 
 | Idée | Effet |

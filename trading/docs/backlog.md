@@ -16,5 +16,11 @@ Idées validées mais mises de côté. À reprendre quand le besoin se présente
 
 **Idées liées** : alarme par compte à 50 % / 70 % de la perte du jour ; AUTO sur chaque terminal avec un risque en % du solde de chaque compte (vérifier le plafond de capital par trader dans les règles FTMO).
 
+## Bridge : historique pour les backtests (mis en attente le 27/11/2026)
+L'export actuel ne va que vers le passé et mémorise sa progression dans les variables globales de MT5 (perdues si MT5 se ferme brutalement : réexport complet d'environ 1 h, sans perte de données). Pas utile tant qu'on ne refait pas de backtest. À faire quand on voudra refaire les backtests avec les mois récents ou ajouter un actif :
+- mise à jour incrémentale : n'envoyer que les jours manquants depuis le dernier export ;
+- reprise depuis le serveur (`desk_hist_status`) au lieu des variables globales, et enregistrement immédiat de la progression (`GlobalVariablesFlush`) ;
+- découpage M5 aligné sur des semaines fixes (sinon un réexport crée des doublons M5).
+
 ## Autres
 - Backtest US30 (Dow Jones) et XAUUSD dès que l'historique M1 est exporté par le Bridge.
