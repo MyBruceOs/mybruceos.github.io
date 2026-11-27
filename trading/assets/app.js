@@ -1,5 +1,6 @@
 /* Desk US · Règle A : suivi en direct (Desk Key), journal des setups, suivi du test et règles.
    1.09 : or (XAUUSD) avec second trade, feu rouge des indices (journal, aujourd'hui, mon compte, suivi).
+   1.10 : Desk Key aligne l'exécution sur le graphique (spread) ; règles mises à jour.
    Onglet Simulateur (assets/sim.js) : challenge FTMO à plusieurs comptes et compte propre, sur les 3 ans de résultats.
    Les actifs (profils) sont lus dans la base : ajouter un actif validé en backtest suffit pour qu'il apparaisse partout. */
 (function () {
@@ -572,8 +573,8 @@
     'Judas : après 9:30 NY, passage sous le bas (achat) ou au-dessus du haut (vente) du pré-marché.',
     'Cassure M1 : clôture au-delà du dernier sommet (creux) pivot de 2 bougies formé avant l\'extrême du Judas.',
     'Ordre limite au 50 % du Fibo (Judas = 0 %, plus haut de la jambe = 100 %, retracé tant que la jambe s\'allonge).',
-    'Remplissage entre 10:00 et 11:00 NY (12:00 NY pour l\'or) ; touché avant 10:00 = pas de trade ; pas de remplissage à la fin de la fenêtre = annulé.',
-    'Stop derrière le Judas (marge du profil), objectif en R (3R de référence), sortie à 13:00 NY. Un trade par actif et par jour (plus le second trade de l\'or).'];
+    'Remplissage entre 10:00 et 11:00 NY (12:00 NY pour l\'or) ; touché avant 10:00 = pas de trade ; pas de remplissage à la fin de la fenêtre = annulé. Desk Key 1.10 : si le graphique touche le 50 % d\'un achat sans que l\'ordre se remplisse (spread), achat au marché ; ventes du SP500 et de l\'or : stop et objectif décalés du spread.',
+    'Stop derrière le Judas (marge du profil), objectif en R (3R de référence), sortie à 13:00 NY. Chaque actif est indépendant : la règle donne au plus un setup par actif et par jour (plus le second trade de l\'or), sans limite de trades sur l\'ensemble du compte ; le risque par trade et les limites FTMO encadrent le reste.'];
   function renderRules() {
     const statKpis = s => `<div class="res" style="margin-top:8px">
       <div class="kpi"><small>Trades</small><b>${s.trades ?? '—'}</b></div><div class="kpi"><small>% des jours</small><b>${s.pctDays != null ? s.pctDays + ' %' : '—'}</b></div>

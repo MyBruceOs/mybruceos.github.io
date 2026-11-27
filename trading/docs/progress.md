@@ -6,9 +6,9 @@
 
 | Élément | Version | En ligne | Remarque |
 |---|---|---|---|
-| Desk Key (MT5, exécution en une touche) | **1.10** | non (branche) | 1.10 : exécution alignée sur le graphique (Bid) : rattrapage des achats touchés mais non remplis à cause du spread, ventes SP500 / or avec stop et objectif + spread (backtests.md 4 unvicies). À compiler dans MetaEditor. 1.09 (en ligne le 27/11) : profil or (XAUUSD) avec second trade et stop du trade 1 remonté, feu rouge US100 / SP500 désactivable (bouton FEU ROUGE). 1.08 : Telegram / WhatsApp par le relais du serveur si MT5 échoue. |
+| Desk Key (MT5, exécution en une touche) | **1.10** | oui (27/11) | 1.10 : exécution alignée sur le graphique (Bid) : rattrapage des achats touchés mais non remplis à cause du spread, ventes SP500 / or avec stop et objectif + spread (backtests.md 4 unvicies). À compiler dans MetaEditor. 1.09 (en ligne le 27/11) : profil or (XAUUSD) avec second trade et stop du trade 1 remonté, feu rouge US100 / SP500 désactivable (bouton FEU ROUGE). 1.08 : Telegram / WhatsApp par le relais du serveur si MT5 échoue. |
 | DeskUS_Bridge (MT5, données) | **1.06** | oui | Exporte aussi US30 et XAUUSD pour les backtests. |
-| Application web | — | oui (or et feu rouge en ligne le 27/11) | Prête : or, second trade, colonne « Feu » et filtres du journal, statistiques et bornes d'alarme sur 3 ans. **Onglet Simulateur (challenge FTMO à plusieurs comptes, compte propre) prêt sur la branche, pas encore en ligne.** |
+| Application web | — | oui (or et feu rouge en ligne le 27/11) | Prête : or, second trade, colonne « Feu » et filtres du journal, statistiques et bornes d'alarme sur 3 ans. **Onglet Simulateur (challenge FTMO à plusieurs comptes, compte propre) en ligne le 27/11.** |
 | Base Supabase | — | — | Plan gratuit : 133 Mo / 500 Mo (projet partagé avec une autre application). |
 | Moteur de backtest `desk-bt-m1` | **v14** | — | v14 : chemin du prix et 34 gestions de sortie (backtests.md 4 quaterdecies). v13 : second trade. |
 | (ancien) moteur | v11 | — | Séance paramétrable (Londres / New York) ; structure M5 avec exécution M1 (`tf=5`) ; historique M5 sur 3 ans (`src=M5`). Vérifié : redonne les trades de référence. |
