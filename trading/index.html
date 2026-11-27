@@ -27,6 +27,7 @@
   </div>
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="jour" aria-selected="true">Aujourd'hui</button>
+    <button role="tab" data-tab="compte" aria-selected="false">Mon compte</button>
     <button role="tab" data-tab="journal" aria-selected="false">Journal</button>
     <button role="tab" data-tab="suivi" aria-selected="false">Suivi du test</button>
     <button role="tab" data-tab="regles" aria-selected="false">Règles</button>
@@ -45,6 +46,11 @@
       <div class="card c12" id="newsCard"></div>
       <div class="card c12" id="ftmoCard"></div>
     </div>
+  </section>
+
+  <!-- ================= MON COMPTE ================= -->
+  <section class="tab" id="tab-compte">
+    <div class="grid" id="compteBody"></div>
   </section>
 
   <!-- ================= JOURNAL ================= -->
@@ -93,6 +99,7 @@
           <li>Ouvrir <b>un graphique M1 par indice</b> (US100.cash, US500.cash) et glisser Desk Key sur chacun : le profil se choisit tout seul et refuse un symbole qui ne correspond pas.</li>
           <li>Cocher « Autoriser le trading algorithmique » (nécessaire même pour l'exécution en une touche) et régler le risque par trade.</li>
           <li>Touche <b>K</b> : placer l'ordre (ou l'armer avant 10:00 NY) · <b>X</b> : annuler · bouton <b>–</b> : réduire le panneau · <b>HISTO</b> : setups passés sur le graphique · <b>PÉRIODE</b> : 7, 30, 90 ou 250 séances.</li>
+          <li><b>RISQUE</b> : montant, % du solde ou lot fixe, réglable dans le panneau (– / + ou saisie). <b>TESTER LES NOTIFS</b> : notification sur le téléphone (application MT5), Telegram ou WhatsApp. Mode d'emploi : <a href="docs/regles.md">règles, section Notifications</a>.</li>
         </ol>
         <p class="hint">Desk Key envoie ses setups ici tout seul (même adresse autorisée que le robot DeskUS_Bridge). Le mode automatique est désactivé par défaut.</p>
         <h3>Préférences d'affichage</h3>
