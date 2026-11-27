@@ -253,6 +253,83 @@
       }).join('')}</tbody></table></div>` : ''}`;
   }
 
+  /* ================= Mon compte ================= */
+  // risque par trade : celui réglé dans Desk Key (envoyé avec le setup du jour), sinon celui des Réglages
+  function riskNow() {
+    const live = SETUPS.filter(s => s.data && s.data.live && num(s.data.rUsd) > 0).sort((a, b) => (b.date > a.date) - (b.date < a.date))[0];
+    return live ? { usd: num(live.data.rUsd), src: 'Desk Key', mode: live.data.rMode, val: num(live.data.rVal) } : { usd: PREF.risk, src: 'Réglages', mode: 0, val: PREF.risk };
+  }
+  function timeSvg(series, fmtY, base, W) {
+    W = Math.max(300, Math.round(W || 900)); const H = W < 600 ? 220 : 260, pl = 62, pr = 10, pt = 12, pb = 26;
+    const all = series.flatMap(s => s.pts);
+    if (all.length < 2) return '';
+    const t0 = Math.min(...all.map(p => p[0])), t1 = Math.max(t0 + 3600, ...all.map(p => p[0]));
+    let lo = Math.min(base, ...all.map(p => p[1])), hi = Math.max(base, ...all.map(p => p[1]));
+    const padY = Math.max(1, (hi - lo) * 0.08); lo -= padY; hi += padY;
+    const X = t => pl + (W - pl - pr) * (t - t0) / (t1 - t0), Y = v => pt + (H - pt - pb) * (hi - v) / (hi - lo);
+    let g = `<line x1="${pl}" x2="${W - pr}" y1="${Y(base)}" y2="${Y(base)}" stroke="var(--line)" stroke-dasharray="4 4"/>`;
+    const stepY = Math.pow(10, Math.floor(Math.log10((hi - lo) / 4))), k = Math.ceil((hi - lo) / 4 / stepY) * stepY;
+    for (let v = Math.ceil(lo / k) * k; v <= hi; v += k) g += `<text x="${pl - 8}" y="${Y(v) + 4}" fill="var(--faint)" font-size="11" text-anchor="end">${esc(fmtY(v))}</text>`;
+    for (let i = 0; i <= 4; i++) { const t = t0 + (t1 - t0) * i / 4, p = partsIn(TZP, new Date(t * 1000)); g += `<text x="${X(t)}" y="${H - 6}" fill="var(--faint)" font-size="11" text-anchor="${i === 0 ? 'start' : i === 4 ? 'end' : 'middle'}">${pad(p.d)}/${pad(p.m)}</text>`; }
+    series.forEach(s => {
+      if (s.pts.length < 2) return;
+      const d = s.step ? s.pts.map((p, i) => (i ? `L${X(p[0])},${Y(s.pts[i - 1][1])}L` : 'M') + X(p[0]) + ',' + Y(p[1])).join('') : 'M' + s.pts.map(p => X(p[0]) + ',' + Y(p[1])).join('L');
+      g += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.w || 2}" ${s.dash ? `stroke-dasharray="${s.dash}"` : ''}/>`;
+    });
+    return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;max-width:${W}px">${g}</svg>`;
+  }
+  function renderCompte() {
+    const box = $('#compteBody');
+    if (!LIVE.key) { box.innerHTML = '<div class="card c12"><p class="muted" style="margin:0">Connectez MT5 (Réglages) pour suivre votre compte. <button class="btn small" data-goto="reglages">Connecter MT5</button></p></div>'; return; }
+    const F = ftmoNumbers();
+    if (!F) { box.innerHTML = `<div class="card c12"><p class="muted" style="margin:0">En attente des données du robot DeskUS_Bridge… ${esc(LIVE.err)}</p></div>`; return; }
+    const a = F.a, init = F.init, total = a.eq - init, now = Date.now() / 1000;
+    const trades = LIVE.trades.map(r => r.data).filter(t => t && isFinite(t.tc)).sort((x, y) => x.tc - y.tc);
+    const linked = new Map(SETUPS.filter(s => s.data.pris).map(s => [String(s.data.pris.id), s]));
+    const dkT = trades.filter(t => linked.has(String(t.id))), hoT = trades.filter(t => !linked.has(String(t.id)));
+    const sum = (arr, f) => arr.reduce((x, y) => x + (f(y) || 0), 0);
+    const dkNet = sum(dkT, t => t.net), hoNet = sum(hoT, t => t.net), other = total - dkNet - hoNet - (a.pl || 0);
+    const R = riskNow();
+    // --- KPIs
+    const kpi = (l, v, c = '') => `<div class="kpi"><small>${l}</small><b class="${c}">${v}</b></div>`;
+    const pctOf = v => (v >= 0 ? '+' : '−') + fmtN(Math.abs(v / init * 100), 2) + ' %';
+    let html = `<div class="card c12"><h2>Mon compte<span class="spacer"></span><span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">${liveOn() ? 'en direct' : 'dernière donnée il y a ' + dur(liveAge() * 1000)}</span></h2>
+      <div class="res" style="margin-top:0">${kpi('Capital de départ', fmtE(init))}${kpi('Équité', fmtE(a.eq))}${kpi('Total réel', fmtM(total) + ' <small>' + pctOf(total) + '</small>', cls(total))}${kpi('Résultat du jour', fmtM(a.eq - F.dayStart), cls(a.eq - F.dayStart))}</div>
+      <h3>D'où vient le total</h3>
+      <div class="res" style="margin-top:6px">${kpi('Trades Desk Key (' + dkT.length + ')', fmtM(dkNet), cls(dkNet))}${kpi('Trades hors Desk Key (' + hoT.length + ')', fmtM(hoNet), cls(hoNet))}${kpi('Flottant', fmtM(a.pl || 0), cls(a.pl))}${Math.abs(other) >= 1 ? kpi('Avant le suivi / ajustements', fmtM(other), cls(other)) : ''}</div>
+      <p class="hint">Total réel = équité − capital de départ : il compte tout (trades Desk Key, trades à la main, frais, swaps). « Avant le suivi » = trades plus anciens que l'historique envoyé par DeskUS_Bridge.</p></div>`;
+    // --- objectif et marges, au risque actuel
+    const r = R.usd, need = F.target > 0 ? Math.max(0, init + F.target - a.bal) : NaN;
+    const wins = r > 0 && isFinite(need) ? Math.ceil(need / (r * PREF.tp)) : NaN, losses = r > 0 ? Math.floor(F.maxLeft / r) : NaN, dayL = r > 0 ? Math.floor(F.dayLeft / r) : NaN;
+    html += `<div class="card c12"><h2>Au risque actuel : ${fmtE(r)} par trade <small class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">(${R.src === 'Desk Key' ? 'réglé dans Desk Key' : 'Réglages de l\'appli, en attendant Desk Key 1.06'} · ${fmtN(r / init * 100, 2)} % du capital)</small></h2>
+      <div class="res" style="margin-top:0">${F.target > 0 ? kpi('Reste pour l\'objectif', fmtE(need)) + kpi('Gagnants à ' + PREF.tp + 'R nécessaires', isFinite(wins) ? wins : '—') : ''}${kpi('Pertes avant la perte max', isFinite(losses) ? losses : '—', losses <= 6 ? 'bear' : '')}${kpi('Pertes possibles aujourd\'hui', isFinite(dayL) ? Math.max(0, dayL) : '—', dayL < 2 ? 'bear' : '')}</div>
+      <p class="hint">Backtest (les deux indices) : séries de 6 à 9 pertes d'affilée normales sur une année, 13 au pire 1 année sur 100. Avec moins de pertes possibles que ça avant la perte max, le compte peut sauter sur une série normale. Les deux indices peuvent perdre le même jour : il faut au moins 2 pertes possibles sur la journée.</p></div>`;
+    // --- courbes : equity réelle contre règle
+    const live = SETUPS.filter(s => s.data.live && s.data.etat === 'rempli' && s.data.fini && isFinite(resOf(s.data)) && isFinite(s.data.fill)).sort((x, y) => x.data.fill - y.data.fill);
+    const starts = [trades.length ? trades[0].to || trades[0].tc : Infinity, live.length ? live[0].data.fill : Infinity];
+    const T0 = Math.min(...starts) - 3600;
+    if (!isFinite(T0)) { box.innerHTML = html + '<div class="card c12"><h2>Mon equity contre la règle</h2><p class="muted" style="margin:0">Les courbes apparaîtront avec le premier trade clôturé ou la première entrée de la règle vue en direct par Desk Key.</p></div>'; return; }
+    const inP = trades.filter(t => t.tc >= T0);
+    let bal0 = a.bal - sum(inP, t => t.net), acc = bal0;
+    const real = [[T0, bal0]]; inP.forEach(t => { acc += t.net; real.push([t.tc, acc]); }); real.push([now, a.eq]);
+    let rv = bal0; const rule = [[T0, bal0]]; live.forEach(s => { rv += resOf(s.data) * r; rule.push([s.data.fill, rv]); }); rule.push([now, rv]);
+    const notTaken = sum(live.filter(s => !s.data.pris), s => resOf(s.data) * r);
+    const takenRule = sum(live.filter(s => s.data.pris), s => resOf(s.data) * r);
+    const takenReal = sum(live.filter(s => s.data.pris), s => { const x = realOf(s.data); return x && !x.open ? x.net : 0; });
+    // la règle au risque réellement pris sur chaque trade (pour séparer exécution et taille de position)
+    const takenRuleReal = sum(live.filter(s => s.data.pris), s => { const x = realOf(s.data); const ru = x && !x.open && isFinite(x.r) && Math.abs(x.r) > 0.05 ? Math.abs(x.net / x.r) : r; return resOf(s.data) * ru; });
+    const hoP = sum(inP.filter(t => !linked.has(String(t.id))), t => t.net);
+    const gapReal = a.eq - bal0, gapRule = rv - bal0;
+    html += `<div class="card c12"><h2>Mon equity contre la règle</h2>
+      ${timeSvg([{ pts: rule, color: 'var(--accent)', w: 2, dash: '6 4', step: true }, { pts: real, color: 'var(--bull)', w: 2.4, step: true }], v => Math.round(v).toLocaleString('fr-FR'), bal0, box.clientWidth - 36)}
+      <p class="hint" style="margin-top:0"><span class="dotc" style="background:var(--bull)"></span>Mon equity réelle &nbsp; <span class="dotc" style="background:var(--accent)"></span>La règle (entrées vues en direct par Desk Key × ${fmtE(r)}, objectif ${PREF.tp}R) · depuis le ${dateFr(new Date(T0 * 1000).toISOString().slice(0, 10))}</p>
+      <div class="res">${kpi('Mon résultat', fmtM(gapReal), cls(gapReal))}${kpi('La règle', fmtM(gapRule), cls(gapRule))}${kpi('Écart', fmtM(gapReal - gapRule), cls(gapReal - gapRule))}</div>
+      <h3>Explication de l'écart</h3>
+      <div class="res" style="margin-top:6px">${kpi('Entrées de la règle non prises (' + live.filter(s => !s.data.pris).length + ')', fmtM(-notTaken), cls(-notTaken))}${kpi('Trades pris : exécution', fmtM(takenReal - takenRuleReal), cls(takenReal - takenRuleReal))}${Math.abs(takenRuleReal - takenRule) >= 1 ? kpi('Trades pris : risque ≠ ' + fmtE(r), fmtM(takenRuleReal - takenRule), cls(takenRuleReal - takenRule)) : ''}${kpi('Trades hors Desk Key', fmtM(hoP), cls(hoP))}${kpi('Flottant', fmtM(a.pl || 0), cls(a.pl))}</div>
+      <p class="hint">« Exécution » : sur les trades pris, résultat réel moins résultat de la règle au même risque (glissement, spread, lot arrondi, sortie différente). « Risque ≠ » : ces trades ont été pris avec un autre risque que ${fmtE(r)}. La règle ne compte que les jours suivis en direct (pas l'historique recalculé).</p></div>`;
+    box.innerHTML = html;
+  }
+
   /* ================= Journal ================= */
   function filteredSetups() {
     const prof = $('#jProfile').value, days = +$('#jPeriod').value, type = $('#jType').value;
@@ -552,12 +629,14 @@
   function renderAll() {
     renderTop();
     if (active('jour')) { renderSession(); renderProfiles(); renderNews(); renderFtmo(); }
+    if (active('compte')) renderCompte();
     if (active('journal')) renderJournal();
     if (active('suivi')) renderSuivi();
     if (active('regles')) renderRules();
     if (active('reglages')) renderMt5Settings();
   }
 
+  let rsz = 0; window.addEventListener('resize', () => { clearTimeout(rsz); rsz = setTimeout(() => { if (active('compte')) renderCompte(); }, 250); });
   initPrefs();
   const savedTab = store.get('dk.tab', 'jour');
   if ($('#tab-' + savedTab)) showTab(savedTab); else renderAll();

@@ -1,6 +1,6 @@
 # Règles de trading Desk US — référence A
 
-*Version du 27 novembre 2026 (Desk Key 1.05, nouvelle application). Règles validées par le backtest M1 FTMO (décembre 2025 – novembre 2026). Les chiffres détaillés sont dans [backtests.md](backtests.md).*
+*Version du 27 novembre 2026 (Desk Key 1.06, nouvelle application). Règles validées par le backtest M1 FTMO (décembre 2025 – novembre 2026). Les chiffres détaillés sont dans [backtests.md](backtests.md).*
 
 > **Un indice = un profil = un graphique.** On ne mélange jamais les règles de l'US100 et du SP500.
 
@@ -70,7 +70,7 @@ Fichier : `trading/mt5/DeskUS_Key.mq5`.
 2. Ouvrir **un graphique M1 de US100.cash** et **un graphique M1 de US500.cash** (deux graphiques séparés).
 3. Glisser Desk Key sur chaque graphique. Le profil se choisit tout seul d'après le symbole. Il refuse de démarrer si le profil ne correspond pas au symbole.
 4. Cocher **« Autoriser le trading algorithmique »** dans les réglages de Desk Key, et activer le bouton **Algo Trading** de MT5. C'est nécessaire même pour l'exécution manuelle en une touche.
-5. Régler le **risque par trade** : montant, pourcentage du solde ou lot fixe.
+5. Régler le **risque par trade** directement dans le panneau (voir « Money management » ci-dessous).
 
 ### Utilisation
 - Le panneau affiche chaque condition dans l'ordre : tendance du jour → Judas → cassure (avec la règle propre à l'indice) → ordre (prix, SL, TP, lot, risque en devise du compte) → état.
@@ -86,12 +86,43 @@ Fichier : `trading/mt5/DeskUS_Key.mq5`.
   - La limite vient des bougies M1 que MT5 garde : il faut environ 60 jours de plus que la période (tendance H4 et Daily). Si la ligne indique « M1 disponible : N séances », mettre **Outils → Options → Graphiques → Barres max dans le graphique = Illimité**, redémarrer MT5, puis faire défiler le graphique M1 vers la gauche pour charger l'historique.
 - **Rangée des 7 jours** (sous les boutons) : un bouton par jour, du plus récent au plus ancien ; un clic amène le graphique sur la séance de ce jour, quelle que soit l'unité de temps. Vert = gagnant, rouge = perdant, gris = pas de trade : « manqué » (setup valide, 50 % pas touché avant 11:00 NY), « < 10h » (50 % touché avant 10:00 NY), « tendance » (pas de sens du jour), « rien » (pas de Judas ou pas de cassure valide). En mode réduit, le résumé tient sur une ligne.
 - Boutons **2R / 2,5R / 3R** : choix de l'objectif.
+- **Money management** (rangée RISQUE du panneau) :
+  - bouton **RISQUE** : montant fixe → % du solde → lot fixe (le risque est converti pour rester à peu près le même) ;
+  - **–** / **+** ou saisie directe de la valeur dans la case blanche (Entrée pour valider) ;
+  - le réglage est **commun au compte** : changé sur le graphique US100, il s'applique aussi au SP500 dans la seconde. Il est gardé quand MT5 redémarre. Si on modifie le risque dans les paramètres du robot (F7), c'est cette valeur qui reprend la main ;
+  - un ordre en attente est remis tout de suite avec le nouveau lot ; une position ouverte n'est pas touchée ;
+  - la ligne au-dessus des boutons donne le risque en % du capital de départ, la perte si les deux indices perdent le même jour (comparée à la limite FTMO du jour) et le nombre de pertes avant la perte max. Vert : confortable ; orange : agressif ; rouge : deux pertes le même jour peuvent dépasser la limite du jour. Les limites se règlent dans les paramètres (5 % et 10 % par défaut).
 - Bouton **AUTO** : mode automatique, désactivé par défaut. À n'activer que si la prop firm l'autorise.
 - Gestion faite par Desk Key :
   - l'ordre suit le 50 % quand la jambe s'allonge, avec le lot recalculé ;
   - il est annulé à 11:00 NY s'il n'est pas rempli ;
   - la position est fermée à 13:00 NY (réglage modifiable).
 - Chaque profil a son **numéro magique** : US100 = 7710100, SP500 = 7710500. Le commentaire de l'ordre indique le profil (« DeskKey US100 3R »), pour le suivi dans le journal.
+
+### Notifications
+Desk Key prévient à chaque étape importante, une seule fois par jour et par événement (même si MT5 redémarre) :
+- **SETUP PRÊT** : sens, prix limite, SL, TP, lot, risque, heure de départ, mode AUTO ou manuel, protection annonces ;
+- **ORDRE PLACÉ**, **EN POSITION** (rempli), **SORTIE** (TP, stop, 13:00 NY ou à la main, avec le résultat et l'équité) ;
+- ordre annulé à 11:00 NY ou setup annulé (50 % touché avant 10:00 NY) ;
+- **problème** : ordre refusé par le serveur, lot impossible ;
+- en option (réglage « Aussi le sens du jour et le Judas ») : le sens du jour à 9:25 NY et le Judas.
+
+Canaux, à choisir dans les paramètres de Desk Key (onglet Paramètres, groupe « Notifications ») :
+1. **Téléphone, application MT5** (activé par défaut, gratuit, rien à installer de plus) :
+   - sur le téléphone, application MetaTrader 5 → Paramètres → **Messages** : noter le **MetaQuotes ID** ;
+   - sur l'ordinateur, MT5 → **Outils → Options → Notifications** : cocher « Activer les notifications Push », coller l'ID, cliquer **Test**.
+2. **Telegram** (son personnalisable, idéal pour attirer l'attention) :
+   - dans Telegram, écrire à **@BotFather**, commande `/newbot`, récupérer le **jeton** du bot ; envoyer un premier message à ce bot ;
+   - récupérer son **identifiant de chat** (par exemple avec @userinfobot) ;
+   - coller le jeton et l'identifiant dans Desk Key ; ajouter `https://api.telegram.org` dans **Outils → Options → Expert Advisors → Autoriser WebRequest** ;
+   - dans Telegram, choisir une sonnerie forte pour la conversation du bot.
+3. **WhatsApp** par le service gratuit **CallMeBot** (service tiers : les messages passent par lui) :
+   - suivre la page WhatsApp de callmebot.com : ajouter leur numéro à ses contacts, leur envoyer le message d'autorisation, recevoir la **clé** ;
+   - remplir le numéro (format +33612345678) et la clé dans Desk Key ; ajouter `https://api.callmebot.com` dans la liste WebRequest ;
+   - dans WhatsApp, donner une sonnerie personnalisée à ce contact.
+4. **Ordinateur** : fenêtre d'alerte et son de MT5 pour les messages importants.
+
+Le bouton **TESTER LES NOTIFS** du panneau envoie un message de test sur tous les canaux activés. Une erreur éventuelle (adresse non autorisée, ID manquant) s'affiche dans l'onglet **Experts** de MT5.
 
 ### Envoi vers l'application
 - Desk Key envoie chaque setup (pré-marché, Judas, cassure, entrée, SL, TP 2R / 2,5R / 3R, lot, état, résultat simulé) à l'application Desk US : le jour même en direct, les jours de la période au démarrage, et toute la période à chaque changement avec le bouton PÉRIODE (envoi par paquets de 25 jours). Le Journal de l'application peut ainsi remonter jusqu'à un an.
@@ -101,6 +132,10 @@ Fichier : `trading/mt5/DeskUS_Key.mq5`.
 ## 7. L'application Desk US
 
 - **Aujourd'hui** : déroulé de la séance en heure de Paris, setup du jour de chaque actif (tendance, Judas, cassure, ordre, lot, état), annonces économiques, compte FTMO.
+- **Mon compte** :
+  - total réel = équité − capital de départ (en $ et en %), avec son détail : trades Desk Key, trades hors Desk Key, flottant, trades plus anciens que le suivi ;
+  - au risque réglé dans Desk Key : ce qui reste pour l'objectif, le nombre de gagnants nécessaires, les pertes possibles avant la perte max et sur la journée ;
+  - deux courbes : mon equity réelle et la règle (entrées vues en direct × risque actuel), puis l'explication de l'écart : entrées non prises, exécution, risque différent, trades hors Desk Key, flottant.
 - **Journal** : un jour = une ligne par actif, avec les niveaux, le résultat de la règle et le trade réel ; filtres (pris, ratés…) et export CSV.
 - **Suivi du test** : win rate, R, séries de pertes et creux de chaque actif comparés aux bornes du backtest (« dans la norme », « à surveiller », « alarme »).
 - **Règles** : règles et résultats de backtest de chaque actif.

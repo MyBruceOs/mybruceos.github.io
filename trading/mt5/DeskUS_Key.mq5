@@ -14,12 +14,12 @@
 //|    leur résultat), et envoie les niveaux à l'application.        |
 //+------------------------------------------------------------------+
 #property copyright "Desk US"
-#property version   "1.05"
+#property version   "1.06"
 #property description "Règle A Desk US (US100 / SP500) : détection, dessin, historique et exécution en une touche."
 
 #include <Trade\Trade.mqh>
 
-#define DK_VERSION "1.05"
+#define DK_VERSION "1.06"
 
 enum ENUM_DK_PROFIL
   {
@@ -43,7 +43,10 @@ enum ENUM_DK_HEURE
 
 input ENUM_DK_PROFIL InpProfil      = PROFIL_AUTO;     // Profil (un graphique = un indice)
 input ENUM_DK_RISQUE InpRisqueMode  = RISQUE_MONTANT;  // Calcul du lot
-input double         InpRisque      = 1000;            // Risque par trade (montant ou %) ou lot fixe
+input double         InpRisque      = 1000;            // Risque par trade (montant ou %) ou lot fixe · modifiable dans le panneau
+input double         InpFtmoJour    = 5;               // FTMO : perte max du jour (% du capital de départ), pour l'avertissement du risque
+input double         InpFtmoMax     = 10;              // FTMO : perte max totale (% du capital de départ)
+input double         InpCapital     = 0;               // Capital de départ (0 = lu dans les dépôts du compte)
 input double         InpTP          = 3.0;             // Objectif en R (2, 2.5 ou 3)
 input string         InpTouche      = "K";             // Touche : placer l'ordre (ou l'armer avant 10:00 NY)
 input string         InpToucheAnnul = "X";             // Touche : annuler l'ordre en attente
@@ -58,6 +61,14 @@ input bool           InpEnvoyer     = true;            // Envoyer les setups à 
 input string         InpKey         = "";              // Clé Desk US (vide = reprise du robot DeskUS_Bridge)
 input ENUM_DK_HEURE  InpHeure       = HEURE_AUTO;      // Heure du serveur
 input int            InpCoin        = 0;               // Coin du panneau (0 = haut gauche, 1 = haut droit)
+input group          "Notifications"
+input bool           InpNotifPush   = true;            // Notification sur le téléphone (application MT5, MetaQuotes ID)
+input bool           InpNotifTout   = false;           // Aussi le sens du jour et le Judas (sinon : setup prêt, ordre, entrée, sortie)
+input bool           InpAlertePC    = true;            // Fenêtre d'alerte et son sur l'ordinateur
+input string         InpTgToken     = "";              // Telegram : jeton du bot (vide = pas de Telegram)
+input string         InpTgChat      = "";              // Telegram : identifiant du chat
+input string         InpWaPhone     = "";              // WhatsApp (CallMeBot) : numéro au format +33612345678 (vide = pas de WhatsApp)
+input string         InpWaApiKey    = "";              // WhatsApp (CallMeBot) : clé reçue de CallMeBot
 
 const string URL_SETUP = "https://xakrdapoxthvvqpyjuji.supabase.co/rest/v1/rpc/desk_setup_push";
 const string API_KEY   = "sb_publishable_Hzn2bTrae-TflG_HCzLVWg_QYF4l0ec";
@@ -152,6 +163,19 @@ long     g_hT[];               // 9:30 NY de chaque jour (UTC)
 int      g_hObj     = 0;       // objets dessinés pour l'historique
 int      g_histN    = 7;       // séances analysées (7, 30, 90, 250)
 string   g_hStat    = "";      // statistiques de la période
+int      g_rMode    = 0;       // money management : 0 montant, 1 % du solde, 2 lot fixe (modifiable dans le panneau)
+double   g_rVal     = 1000;
+double   g_capital  = 0;       // capital de départ (dépôts)
+int      g_notif    = 0;       // notifications déjà envoyées aujourd'hui (bits)
+string   g_notifJour = "";
+ulong    g_posSuivie = 0;      // position Desk Key en cours (pour la notification de sortie)
+// déclarations (fonctions définies plus bas)
+string Sens(int v);
+double RisqueVoulu();
+string RisqueTexte();
+string RisqueAnalyse(color &c);
+void   NotifierUneFois(int bit, string texte, bool fort);
+void   Notifier(string texte, bool fort);
 
 //+------------------------------------------------------------------+
 //| Heures                                                           |
@@ -640,8 +664,8 @@ double Lot(double entry, double sl)
   {
    double step = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP), vmin = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN), vmax = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
    if(step <= 0) step = 0.01;
-   if(InpRisqueMode == RISQUE_LOT_FIXE) return MathMax(vmin, MathMin(vmax, MathFloor(InpRisque / step) * step));
-   double risk = InpRisqueMode == RISQUE_MONTANT ? InpRisque : AccountInfoDouble(ACCOUNT_BALANCE) * InpRisque / 100.0;
+   if(g_rMode == RISQUE_LOT_FIXE) return MathMax(vmin, MathMin(vmax, MathFloor(g_rVal / step + 1e-9) * step));
+   double risk = RisqueVoulu();
    double p = 0;
    if(!OrderCalcProfit(entry > sl ? ORDER_TYPE_BUY : ORDER_TYPE_SELL, _Symbol, 1.0, entry, sl, p) || p >= 0) return 0;
    double lots = MathFloor(risk / (-p) / step) * step;
@@ -657,6 +681,208 @@ double RisqueArgent(double entry, double sl, double lots)
 double TpPrix(Setup &s, int dir, double r) { return s.entry + dir * r * MathAbs(s.entry - s.sl); }
 
 void Msg(string s) { g_msg = s; g_msgT = TimeLocal(); Print("Desk Key ", P.nom, " : ", s); }
+
+//+------------------------------------------------------------------+
+//| Money management (panneau, commun aux graphiques du compte)      |
+//+------------------------------------------------------------------+
+string GvNom(string k) { return "DK_" + I(AccountInfoInteger(ACCOUNT_LOGIN)) + "_" + k; }
+double RisqueVoulu() { return g_rMode == RISQUE_MONTANT ? g_rVal : (g_rMode == RISQUE_POURCENT ? AccountInfoDouble(ACCOUNT_BALANCE) * g_rVal / 100.0 : 0); }
+double BorneRisque(int mode, double v)
+  {
+   if(mode == RISQUE_POURCENT) return MathMax(0.05, MathMin(20, NormalizeDouble(v, 2)));
+   if(mode == RISQUE_LOT_FIXE) return MathMax(0.01, MathMin(500, NormalizeDouble(v, 2)));
+   return MathMax(10, MathMin(1e7, MathRound(v)));
+  }
+// au démarrage : le réglage du panneau est gardé, sauf si les paramètres du robot ont été modifiés (F7)
+void ChargerRisque()
+  {
+   int im = (int)InpRisqueMode; double iv = BorneRisque(im, InpRisque);
+   bool connu = GlobalVariableCheck(GvNom("rm")) && GlobalVariableCheck(GvNom("rv"));
+   bool inputsChanges = !GlobalVariableCheck(GvNom("im")) || (int)GlobalVariableGet(GvNom("im")) != im || MathAbs(GlobalVariableGet(GvNom("iv")) - iv) > 1e-9;
+   if(connu && !inputsChanges) { g_rMode = (int)GlobalVariableGet(GvNom("rm")); g_rVal = BorneRisque(g_rMode, GlobalVariableGet(GvNom("rv"))); }
+   else { g_rMode = im; g_rVal = iv; }
+   GlobalVariableSet(GvNom("im"), im); GlobalVariableSet(GvNom("iv"), iv);
+   SauverRisque();
+  }
+void SauverRisque() { GlobalVariableSet(GvNom("rm"), g_rMode); GlobalVariableSet(GvNom("rv"), g_rVal); }
+// un changement fait sur l'autre graphique (autre indice) est repris ici
+bool SuivreRisque()
+  {
+   if(!GlobalVariableCheck(GvNom("rm"))) return false;
+   int m = (int)GlobalVariableGet(GvNom("rm")); double v = GlobalVariableGet(GvNom("rv"));
+   if(m == g_rMode && MathAbs(v - g_rVal) < 1e-9) return false;
+   g_rMode = m; g_rVal = BorneRisque(m, v);
+   return true;
+  }
+void ChangerRisque(int mode, double v)
+  {
+   double bal = AccountInfoDouble(ACCOUNT_BALANCE);
+   if(mode != g_rMode)   // conversion pour garder à peu près le même risque
+     {
+      double argent = RisqueVoulu();
+      if(g_rMode == RISQUE_LOT_FIXE) argent = 0;
+      if(mode == RISQUE_POURCENT) v = argent > 0 && bal > 0 ? argent / bal * 100.0 : 1.0;
+      else if(mode == RISQUE_MONTANT) v = argent > 0 ? argent : bal * 0.01;
+      else v = S.ok ? Lot(NormPx(S.entry), NormPx(S.sl)) : 1.0;
+     }
+   g_rMode = mode; g_rVal = BorneRisque(mode, v);
+   SauverRisque();
+   Msg("risque par trade : " + RisqueTexte());
+  }
+double PasRisque() { return g_rMode == RISQUE_POURCENT ? (g_rVal < 1 ? 0.1 : 0.25) : (g_rMode == RISQUE_LOT_FIXE ? (g_rVal < 1 ? 0.01 : 0.1) : (g_rVal < 1000 ? 50 : 250)); }
+string RisqueTexte()
+  {
+   string cur = AccountInfoString(ACCOUNT_CURRENCY);
+   if(g_rMode == RISQUE_POURCENT) return Fr(g_rVal, 2) + " % du solde (" + Fr(RisqueVoulu(), 0) + " " + cur + ")";
+   if(g_rMode == RISQUE_LOT_FIXE) return Fr(g_rVal, 2) + " lot fixe";
+   return Fr(g_rVal, 0) + " " + cur;
+  }
+double CapitalDepart()
+  {
+   if(InpCapital > 0) return InpCapital;
+   if(g_capital > 0) return g_capital;
+   double sum = 0;
+   if(HistorySelect(0, TimeTradeServer() + 86400))
+      for(int i = 0; i < HistoryDealsTotal(); i++)
+        {
+         ulong tk = HistoryDealGetTicket(i);
+         if(tk != 0 && (ENUM_DEAL_TYPE)HistoryDealGetInteger(tk, DEAL_TYPE) == DEAL_TYPE_BALANCE) sum += HistoryDealGetDouble(tk, DEAL_PROFIT);
+        }
+   g_capital = sum > 0 ? sum : AccountInfoDouble(ACCOUNT_BALANCE);
+   return g_capital;
+  }
+// ligne du panneau : risque en argent, pire jour (les 2 indices perdants), pertes avant la perte max
+string RisqueAnalyse(color &c)
+  {
+   double cap = CapitalDepart(), eq = AccountInfoDouble(ACCOUNT_EQUITY);
+   double r = RisqueVoulu();
+   if(g_rMode == RISQUE_LOT_FIXE && S.ok) r = RisqueArgent(NormPx(S.entry), NormPx(S.sl), Lot(NormPx(S.entry), NormPx(S.sl)));
+   c = clrSilver;
+   if(r <= 0 || cap <= 0) return "Risque : " + RisqueTexte();
+   double jour = cap * InpFtmoJour / 100.0, plancher = cap * (1 - InpFtmoMax / 100.0);
+   int avant = (int)MathFloor((eq - plancher) / r);
+   double pire = 2 * r / cap * 100.0;
+   if(r >= jour || 2 * r >= jour) c = clrTomato; else if(2 * r >= 0.5 * jour || avant <= 6) c = clrOrange; else c = clrMediumSeaGreen;
+   return "Risque " + Fr(r / cap * 100.0, 2) + " % · 2 pertes le même jour : −" + Fr(pire, 1) + " % (limite jour " + Fr(InpFtmoJour, 0) + " %) · "
+          + I(MathMax(0, avant)) + " pertes avant la perte max";
+  }
+
+//+------------------------------------------------------------------+
+//| Notifications (téléphone MT5, Telegram, WhatsApp, ordinateur)    |
+//+------------------------------------------------------------------+
+#define N_SENS    1
+#define N_JUDAS   2
+#define N_PRET    4
+#define N_ORDRE   8
+#define N_REMPLI  16
+#define N_SORTIE  32
+#define N_ANNULE  64
+#define N_AVANT10 128
+string UrlEnc(string s)
+  {
+   uchar b[]; int n = StringToCharArray(s, b, 0, WHOLE_ARRAY, CP_UTF8);
+   string o = "";
+   for(int i = 0; i < n; i++)
+     {
+      uchar c = b[i];
+      if(c == 0) break;
+      if((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' || c == '~') o += CharToString(c);
+      else o += StringFormat("%%%02X", c);
+     }
+   return o;
+  }
+bool HttpGet(string url, string quoi)
+  {
+   char data[], res[]; string rh;
+   ResetLastError();
+   int code = WebRequest("GET", url, "", 8000, data, res, rh);
+   if(code == 200) return true;
+   if(code == -1 && GetLastError() == 4014) Print("Desk Key : ajoutez l'adresse de ", quoi, " dans Outils > Options > Expert Advisors > WebRequest");
+   else Print("Desk Key : notification ", quoi, " refusée (code ", code, ") ", CharArrayToString(res));
+   return false;
+  }
+void Notifier(string texte, bool fort)
+  {
+   string m = "Desk Key " + P.nom + " · " + texte;
+   if(InpNotifPush && !MQLInfoInteger(MQL_TESTER))
+     {
+      string court = StringLen(m) > 250 ? StringSubstr(m, 0, 250) : m;
+      if(!SendNotification(court)) Print("Desk Key : notification téléphone impossible (Outils > Options > Notifications : MetaQuotes ID et case cochée), erreur ", GetLastError());
+     }
+   if(InpAlertePC && fort && !MQLInfoInteger(MQL_TESTER)) Alert(m);
+   if(MQLInfoInteger(MQL_TESTER)) { Print("[notif] ", m); return; }
+   if(InpTgToken != "" && InpTgChat != "")
+      HttpGet("https://api.telegram.org/bot" + InpTgToken + "/sendMessage?chat_id=" + UrlEnc(InpTgChat) + "&text=" + UrlEnc((fort ? "🔔 " : "") + m), "Telegram (https://api.telegram.org)");
+   if(InpWaPhone != "" && InpWaApiKey != "")
+      HttpGet("https://api.callmebot.com/whatsapp.php?phone=" + UrlEnc(InpWaPhone) + "&text=" + UrlEnc((fort ? "🔔 " : "") + m) + "&apikey=" + UrlEnc(InpWaApiKey), "WhatsApp (https://api.callmebot.com)");
+  }
+// une seule fois par jour et par événement, même si MT5 redémarre
+bool DejaNotifie(int bit)
+  {
+   string j = StringSubstr(g_jour, 0, 10);
+   if(j != g_notifJour)
+     {
+      g_notifJour = j;
+      string gv = GvNom(P.nom + "_notif_" + StringSubstr(j, 0, 4) + StringSubstr(j, 5, 2) + StringSubstr(j, 8, 2));
+      g_notif = GlobalVariableCheck(gv) ? (int)GlobalVariableGet(gv) : 0;
+     }
+   return (g_notif & bit) != 0;
+  }
+void Marquer(int bit)
+  {
+   g_notif |= bit;
+   string j = g_notifJour;
+   GlobalVariableSet(GvNom(P.nom + "_notif_" + StringSubstr(j, 0, 4) + StringSubstr(j, 5, 2) + StringSubstr(j, 8, 2)), g_notif);
+  }
+void NotifierUneFois(int bit, string texte, bool fort) { if(DejaNotifie(bit)) return; Marquer(bit); Notifier(texte, fort); }
+string ModeTexte() { return g_auto ? "AUTO : l'ordre part tout seul" : "manuel : touche " + InpTouche; }
+// suit les étapes du setup et la position du jour
+void SuivreNotifs()
+  {
+   if(!G.ok || g_jour == "") return;
+   long now = NowUtc();
+   if(InpNotifTout && G.dir != 0 && now >= G.t925 && now < G.t11)
+      NotifierUneFois(N_SENS, (G.dir > 0 ? "ACHATS" : "VENTES") + " uniquement aujourd'hui (H4 " + Sens(G.h4) + (P.daily ? ", Daily " + Sens(G.d1) : "") + ")", false);
+   if(InpNotifTout && S.sweepT > 0 && now < G.t11)
+      NotifierUneFois(N_JUDAS, "Judas fait à " + Hm(ParisLocal(S.sweepT)) + " Paris · attente de la cassure", false);
+   if(S.etape == E_PRET && now < G.t11)
+     {
+      double e = NormPx(S.entry), sl = NormPx(S.sl), lots = Lot(e, sl);
+      NotifierUneFois(N_PRET, "SETUP PRÊT · " + (G.dir > 0 ? "ACHAT" : "VENTE") + " limite " + Px(e) + " · SL " + Px(sl) + " · TP " + Px(NormPx(TpPrix(S, G.dir, g_tp))) + " (" + Fr(g_tp, 1) + "R) · "
+                      + Fr(lots, 2) + " lot · risque " + Fr(RisqueArgent(e, sl, lots), 0) + " " + AccountInfoString(ACCOUNT_CURRENCY) + " · "
+                      + (now < G.t10 ? "départ 10:00 NY (" + Hm(ParisLocal(G.t10)) + " Paris) · " : "") + ModeTexte()
+                      + (g_protect ? " · protection annonces ON" : ""), true);
+     }
+   if(S.etape == E_IGNORE && DejaNotifie(N_PRET))
+      NotifierUneFois(N_AVANT10, "setup annulé : le 50 % a été touché avant 10:00 NY (pas de trade, comme le backtest)", false);
+   ulong pos = MaPosition();
+   if(pos != 0 && g_posSuivie == 0)
+     {
+      g_posSuivie = pos;
+      if(PositionSelectByTicket(pos))
+         NotifierUneFois(N_REMPLI, "EN POSITION · " + (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY ? "achat " : "vente ") + Fr(PositionGetDouble(POSITION_VOLUME), 2) + " lot à "
+                         + Px(PositionGetDouble(POSITION_PRICE_OPEN)) + " · SL " + Px(PositionGetDouble(POSITION_SL)) + " · TP " + Px(PositionGetDouble(POSITION_TP)), true);
+     }
+   if(pos == 0 && g_posSuivie != 0)
+     {
+      ulong id = g_posSuivie; g_posSuivie = 0;
+      double net = 0; string why = "fermée";
+      if(HistorySelectByPosition(id))
+         for(int i = 0; i < HistoryDealsTotal(); i++)
+           {
+            ulong tk = HistoryDealGetTicket(i);
+            if(tk == 0) continue;
+            net += HistoryDealGetDouble(tk, DEAL_PROFIT) + HistoryDealGetDouble(tk, DEAL_COMMISSION) + HistoryDealGetDouble(tk, DEAL_SWAP) + HistoryDealGetDouble(tk, DEAL_FEE);
+            if(HistoryDealGetInteger(tk, DEAL_ENTRY) == DEAL_ENTRY_OUT)
+              {
+               long rs = HistoryDealGetInteger(tk, DEAL_REASON);
+               why = rs == DEAL_REASON_TP ? "TP touché" : (rs == DEAL_REASON_SL ? "stop touché" : (rs == DEAL_REASON_EXPERT ? "fermée par Desk Key (13:00 NY)" : "fermée à la main"));
+              }
+           }
+      NotifierUneFois(N_SORTIE, "SORTIE · " + why + " · résultat " + (net >= 0 ? "+" : "") + Fr(net, 0) + " " + AccountInfoString(ACCOUNT_CURRENCY)
+                      + " · équité " + Fr(AccountInfoDouble(ACCOUNT_EQUITY), 0), true);
+     }
+  }
 
 bool Placer()
   {
@@ -674,7 +900,13 @@ bool Placer()
      }
    double entry = NormPx(S.entry), sl = NormPx(S.sl), tp = NormPx(TpPrix(S, G.dir, g_tp));
    double lots = Lot(entry, sl);
-   if(lots <= 0) { Msg("lot impossible : risque trop faible pour le lot minimum"); return false; }
+   if(lots <= 0)
+     {
+      Msg("lot impossible : risque trop faible pour le lot minimum");
+      static datetime dernierLot = 0;
+      if(TimeLocal() - dernierLot > 600) { dernierLot = TimeLocal(); Notifier("ordre NON placé : risque trop faible pour le lot minimum", true); }
+      return false;
+     }
    string cmt = "DeskKey " + P.nom + " " + Fr(g_tp, 1) + "R";
    double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK), bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
    bool ok;
@@ -684,15 +916,23 @@ bool Placer()
      {
       g_arme = false;
       Msg((G.dir > 0 ? "ACHAT" : "VENTE") + " " + Fr(lots, 2) + " lot à " + Px(entry) + " · SL " + Px(sl) + " · TP " + Px(tp));
+      NotifierUneFois(N_ORDRE, "ORDRE PLACÉ · " + (G.dir > 0 ? "achat" : "vente") + " limite " + Px(entry) + " · " + Fr(lots, 2) + " lot · SL " + Px(sl) + " · TP " + Px(tp)
+                      + " · annulé à 11:00 NY s'il n'est pas rempli", false);
       return true;
      }
    Msg("refusé par le serveur : " + trade.ResultRetcodeDescription());
+   static datetime dernierRefus = 0;
+   if(TimeLocal() - dernierRefus > 600) { dernierRefus = TimeLocal(); Notifier("ORDRE REFUSÉ par le serveur : " + trade.ResultRetcodeDescription() + " · vérifiez MT5 (Algo Trading activé ?)", true); }
    return false;
   }
 void Annuler(string pourquoi)
   {
    ulong tk = MonOrdre();
-   if(tk != 0 && trade.OrderDelete(tk)) Msg("ordre annulé (" + pourquoi + ")");
+   if(tk != 0 && trade.OrderDelete(tk))
+     {
+      Msg("ordre annulé (" + pourquoi + ")");
+      if(pourquoi != "à votre demande") NotifierUneFois(N_ANNULE, "ordre annulé : " + pourquoi, false);
+     }
    g_arme = false;
   }
 
@@ -719,7 +959,12 @@ void Gerer()
          double px = OrderGetDouble(ORDER_PRICE_OPEN);
          double ts = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
          if(MathAbs(px - NormPx(S.entry)) >= ts)
-            if(trade.OrderDelete(ord)) { Msg("la jambe s'allonge : ordre déplacé au nouveau 50 %"); Placer(); }
+           { if(trade.OrderDelete(ord)) { Msg("la jambe s'allonge : ordre déplacé au nouveau 50 %"); Placer(); } }
+         else
+           {
+            double lv = Lot(NormPx(S.entry), NormPx(S.sl));
+            if(lv > 0 && MathAbs(OrderGetDouble(ORDER_VOLUME_CURRENT) - lv) > 1e-6 && trade.OrderDelete(ord)) { Msg("risque modifié : ordre remis avec " + Fr(lv, 2) + " lot"); Placer(); }
+           }
         }
       return;
      }
@@ -770,6 +1015,7 @@ string SetupJson(Ctx &c, Setup &s, bool aujourdhui)
       if(pid != 0) j += ",\"pris\":{\"id\":" + I(pid) + ",\"vol\":" + N(vol, 2) + ",\"px\":" + N(px, dg) + ",\"tpR\":" + N(g_tp, 1) + "}";
       else if(MonOrdre() != 0) j += ",\"ordre\":true";
       j += ",\"auto\":" + (g_auto ? "true" : "false") + ",\"protection\":" + (g_protect ? "true" : "false");
+      j += ",\"rMode\":" + I(g_rMode) + ",\"rVal\":" + N(g_rVal, 2) + ",\"rUsd\":" + N(RisqueVoulu(), 0);
      }
    return j + "}";
   }
@@ -1068,6 +1314,22 @@ void Btn(string id, int x, int y, int w, string text, color bg, color fg, int si
    ObjectSetInteger(0, n, OBJPROP_BGCOLOR, bg); ObjectSetInteger(0, n, OBJPROP_COLOR, fg); ObjectSetInteger(0, n, OBJPROP_BORDER_COLOR, clrDimGray);
    ObjectSetInteger(0, n, OBJPROP_STATE, false); ObjectSetInteger(0, n, OBJPROP_SELECTABLE, false);
   }
+// champ de saisie (valeur du risque) : le texte n'est réécrit que si la valeur change, pour ne pas gêner la frappe
+string g_rvAff = "";
+void Edit(string id, int x, int y, int w, string text)
+  {
+   string n = PFX + "E" + id;
+   bool neuf = ObjectFind(0, n) < 0;
+   if(neuf) ObjectCreate(0, n, OBJ_EDIT, 0, 0, 0);
+   ObjectSetInteger(0, n, OBJPROP_CORNER, InpCoin == 1 ? CORNER_RIGHT_UPPER : CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, n, OBJPROP_XDISTANCE, InpCoin == 1 ? PX0 + PW - 10 - x : PX0 + 10 + x); ObjectSetInteger(0, n, OBJPROP_YDISTANCE, y);
+   ObjectSetInteger(0, n, OBJPROP_XSIZE, w); ObjectSetInteger(0, n, OBJPROP_YSIZE, 24);
+   ObjectSetString(0, n, OBJPROP_FONT, "Arial Bold"); ObjectSetInteger(0, n, OBJPROP_FONTSIZE, 10);
+   ObjectSetInteger(0, n, OBJPROP_ALIGN, ALIGN_CENTER);
+   ObjectSetInteger(0, n, OBJPROP_BGCOLOR, clrWhite); ObjectSetInteger(0, n, OBJPROP_COLOR, clrBlack); ObjectSetInteger(0, n, OBJPROP_BORDER_COLOR, clrDimGray);
+   ObjectSetInteger(0, n, OBJPROP_SELECTABLE, false);
+   if(neuf || text != g_rvAff) { ObjectSetString(0, n, OBJPROP_TEXT, text); g_rvAff = text; }
+  }
 string Sens(int v) { return v > 0 ? "haussière" : (v < 0 ? "baissière" : "neutre"); }
 color  CSens(int v) { return v > 0 ? clrMediumSeaGreen : (v < 0 ? clrTomato : clrSilver); }
 
@@ -1102,12 +1364,12 @@ void Panneau()
    int d = G.dir;
    ulong ord = MonOrdre(), pos = MaPosition();
    color ce; string etat = EtatTexte(ce);
-   int rows = g_reduit ? 3 : 16;
+   int rows = g_reduit ? 3 : 17;
    int nh = MathMin(ArraySize(g_hLab), 7);
    if(ObjectFind(0, bg) < 0) ObjectCreate(0, bg, OBJ_RECTANGLE_LABEL, 0, 0, 0);
    ObjectSetInteger(0, bg, OBJPROP_CORNER, InpCoin == 1 ? CORNER_RIGHT_UPPER : CORNER_LEFT_UPPER);
    ObjectSetInteger(0, bg, OBJPROP_XDISTANCE, InpCoin == 1 ? PX0 + PW : PX0); ObjectSetInteger(0, bg, OBJPROP_YDISTANCE, PY0);
-   ObjectSetInteger(0, bg, OBJPROP_XSIZE, PW); ObjectSetInteger(0, bg, OBJPROP_YSIZE, RowY(rows) - PY0 + (g_reduit ? 34 : (nh > 0 ? 100 : 70)));
+   ObjectSetInteger(0, bg, OBJPROP_XSIZE, PW); ObjectSetInteger(0, bg, OBJPROP_YSIZE, RowY(rows) - PY0 + (g_reduit ? 34 : (nh > 0 ? 130 : 100)));
    ObjectSetInteger(0, bg, OBJPROP_BGCOLOR, (color)0x1C1712); ObjectSetInteger(0, bg, OBJPROP_BORDER_TYPE, BORDER_FLAT);
    ObjectSetInteger(0, bg, OBJPROP_COLOR, P.couleur); ObjectSetInteger(0, bg, OBJPROP_SELECTABLE, false);
    bool pret = S.etape == E_PRET && ord == 0 && pos == 0 && !g_tradeFait && now < G.t11;
@@ -1115,12 +1377,13 @@ void Panneau()
    Btn("MIN", PW - 46, PY0 + 4, 26, g_reduit ? "+" : "–", clrDimGray, clrWhite);
    if(g_reduit)
      {
-      for(int r = 3; r <= 16; r++) ObjectDelete(0, PFX + "L" + IntegerToString(r));
+      for(int r = 3; r <= 17; r++) ObjectDelete(0, PFX + "L" + IntegerToString(r));
       ObjectDelete(0, PFX + "BPER");
+      ObjectDelete(0, PFX + "BRM"); ObjectDelete(0, PFX + "BRMOINS"); ObjectDelete(0, PFX + "BRPLUS"); ObjectDelete(0, PFX + "BRINF"); ObjectDelete(0, PFX + "BNT"); ObjectDelete(0, PFX + "ERV"); g_rvAff = "";
       for(int i = 0; i < 7; i++) ObjectDelete(0, PFX + "BD" + I(i));
       ObjectDelete(0, PFX + "BX"); ObjectDelete(0, PFX + "BAUTO"); ObjectDelete(0, PFX + "BT2"); ObjectDelete(0, PFX + "BT25"); ObjectDelete(0, PFX + "BT3"); ObjectDelete(0, PFX + "BHIS"); ObjectDelete(0, PFX + "BANN");
       Lbl(0, "DESK KEY · " + P.nom + (d > 0 ? " · ACHATS" : (d < 0 ? " · VENTES" : " · pas de trade")), P.couleur, 11, "Arial Black");
-      Lbl(1, etat, ce, 9, "Arial Bold");
+      Lbl(1, etat + " · risque " + RisqueTexte(), ce, 9, "Arial Bold");
       string rs = ""; for(int i = 0; i < nh; i++) rs += (i > 0 ? " · " : "") + g_hLab[i];
       Lbl(2, nh > 0 ? "7 j : " + rs : " ", clrSilver, 8);
       Btn("GO", 0, RowY(rows) + 4, 220, go, pret ? clrForestGreen : clrDimGray, clrWhite);
@@ -1168,6 +1431,8 @@ void Panneau()
                    : (g_lastPushT > 0 ? "Application : setups envoyés (" + TimeToString(g_lastPushT, TIME_MINUTES) + ")" : "Application : en attente"));
    Lbl(14, app, g_pushErr != "" ? clrOrange : clrDimGray, 8);
    Lbl(15, g_hStat != "" ? g_hStat : " ", clrSilver, 8);
+   color cr; string ra = RisqueAnalyse(cr);
+   Lbl(16, ra, cr, 8);
    int by = RowY(rows) + 6;
    Btn("GO", 0, by, 190, go, pret ? clrForestGreen : clrDimGray, clrWhite);
    Btn("X", 196, by, 90, "ANNULER (" + InpToucheAnnul + ")", ord != 0 || g_arme ? clrFireBrick : clrDimGray, clrWhite);
@@ -1178,9 +1443,19 @@ void Panneau()
    Btn("ANN", 196, by + 30, 90, g_protect ? "ANNONCES : OUI" : "ANNONCES : NON", g_protect ? clrSteelBlue : clrDimGray, clrWhite);
    Btn("HIS", 292, by + 30, 108, (g_histo ? "MASQUER " : "AFFICHER ") + "HISTO", g_histo ? clrSteelBlue : clrDimGray, clrWhite);
    Btn("PER", 406, by + 30, 134, "PÉRIODE : " + I(g_histN) + " J", clrSlateGray, clrWhite);
+   // money management : mode, valeur (saisie ou − / +), équivalent en argent, test des notifications
+   string nm = g_rMode == RISQUE_POURCENT ? "RISQUE : % SOLDE" : (g_rMode == RISQUE_LOT_FIXE ? "RISQUE : LOT FIXE" : "RISQUE : MONTANT");
+   Btn("RM", 0, by + 60, 130, nm, clrSlateGray, clrWhite);
+   Btn("RMOINS", 136, by + 60, 26, "–", clrDimGray, clrWhite, 11);
+   Edit("RV", 166, by + 60, 80, Fr(g_rVal, g_rMode == RISQUE_MONTANT ? 0 : 2));
+   Btn("RPLUS", 250, by + 60, 26, "+", clrDimGray, clrWhite, 11);
+   double rv = RisqueVoulu();
+   if(g_rMode == RISQUE_LOT_FIXE && S.ok) rv = RisqueArgent(NormPx(S.entry), NormPx(S.sl), Lot(NormPx(S.entry), NormPx(S.sl)));
+   Btn("RINF", 282, by + 60, 118, rv > 0 ? "= " + Fr(rv, 0) + " " + AccountInfoString(ACCOUNT_CURRENCY) : "= selon le stop", (color)0x303030, clrSilver, 8);
+   Btn("NT", 406, by + 60, 134, "TESTER LES NOTIFS", clrDimGray, clrWhite, 8);
    for(int i = 0; i < 7; i++)
      {
-      if(i < nh) Btn("D" + I(i), i * 76, by + 60, 72, g_hLab[i], g_hCol[i], clrWhite, 8);
+      if(i < nh) Btn("D" + I(i), i * 76, by + 90, 72, g_hLab[i], g_hCol[i], clrWhite, 8);
       else ObjectDelete(0, PFX + "BD" + I(i));
      }
    ChartRedraw();
@@ -1236,6 +1511,8 @@ void Tick()
       ScanDay(B, g_n, G, now, S);
       DessinerJour();
      }
+   SuivreRisque();
+   SuivreNotifs();   // avant Gerer : « setup prêt » arrive avant « ordre placé »
    Gerer();
    EnvoyerJour();
    Panneau();
@@ -1259,9 +1536,11 @@ int OnInit()
       g_histo = g_histN > 0;
       g_protect = InpProtection;
      }
+   ChargerRisque();
    UpdateServerOffset();
    EventSetTimer(1);
-   if(garder) g_lastBar = 0;                       // redessine la séance du jour
+   if(garder) g_lastBar = 0;
+   if(MaPosition() != 0) g_posSuivie = MaPosition();                       // redessine la séance du jour
    Tick();
    if(garder && g_histJour != "") Historique(false); // redessine l'historique, sans renvoi à l'application
    return INIT_SUCCEEDED;
@@ -1284,6 +1563,15 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       if(StringLen(k1) > 0 && lparam == StringGetCharacter(k1, 0)) { Placer(); Panneau(); }
       if(StringLen(k2) > 0 && lparam == StringGetCharacter(k2, 0)) { Annuler("à votre demande"); Panneau(); }
      }
+   if(id == CHARTEVENT_OBJECT_ENDEDIT && sparam == PFX + "ERV")
+     {
+      string t = ObjectGetString(0, sparam, OBJPROP_TEXT);
+      StringReplace(t, ",", "."); StringReplace(t, " ", ""); StringReplace(t, "%", "");
+      double v = StringToDouble(t);
+      if(v > 0) ChangerRisque(g_rMode, v); else { g_rvAff = ""; Msg("valeur de risque non comprise"); }
+      Panneau();
+      return;
+     }
    if(id == CHARTEVENT_OBJECT_CLICK && StringFind(sparam, PFX + "B") == 0)
      {
       string b = StringSubstr(sparam, StringLen(PFX) + 1);
@@ -1292,6 +1580,14 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       else if(b == "X") Annuler("à votre demande");
       else if(b == "MIN") { g_reduit = !g_reduit; }
       else if(b == "HIS") { g_histo = !g_histo; Historique(false); }
+      else if(b == "RM") ChangerRisque((g_rMode + 1) % 3, g_rVal);
+      else if(b == "RMOINS") ChangerRisque(g_rMode, g_rVal - PasRisque());
+      else if(b == "RPLUS") ChangerRisque(g_rMode, g_rVal + PasRisque());
+      else if(b == "NT")
+        {
+         Notifier("TEST · les notifications fonctionnent. Risque " + RisqueTexte() + " · " + ModeTexte(), true);
+         Msg("notification de test envoyée (téléphone" + (InpTgToken != "" ? ", Telegram" : "") + (InpWaPhone != "" ? ", WhatsApp" : "") + ")");
+        }
       else if(b == "PER")
         {
          g_histN = g_histN < 30 ? 30 : (g_histN < 90 ? 90 : (g_histN < 250 ? 250 : 7));
