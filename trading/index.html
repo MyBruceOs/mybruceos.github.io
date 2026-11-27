@@ -59,12 +59,12 @@
       <h2>Journal des setups<span class="spacer"></span>
         <select id="jProfile" class="mini"></select>
         <select id="jPeriod" class="mini"><option value="7">7 jours</option><option value="30" selected>30 jours</option><option value="90">90 jours</option><option value="400">Tout</option></select>
-        <select id="jType" class="mini"><option value="all">Tous les jours</option><option value="setup">Setups (cassure validée)</option><option value="filled">Entrées touchées</option><option value="taken">Trades pris</option><option value="missed">Entrées ratées</option></select>
+        <select id="jType" class="mini"><option value="all">Tous les jours</option><option value="setup">Setups (cassure validée)</option><option value="filled">Entrées touchées</option><option value="taken">Trades pris</option><option value="missed">Entrées ratées</option><option value="green">Sous feu vert</option><option value="red">Sous feu rouge</option></select>
         <button class="btn small" id="jCsv">Export CSV</button>
       </h2>
       <div id="jSummary" class="res" style="margin-top:0"></div>
       <div class="tbl-wrap" style="margin-top:12px"><table id="jTable"></table></div>
-      <p class="hint">Chaque jour, Desk Key envoie le setup de chaque indice : niveaux du pré-marché, Judas, cassure, entrée, SL, TP 2R / 2,5R / 3R, puis le résultat simulé exactement comme le backtest. Les trades pris avec Desk Key sont reliés automatiquement à leur setup (résultat réel à côté). Cliquez sur une ligne pour voir le détail.</p>
+      <p class="hint">Chaque jour, Desk Key envoie le setup de chaque actif : niveaux du pré-marché, Judas, cassure, entrée, SL, TP 2R / 2,5R / 3R, puis le résultat simulé exactement comme le backtest (pour l'or : trade 1 avec son stop remonté, plus le second trade). Colonne « Feu » : état du feu rouge de l'indice ce jour-là (somme des 10 setups précédents à 3R) ; sous feu rouge, la règle est suivie à blanc et ne compte pas dans le résultat « tel que tradé ». Les trades pris avec Desk Key sont reliés automatiquement à leur setup (résultat réel à côté). Cliquez sur une ligne pour voir le détail.</p>
     </div>
     <div class="card" style="margin-top:16px" id="otherTradesCard"></div>
   </section>

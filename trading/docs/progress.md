@@ -1,16 +1,17 @@
 # Progress · Desk US
 
-*Mis à jour le 27/11/2026 (nuit). Fichier tenu à jour à chaque étape du projet.*
+*Mis à jour le 27/11/2026. Fichier tenu à jour à chaque étape du projet.*
 
 ## Où on en est
 
 | Élément | Version | En ligne | Remarque |
 |---|---|---|---|
-| Desk Key (MT5, exécution en une touche) | **1.08** | oui | Telegram / WhatsApp : nettoyage des valeurs collées, relais par le serveur si MT5 échoue (erreur 1009), résultat du test dans le panneau. 1.07 : expiration de l'ordre à 11:00 NY chez FTMO. |
+| Desk Key (MT5, exécution en une touche) | **1.09** (prête) / 1.08 en ligne | non (en attente de « mets en ligne ») | 1.09 : profil or (XAUUSD) avec second trade et stop du trade 1 remonté, feu rouge US100 / SP500 désactivable (bouton FEU ROUGE). 1.08 : Telegram / WhatsApp par le relais du serveur si MT5 échoue. |
 | DeskUS_Bridge (MT5, données) | **1.06** | oui | Exporte aussi US30 et XAUUSD pour les backtests. |
-| Application web | — | oui | Onglet Mon compte ; lecture incrémentale (quota Supabase). |
+| Application web | — | oui (version or / feu rouge prête, pas en ligne) | Prête : or, second trade, colonne « Feu » et filtres du journal, statistiques et bornes d'alarme sur 3 ans. |
 | Base Supabase | — | — | Plan gratuit : 133 Mo / 500 Mo (projet partagé avec une autre application). |
-| Moteur de backtest `desk-bt-m1` | **v11** | — | Séance paramétrable (Londres / New York) ; structure M5 avec exécution M1 (`tf=5`) ; historique M5 sur 3 ans (`src=M5`). Vérifié : redonne les trades de référence. |
+| Moteur de backtest `desk-bt-m1` | **v14** | — | v14 : chemin du prix et 34 gestions de sortie (backtests.md 4 quaterdecies). v13 : second trade. |
+| (ancien) moteur | v11 | — | Séance paramétrable (Londres / New York) ; structure M5 avec exécution M1 (`tf=5`) ; historique M5 sur 3 ans (`src=M5`). Vérifié : redonne les trades de référence. |
 
 ## Fait
 - Règle A validée en backtest M1 (US100 : H4, FVG, cassure nette ; SP500 : H4 + Daily, Judas après 9:50 NY). Détails : [regles.md](regles.md), [backtests.md](backtests.md).
@@ -50,7 +51,14 @@
 - **Or : séries de pertes et retournements analysés (27/11, moteur v14, backtests.md 4 quaterdecies)** : seuls 7 perdants sur 107 avaient atteint +2R ; aucune gestion de sortie (stop à l'entrée, verrouillage, stop suiveur, sortie partielle, sortie au temps) ne bat le TP 3R de façon fiable ; aucun filtre d'entrée ne tient d'une année sur l'autre ; les pertes de l'or ne s'enchaînent pas plus que le hasard. Règles de l'or inchangées.
 - **Proposé, à décider par l'utilisateur** : mi-risque automatique quand le compte est à 4 R sous son plus haut (retour au risque normal à 2 R du plus haut) : pire creux 3 ans −8,8 R au lieu de −13,6 R pour +176 R au lieu de +211 R ; à sécurité égale (5 % de chances de toucher −10 %), 0,87 % par trade au lieu de 0,54 %, gain médian simulé +45 % au lieu de +35 %.
 
-## Décidé, à faire après l'analyse de l'or (27/11)
+- **Pas de mi-risque automatique** quand le compte est en creux : proposé le 27/11, refusé par l'utilisateur.
+
+## Mise à jour or + feu rouge (27/11) — prête, en attente de « mets en ligne »
+- **Desk Key 1.09** : profil or (H4 ou H1 sans conflit, stop Judas ± 1 $, entrées 10:00–12:00 NY, TP 3R, sortie 13:00 NY) ; second trade (détection copiée du moteur de backtest : identique sur 20 000 séries de test) avec stop du trade 1 remonté au remplissage ; feu rouge US100 / SP500 calculé chaque matin sur les 10 derniers setups, bouton FEU ROUGE ON / OFF ; envoi du feu et du second trade à l'application. À compiler dans MetaEditor (pas de compilateur MQL5 ici).
+- **Application** : or et second trade (Aujourd'hui, Journal, Mon compte, Suivi), colonne « Feu » et filtres « Sous feu vert / rouge » dans le journal, alerte du jour, règles et statistiques sur 3 ans (bornes d'alarme recalculées).
+- **Base** (appliquée à la mise en ligne) : profil XAUUSD, règles et statistiques 3 ans des trois profils et de l'ensemble, second trade réel conservé par `desk_setup_push`.
+
+## Décidé, à faire après l'analyse de l'or (27/11) — fait dans la mise à jour ci-dessus
 - **Feu rouge sur l'US100 et le SP500 (pas sur l'or), activé** : pause d'un actif quand la somme de ses 10 derniers setups (résultat de la règle à 3R, pris ou non) est négative ; retour automatique au vert quand elle redevient positive ou nulle. Explication visuelle : https://claude.ai/artifact/CXxoyndBmwbWBnf1v8Lk7z
   - Desk Key : voyant vert / rouge par actif avec la somme des 10 derniers setups ; en rouge, la touche K et le mode AUTO ne placent pas l'ordre (option « prévenir seulement ») ; notification à chaque changement de couleur ; la règle continue d'être suivie à blanc.
   - Application : voyant et courbe du total des 10 derniers setups par actif, historique des périodes rouges.

@@ -1,6 +1,6 @@
 # Règles de trading Desk US — référence A
 
-*Version du 27 novembre 2026 (Desk Key 1.08, nouvelle application). Règles validées par le backtest M1 FTMO (décembre 2025 – novembre 2026). Les chiffres détaillés sont dans [backtests.md](backtests.md).*
+*Version du 27 novembre 2026 (Desk Key 1.09 : or, second trade, feu rouge ; application mise à jour). Règles validées par le backtest M1 FTMO (décembre 2025 – novembre 2026). Les chiffres détaillés sont dans [backtests.md](backtests.md).*
 
 > **Un actif = un profil = un graphique.** On ne mélange jamais les règles de l'US100, du SP500 et de l'or.
 
@@ -135,13 +135,28 @@ Fichier : `trading/mt5/DeskUS_Key.mq5`.
   - **–** / **+** ou saisie directe de la valeur dans la case blanche (Entrée pour valider) ;
   - le réglage est **commun au compte** : changé sur le graphique US100, il s'applique aussi au SP500 dans la seconde. Il est gardé quand MT5 redémarre. Si on modifie le risque dans les paramètres du robot (F7), c'est cette valeur qui reprend la main ;
   - un ordre en attente est remis tout de suite avec le nouveau lot ; une position ouverte n'est pas touchée ;
-  - la ligne au-dessus des boutons donne le risque en % du capital de départ, la perte si les deux indices perdent le même jour (comparée à la limite FTMO du jour) et le nombre de pertes avant la perte max. Vert : confortable ; orange : agressif ; rouge : deux pertes le même jour peuvent dépasser la limite du jour. Les limites se règlent dans les paramètres (5 % et 10 % par défaut).
+  - la ligne au-dessus des boutons donne le risque en % du capital de départ, la perte si les trois actifs perdent le même jour (comparée à la limite FTMO du jour) et le nombre de pertes avant la perte max. Vert : confortable ; orange : agressif ; rouge : trois pertes le même jour peuvent dépasser la limite du jour. Les limites se règlent dans les paramètres (5 % et 10 % par défaut).
 - Bouton **AUTO** : mode automatique, désactivé par défaut. À n'activer que si la prop firm l'autorise.
 - Gestion faite par Desk Key :
   - l'ordre suit le 50 % quand la jambe s'allonge, avec le lot recalculé ;
   - il est annulé à 11:00 NY s'il n'est pas rempli : l'ordre porte une **date d'expiration à 11:00 NY chez FTMO**, il est donc annulé par le serveur même si MT5 est fermé (si le serveur refuse l'expiration, Desk Key l'annule lui-même) ;
   - la position est fermée à 13:00 NY (réglage modifiable).
-- Chaque profil a son **numéro magique** : US100 = 7710100, SP500 = 7710500. Le commentaire de l'ordre indique le profil (« DeskKey US100 3R »), pour le suivi dans le journal.
+- Chaque profil a son **numéro magique** : US100 = 7710100, SP500 = 7710500, or = 7710900 (second trade de l'or : 7710901). Le commentaire de l'ordre indique le profil (« DeskKey US100 3R », « DeskKey XAUUSD 2e »), pour le suivi dans le journal.
+
+### Feu rouge (US100, SP500) — Desk Key 1.09
+- Chaque matin, Desk Key additionne le résultat des **10 derniers setups** de l'indice (entrées touchées dans la fenêtre, à 3R, pris ou non), calculé sur l'historique M1 (environ 120 séances de plus que la période affichée).
+- Somme **négative** : **feu rouge**. La touche K, le bouton et le mode AUTO ne placent pas d'ordre ; le setup est suivi et dessiné à blanc, et envoyé à l'application. Somme positive ou nulle (ou moins de 10 setups connus) : feu vert. Le retour au vert est automatique.
+- Ligne « Feu » du panneau (sous le sens du jour) : couleur et somme des 10 derniers setups. Dans la rangée des 7 jours et l'historique, un **●** marque les jours sous feu rouge ; la ligne de statistiques donne aussi le total « sous feu vert ».
+- **Désactivable** : bouton **FEU ROUGE : ON / OFF** du panneau (gardé au redémarrage) ou paramètre « Feu rouge ». Désactivé, Desk Key prévient seulement (panneau, notification) et laisse trader.
+- Notification à chaque changement de couleur (début de séance).
+- Pas de feu rouge sur l'or (backtests.md 4 terdecies).
+
+### Or (XAUUSD) et second trade — Desk Key 1.09
+- Mettre Desk Key sur un **graphique M1 XAUUSD** : le profil or se choisit tout seul (symbole contenant XAU ou GOLD).
+- Règles du profil : section 3 bis. Fenêtre d'entrée **10:00–12:00 NY** : l'ordre expire chez FTMO à 12:00 NY ; panneau, dessins et notifications suivent cette heure.
+- **Second trade** (bouton **2e TRADE : OUI / NON**, paramètre « Second trade », activé par défaut) : pendant que le trade 1 est en position, Desk Key suit la continuation (ligne 4 du panneau : impulsion → repli → cassure du repli). Quand le setup est prêt : notification « SECOND TRADE PRÊT », puis **touche K** (ou AUTO) pour placer la limite au 50 % de la nouvelle jambe, stop sous le repli ± 1 $, objectif = TP du trade 1, expiration à 12:00 NY. K pressée avant que le setup soit prêt : le second trade est armé.
+- Au **remplissage du second trade**, Desk Key **remonte le stop du trade 1** au stop du second trade. Le second trade est annulé si le trade 1 se ferme avant, ou à 12:00 NY. Les deux positions sont fermées à 13:00 NY.
+- Même risque en argent que le trade 1 (lot recalculé sur son propre stop).
 
 ### Notifications
 Desk Key prévient à chaque étape importante, une seule fois par jour et par événement (même si MT5 redémarre) :
@@ -185,7 +200,9 @@ Le bouton **TESTER LES NOTIFS** du panneau envoie un message de test sur tous le
 - **Journal** : un jour = une ligne par actif, avec les niveaux, le résultat de la règle et le trade réel ; filtres (pris, ratés…) et export CSV.
 - **Suivi du test** : win rate, R, séries de pertes et creux de chaque actif comparés aux bornes du backtest (« dans la norme », « à surveiller », « alarme »).
 - **Règles** : règles et résultats de backtest de chaque actif.
-- **Ajouter un actif** : quand un nouvel actif (Dow Jones, XAUUSD…) est validé en backtest, son profil est ajouté dans la base (`desk_profiles`) et un profil correspondant est ajouté à Desk Key ; l'application l'affiche toute seule dans tous les onglets.
+- **Ajouter un actif** : quand un nouvel actif est validé en backtest, son profil est ajouté dans la base (`desk_profiles`) et un profil correspondant est ajouté à Desk Key ; l'application l'affiche toute seule dans tous les onglets (c'est ce qui a été fait pour l'or).
+- **Feu rouge dans l'application** (1.09) : colonne « Feu » du journal (● Vert / ● Rouge, somme des 10 setups précédents au survol, détail en cliquant la ligne), filtres « Sous feu vert » / « Sous feu rouge », total « Règle telle que tradée (sans le feu rouge) » ; ligne « Feu » sur la carte de chaque indice dans Aujourd'hui, et alerte en haut quand un indice est sous feu rouge ; Mon compte : la courbe de la règle ne compte pas les entrées sous feu rouge ; Suivi : la règle complète reste suivie (bornes du backtest sur 3 ans), avec le total « tradé » à côté.
+- **Or dans l'application** : carte du jour avec l'étape du second trade ; journal : résultat de la règle = trade 1 avec stop remonté + second trade (mention « 2 trades »), détail des deux trades réels.
 
 ### Différences possibles avec le backtest
 - Le backtest utilise les prix Bid. En réel, un achat limite se remplit quand l'Ask touche le prix : avec le spread, quelques remplissages « de justesse » n'auront pas lieu.
