@@ -547,6 +547,67 @@ Robustesse (fenêtre de 6 à 20 setups, seuil −2, 0 ou +2 R) : toutes les vari
 
 Variantes moins bonnes : mi-risque au lieu de pause (2025 −14 à −16 R) ; un seul feu pour les deux indices (2025 −17 R).
 
+## 4 quaterdecies. Or : réduire les séries de pertes et les retournements (27/11/2026)
+
+Demande : trouver, sur l'or, un motif qui réduise les séries de pertes sans changer la fréquence, ou une gestion des gains qui évite les retournements, sans perdre en efficacité. Moteur **v14** (desk-bt-m1) : mêmes trades que v13 (résultats identiques vérifiés), plus le chemin du prix après l'entrée, 34 gestions de sortie du trade 1 (combinées au second trade) et 16 nouvelles mesures par trade. 194 trades d'or sur 3 ans (configuration retenue : second trade, stop du trade 1 remonté).
+
+**1. Les retournements sont rares.** Sur 107 trades finis en perte ou à zéro, 32 avaient atteint +1R, 14 avaient atteint +1,5R, **7 seulement avaient atteint +2R**. La plupart des perdants partent tout de suite dans le mauvais sens : sur 89 pertes pleines, 37 ne sont jamais montées au-delà de +0,3R, et 25 ont touché le stop en 10 minutes ou moins.
+
+**2. Gestion des gains : rien ne bat « stop au Judas, TP 3R, sortie 13:00 ».** Écart en R par rapport à la règle actuelle :
+
+| Gestion du trade 1 | 2024 | 2025 | 2026 | 3 ans | Pire creux de l'or | Pire creux du compte |
+|---|---|---|---|---|---|---|
+| **Actuelle (TP 3R)** | +13,8 | +47,9 | +51,2 | **+112,9 R** | −14,0 R | −13,6 R |
+| Stop à l'entrée à +1R | −5,6 | −3,0 | −13,2 | −21,8 | −12,5 R | −12,6 R |
+| Stop à l'entrée à +1,5R | | | | −11,5 | −16,0 R | −13,6 R |
+| Stop à l'entrée à +2R | +1,0 | +2,0 | −0,7 | +2,3 | −13,0 R | −13,6 R |
+| Stop à +1R quand +2R est atteint | +0,3 | +4,0 | −11,5 | −7,2 | −12,0 R | −13,6 R |
+| Stop suiveur à 1,5R, actif à +2R | | | | −3,2 | −12,1 R | −13,6 R |
+| Moitié sortie à +1R (reste à l'entrée) | −4,7 | −10,4 | −21,3 | −36,4 | −8,2 R | −12,0 R |
+| Moitié sortie à +2R | −1,2 | −4,7 | −7,4 | −13,4 | −13,0 R | −13,6 R |
+| TP 2R / TP 2,5R | | | | −36,6 / −17,3 | −14,6 / −14,7 R | −13,6 R |
+| TP 4R, stop à +1R quand +2R est atteint | −0,2 | +10,5 | −8,0 | +2,3 | −11,4 R | −13,6 R |
+| Sortie à 12:00 NY au lieu de 13:00 | | | | −18,2 | −14,5 R | −14,8 R |
+| Sortie au marché si le trade est sous l'entrée 60 min après | +1,2 | +2,3 | +0,8 | +4,3 | −12,9 R | −12,7 R |
+| idem à 30 min / à 90 min | +5,9 / −2,6 | −14,2 / −3,2 | −2,4 / −1,6 | −10,7 / −7,5 | | |
+
+- Le stop à l'entrée à +1R sauve 22 trades (+19,5 R) mais coupe 16 gagnants qui seraient allés au TP (−41,4 R). La sortie de moitié à +1R sauve 40 trades (+34,4 R) mais en coupe 63 (−70,8 R).
+- Les deux petites améliorations (stop à l'entrée à +2R, sortie à 60 min) ne tiennent pas : leurs voisines (+1,5R, +2,5R ; 30 min, 90 min) font moins bien. C'est du bruit. **On ne change pas la gestion.**
+
+**3. Aucun filtre d'entrée ne réduit les pertes de façon fiable.** 39 mesures (heure, profondeur du Judas, taille du stop, volatilité, Asie, Londres, annonce de 8:30, 30 premières minutes, pente H4, tendance journalière, jour de la semaine, position dans le range de la veille, etc.), chacune testée en écartant les 10 %, 15 %, 20 % ou 25 % des trades les plus hauts ou les plus bas, avec le seuil choisi sur deux années et vérifié sur la troisième (3 fois) : **1 règle sur 312 gagne les 3 années**, et +3,6 R seulement. Avec des résultats mélangés au hasard, le même test en trouve 0,8 en moyenne : c'est le niveau du hasard.
+
+**4. Les séries de pertes de l'or sont du hasard, pas un régime.** Après une perte, le trade suivant perd 50 % du temps ; après un gain, 60 %. Les pertes ne s'enchaînent donc pas plus que prévu. La plus longue série réelle (7) est même plus courte que celle qu'on obtient en mélangeant les trades au hasard (médiane 8, une fois sur 10 au moins 10). C'est pour cela que le feu rouge n'aide pas l'or, et que les règles de taille après une série de pertes de l'or ne marchent pas non plus :
+
+| Règle sur l'or | 3 ans | Pire creux de l'or | Compte 3 ans | Pire creux du compte |
+|---|---|---|---|---|
+| Aucune | +112,9 R | −14,0 R | +211,2 R | −13,6 R |
+| Mi-risque après 2 / 3 / 4 pertes | +102,8 / +105,6 / +106,3 | −13,8 / −15,0 / −17,4 | +201,1 / +204,0 / +204,7 | −11,2 / −12,2 / −12,6 |
+| Pause après 3 / 4 pertes | +98,4 / +99,8 | −16,0 / −20,9 | +196,8 / +198,2 | −11,0 / −13,0 |
+| Mi-risque si les 5 / 10 derniers < 0 | +100,2 / +103,0 | −15,7 / −12,9 | +198,6 / +201,3 | −12,7 / −11,8 |
+
+**5. Ce qui réduit vraiment le pire creux : baisser le risque du compte quand il est en creux.** Règle testée : quand le compte (les 3 actifs) est à 4 R sous son plus haut, tous les trades passent à mi-risque ; on revient au risque normal quand le compte est remonté à 2 R de son plus haut. La règle ne touche ni les entrées ni les sorties, et ne change pas la fréquence.
+
+| Compte 3 actifs | 2024 | 2025 | 2026 | 3 ans | Pire creux |
+|---|---|---|---|---|---|
+| Actuel | +69,7 R (creux −13,6) | +41,9 R (creux −10,0) | +99,7 R (creux −8,6) | +211,2 R | **−13,6 R** |
+| Mi-risque à −4 R (retour à −2 R) | +53,6 R (creux −8,8) | +33,6 R (creux −8,1) | +88,5 R (creux −6,3) | +175,7 R | **−8,8 R** |
+| Mi-risque à −6 R (retour à −3 R) | +57,4 R (−10,2) | +34,1 R (−9,9) | +96,6 R (−7,3) | +188,1 R | −10,2 R |
+
+- Le creux baisse chaque année. Le gain baisse aussi (17 % de R en moins), mais moins que le creux (35 % en moins) : pour le même pire creux, on peut donc risquer plus par trade. Ramenée au même pire creux que l'actuel (−13,6 R), la règle donnerait environ +271 R au lieu de +211 R.
+- Avec la règle à −4 R, 42 % des trades sont passés à mi-risque (12 périodes en 3 ans).
+- Simulation (blocs de mois tirés au hasard dans les 3 ans, frais de 0,05 R par trade, la règle appliquée sur le chemin simulé ; le feu rouge des indices est pris tel qu'il s'est allumé dans l'historique, d'où des chiffres un peu différents de 4 terdecies) :
+
+| Une année simulée | R médian | Creux médian | Creux 1 année sur 10 | Creux 1 année sur 100 | Risque par trade pour 5 % de chances de toucher −10 % | Gain médian à ce risque |
+|---|---|---|---|---|---|---|
+| Actuel | +63,5 R | −10,3 R | −16,2 R | −23,7 R | 0,54 % | +35 % |
+| **Mi-risque à −4 R** | +52,1 R | −7,4 R | −10,3 R | −14,2 R | **0,87 %** | **+45 %** |
+| Mi-risque à −6 R | +54,5 R | −8,4 R | −11,4 R | −15,2 R | 0,80 % | +43 % |
+| Mi-risque à −8 R | +57,2 R | −9,5 R | −12,4 R | −16,2 R | 0,74 % | +42 % |
+
+Les trois réglages améliorent le rapport gain / creux : le résultat ne dépend pas d'un seuil choisi au plus juste. C'est une règle de gestion du risque, pas un motif de marché : elle suppose que la règle reste gagnante, et elle retarde la remontée après un creux.
+
+**Conclusion** : les règles de l'or ne changent pas (stop au Judas ± 1 $, TP 3R, second trade, sortie 13:00). Pour réduire les pires creux, la piste solide est la **réduction automatique du risque du compte en creux**, à décider par l'utilisateur (Desk Key et application), pas un filtre ni une sortie anticipée.
+
 ## 4 terdecies. L'or sur 3 ans, et le compte 3 actifs (2024, 2025, 2026) — 27/11/2026
 
 **Or seul** (séance New York, sens « H4 ou H1 sans conflit », entrées 10:00–12:00 NY, TP 3R) :

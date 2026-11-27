@@ -47,6 +47,8 @@
 
 - **Or validé sur 3 ans (27/11)** : +2,4 / +35,4 / +37,7 R (trade 1 seul), +13,8 / +47,9 / +51,2 R avec le second trade (confirmé hors échantillon). Le feu rouge n'aide pas l'or.
 - **Compte 3 actifs, configuration retenue** : feu rouge sur l'US100 et le SP500, or avec second trade sans feu rouge : 3 ans +211 R (2024 +69,7 ; 2025 +41,9 ; 2026 +99,7), pire creux −13,6 R, 29 mois positifs sur 36 ; risque **0,5 % par trade** (5 % de risque de toucher −10 % dans l'année, pire creux réel −7,4 %), 0,33 % pour une sécurité maximale (backtests.md 4 terdecies).
+- **Or : séries de pertes et retournements analysés (27/11, moteur v14, backtests.md 4 quaterdecies)** : seuls 7 perdants sur 107 avaient atteint +2R ; aucune gestion de sortie (stop à l'entrée, verrouillage, stop suiveur, sortie partielle, sortie au temps) ne bat le TP 3R de façon fiable ; aucun filtre d'entrée ne tient d'une année sur l'autre ; les pertes de l'or ne s'enchaînent pas plus que le hasard. Règles de l'or inchangées.
+- **Proposé, à décider par l'utilisateur** : mi-risque automatique quand le compte est à 4 R sous son plus haut (retour au risque normal à 2 R du plus haut) : pire creux 3 ans −8,8 R au lieu de −13,6 R pour +176 R au lieu de +211 R ; à sécurité égale (5 % de chances de toucher −10 %), 0,87 % par trade au lieu de 0,54 %, gain médian simulé +45 % au lieu de +35 %.
 
 ## Décidé, à faire après l'analyse de l'or (27/11)
 - **Feu rouge sur l'US100 et le SP500 (pas sur l'or), activé** : pause d'un actif quand la somme de ses 10 derniers setups (résultat de la règle à 3R, pris ou non) est négative ; retour automatique au vert quand elle redevient positive ou nulle. Explication visuelle : https://claude.ai/artifact/CXxoyndBmwbWBnf1v8Lk7z
