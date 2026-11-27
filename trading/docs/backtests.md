@@ -292,7 +292,30 @@ Moteur v10 : Judas, pivot, cassure, FVG et Fibonacci sur bougies M5 ; remplissag
 
 Entrer dès l'ouverture **dégrade l'US100** et ne sauve pas l'US30 : la règle « remplissage à partir de 10:00 NY » est confirmée.
 
-**Conclusion : US30 toujours rejeté**, y compris en M5. À retester dans quelques mois avec les nouveaux mois (si la seconde moitié se confirme, le M5 avec le Daily serait le candidat).
+**Conclusion (première passe) : US30 rejeté** avec les règles des autres indices.
+
+### Recherche d'une méthode US30 avec les concepts ICT / SMC (27/11/2026)
+Protocole : liste de concepts fixée à l'avance, sélection sur la 1re moitié de 2026, vérification sur la 2de moitié, puis **test hors échantillon sur 2 ans** (déc. 2023 – déc. 2025) avec l'historique M5 (moteur v11 `src=M5`, exécution sur bougies M5, prudente : stop avant TP quand les deux tombent dans la même bougie).
+
+Concepts testés : structure M1 / M5 / M15 ; entrée au 50 % (équilibre) ou OTE 70,5 % ; biais aucun / H4 / Daily / H4 + Daily / H1 + H4 ; FVG ; divergence SMT avec le Nasdaq ; premium / discount (range de la veille) ; Judas après 9:50 ; draw on liquidity (liquidité opposée à au moins l'objectif) ; objectif 2R / 3R. Fenêtre de remplissage 10:00–11:00 (M1) ou 10:00–12:00 (M5, M15) ; stop Judas ± 6 pts ; sortie 13:00 NY.
+
+Sur 2026 seul : 1 377 combinaisons, 22 positives sur les deux moitiés, moins que le hasard n'en donnerait : pas de preuve sur une seule année. Sur 3 ans (2024, 2025, 2026, mêmes données M5) :
+
+| Version US30 | Trades / an | Gagnants | Total 3 ans | 2024 | 2025 | 2026 | Pire baisse |
+|---|---|---|---|---|---|---|---|
+| **A : règle A en M5, biais H4, TP 3R** | 41 | 44 % | **+25,9 R** | +10,5 | +11,8 | +3,7 | −9,5 R |
+| A, TP 2R | 41 | 48 % | +27,4 R | +13,9 | +10,4 | +3,1 | −8,5 R |
+| **B2 : M5, H4 + FVG + draw on liquidity ≥ 2R, TP 2R** | 10 | 52 % | +15,0 R | +6,6 | +5,4 | +3,0 | **−2,0 R** |
+| B : M5, H4 + draw on liquidity, TP 2R | 16 | 47 % | +15,6 R | +5,9 | +6,3 | +3,4 | −4,9 R |
+| D : M15, entrée en discount, TP 3R | 23 | 49 % | +12,5 R | +4,4 | +2,7 | +5,5 | −5,2 R |
+| OTE 70,5 % + SMT, TP 2R | 15 | 35 % | −3,8 R | −1,2 | −2,7 | — | −8,0 R |
+| OTE 70,5 % en discount, TP 2R | 30 | 33 % | −4,9 R | −1,9 | −3,0 | — | −10,0 R |
+
+Par semestre, version A : 2024 −2,2 / +12,7 ; 2025 +1,6 / +10,2 ; 2026 −4,1 / +7,8 (R). Gagnant chaque année, mais l'essentiel vient des seconds semestres.
+
+- **Ce qui aide sur le Dow** : la structure en **M5** (moins de bruit que le M1), le biais **H4**, et le **draw on liquidity** (ne prendre le trade que si la liquidité opposée est à au moins 2R), qui lisse fortement la courbe (B2 : pire baisse −2R, 5 semestres positifs sur 6).
+- **Ce qui n'aide pas** : l'entrée OTE 70,5 % (perdante hors échantillon), la divergence SMT, le Judas après 9:50, le premium / discount en M5.
+- **Bilan** : la version A est **positive chacune des 3 années**, mais son avantage (environ +8,6 R par an) est bien plus faible que celui de l'US100 et du SP500, avec des premiers semestres faibles. **Candidat, pas encore validé** : à suivre en observation (signaux sans ordres, ou risque réduit) avant de l'ajouter comme profil. À retester dans quelques mois avec les nouveaux mois (si la seconde moitié se confirme, le M5 avec le Daily serait le candidat).
 
 ## 5. Idées testées et rejetées
 

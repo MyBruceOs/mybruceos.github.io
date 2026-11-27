@@ -10,7 +10,7 @@
 | DeskUS_Bridge (MT5, données) | **1.06** | oui | Exporte aussi US30 et XAUUSD pour les backtests. |
 | Application web | — | oui | Onglet Mon compte ; lecture incrémentale (quota Supabase). |
 | Base Supabase | — | — | Plan gratuit : 133 Mo / 500 Mo (projet partagé avec une autre application). |
-| Moteur de backtest `desk-bt-m1` | **v10** | — | Séance paramétrable (Londres / New York) ; structure M5 avec exécution M1 (`tf=5`). Vérifié : redonne les trades de référence. |
+| Moteur de backtest `desk-bt-m1` | **v11** | — | Séance paramétrable (Londres / New York) ; structure M5 avec exécution M1 (`tf=5`) ; historique M5 sur 3 ans (`src=M5`). Vérifié : redonne les trades de référence. |
 
 ## Fait
 - Règle A validée en backtest M1 (US100 : H4, FVG, cassure nette ; SP500 : H4 + Daily, Judas après 9:50 NY). Détails : [regles.md](regles.md), [backtests.md](backtests.md).
@@ -18,7 +18,7 @@
 - Application : Aujourd'hui, Mon compte, Journal, Suivi du test, Règles, Réglages ; profils lus dans la base (un actif validé apparaît tout seul).
 
 ## En cours
-- ~~Backtest US30~~ : **fait le 27/11, rejeté** en M1 (win rate 23–32 %) **et en M5** (moteur v10 : structure M5, exécution M1 ; win rate 43–54 % mais toutes les versions perdent sur la première moitié de l'année). Entrées dès 9:30 NY testées aussi : ne changent rien au verdict et dégradent l'US100 (12 trades ajoutés, 17 % de gagnants). À retester dans quelques mois. Détails : backtests.md, section 4 sexies.
+- ~~Backtest US30~~ : **fait le 27/11, rejeté** en M1 (win rate 23–32 %) **et en M5** (moteur v10 : structure M5, exécution M1 ; win rate 43–54 % mais toutes les versions perdent sur la première moitié de l'année). Recherche ICT / SMC (27/11) : **candidat trouvé**, règle A en **M5** avec biais H4, entrées 10:00–12:00 NY : positive chacune des 3 années (2024, 2025, 2026 ; +25,9 R en 3 ans, 41 trades par an), variante lissée avec draw on liquidity (10 trades par an, pire baisse −2R). Avantage plus faible que l'US100 / SP500 : à mettre en observation avant de l'ajouter. Entrées dès 9:30 NY testées aussi : ne changent rien au verdict et dégradent l'US100 (12 trades ajoutés, 17 % de gagnants). À retester dans quelques mois. Détails : backtests.md, section 4 sexies.
 - **Backtest XAUUSD** : séance de Londres (range asiatique, Judas après 2:00 NY, entrée 3:00–5:00 NY, sortie 8:00 NY) contre séance de New York.
 - Export : US100, US500 et US30 complets (doublons M5 nettoyés) ; XAUUSD en cours (environ 7 jours de M1 par minute). Backtests or lancés automatiquement vers 4:05 Paris.
 
