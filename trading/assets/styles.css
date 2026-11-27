@@ -232,3 +232,4 @@ tr.jdetail td{background:rgba(255,255,255,.02)}
 #simBody .verdict{font-size:14px;line-height:1.5}
 #simBody h3{color:var(--muted);font-weight:600}
 @media (max-width:600px){.sm-tbl table{min-width:560px}#simBody .seg button{padding:5px 8px}}
+#simBody details.card > summary{cursor:pointer;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:600}

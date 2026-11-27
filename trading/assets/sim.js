@@ -229,6 +229,21 @@
   <h2>Simulateur<span class="spacer"></span><div class="seg" id="smMode"><button data-m="ftmo">Challenge FTMO</button><button data-m="own">Compte propre</button></div></h2>
   <p class="muted" style="margin:0;font-size:14px">Des milliers de parcours faits des mois réels des 3 ans (US100 et SP500 avec feu rouge, or avec second trade, frais compris), remis dans le désordre. Tous les comptes d'un parcours prennent les mêmes trades le même jour : plusieurs comptes au même risque gagnent et perdent ensemble.</p>
 </div>
+<details class="card c12" id="smPlan">
+  <summary>Ma stratégie : des challenges FTMO au compte propre</summary>
+  <div class="stack" style="margin-top:12px;font-size:14px">
+    <div><b>1 · Démarrage (1 200 €)</b> : un seul challenge 50k à 1,5 % par trade (345 €), les 855 € restants pour deux autres essais. Compte financé à 2,15 %, coussin de 5 % laissé à chaque versement (si FTMO l'autorise). Rien d'autre avant le premier versement (vers le 3e mois).</div>
+    <div><b>2 · Montée en charge</b> : chaque versement va dans la caisse challenges ; dès qu'elle le permet, un challenge 100k à 1,5 %, jusqu'à 400 k$ au total. Compte perdu ou challenge raté : racheter tout de suite. <b>Ne rien sortir de la caisse tant qu'elle n'a pas 10 000 €</b> (tous les comptes tombent ensemble : il faut pouvoir tout relancer plusieurs fois).</div>
+    <div><b>3 · Compte propre</b> : chaque fin de mois, ce qui dépasse 10 000 € : 70 % sur le compte propre, 30 % pour toi, jusqu'à 100 000 € sur le compte propre. Ensuite, tout l'excédent FTMO est pour toi.</div>
+    <div><b>4 · Retraits du compte propre</b> : risque 1 % du solde par trade (jamais 2,15 % : c'est ton argent). Le 1er du mois : si le compte est au-dessus de son plus haut, retirer 50 % de ce qui dépasse ; sinon ne rien retirer. Ne jamais toucher au capital déposé. Mettre de côté une part pour les impôts.</div>
+    <div class="tbl-wrap sm-tbl"><table><thead><tr><th>Sur 3 ans</th><th>Avantage du backtest</th><th>Avantage réduit de moitié</th></tr></thead><tbody>
+      <tr><td>Argent touché par toi</td><td class="mono">≈ 693 k€</td><td class="mono">≈ 183 k€</td></tr>
+      <tr><td>Compte propre à la fin</td><td class="mono">≈ 192 k€</td><td class="mono">≈ 89 k€</td></tr>
+      <tr><td>Mois sans revenu, 3e année</td><td class="mono">≈ 4 sur 12</td><td class="mono">≈ 7 sur 12</td></tr>
+    </tbody></table></div>
+    <div class="row"><button class="btn small primary" id="smPlanLoad">Charger ces réglages dans le simulateur</button><a href="docs/strategie-financement.md" target="_blank" rel="noopener" style="font-size:13px">document complet</a></div>
+  </div>
+</details>
 <div class="c12 grid" id="smFtmo">
   <div class="card c5">
     <h2>Stratégie</h2>
@@ -334,6 +349,7 @@
     document.querySelectorAll('#smMode button').forEach(b => b.onclick = () => { ST.mode = b.dataset.m; save(); fill(); compute(); });
     document.querySelectorAll('#smFtmo input, #smFtmo select, #smOwn input, #smOwn select').forEach(el => el.addEventListener('change', () => { read(); clearTimeout(tm); tm = setTimeout(compute, 120); }));
     $('#smCmp').onclick = compare;
+    $('#smPlanLoad').onclick = () => { Object.assign(ST, { mode: 'ftmo', budget: 1200, size0: 50000, n0: 1, stagger: 0, reinvest: 100000, cap: 400, relaunch: 1, rc: 1.5, rc2: '', rf: 2.15, cushion: 5 }); save(); fill(); compute(); $('#smFtmo').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
     $('#smCmpT').addEventListener('click', ev => { const tr = ev.target.closest('tr[data-i]'); if (!tr || !LAST_CMP) return; Object.assign(ST, LAST_CMP[+tr.dataset.i].set); save(); fill(); compute(); $('#simBody').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
   }
 
