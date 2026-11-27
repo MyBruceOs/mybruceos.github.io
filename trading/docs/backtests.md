@@ -547,6 +547,47 @@ Robustesse (fenêtre de 6 à 20 setups, seuil −2, 0 ou +2 R) : toutes les vari
 
 Variantes moins bonnes : mi-risque au lieu de pause (2025 −14 à −16 R) ; un seul feu pour les deux indices (2025 −17 R).
 
+## 4 novemdecies. Combinaison retenue pour un compte de 200 k$ (critères de l'utilisateur) — 27/11/2026
+
+Critères : challenge validé vite, mais au moins 90 % de réussite pour chaque phase et 80 % pour les deux ; compte financé au gain moyen le plus haut. Même simulation que 4 octodecies, compte de 200 k$, challenge à 1 080 $, 80 % des gains, 3 000 à 4 000 parcours par combinaison.
+
+**Challenge** (tableau complet en 4 septdecies, pas de 0,05 %) :
+
+| Risque | Phase 1 | Phase 2 | Les deux | Durée médiane · 9 sur 10 avant |
+|---|---|---|---|---|
+| 1,30 % | 91,7 % | 92,4 % | 84,8 % | 43 · 89 séances |
+| **1,40 %** | **90,4 %** | **91,3 %** | **82,5 %** | **40 · 83 séances** |
+| 1,45 % | 89,8 % | 90,8 % | 81,5 % | 39 · 80 séances |
+| 1,50 % | 89,8 % | 90,9 % | 81,7 % | 37 · 76 séances |
+| 1,60 % | 88,8 % | 89,9 % | 79,9 % | 36 · 73 séances |
+
+1,40 % est le risque le plus haut qui respecte les trois seuils. 1,60 % ne gagne que 4 séances (médiane) et passe sous les trois seuils. Le risque en challenge change peu le gain final (24 mois : 355, 358 et 361 k$ pour 1,4 / 1,5 / 1,6 % avec le même financé).
+
+**Compte financé** (challenge 1,40 %, 24 mois, meilleur coussin pour chaque risque) :
+
+| Financé | Pertes comme en backtest | Pertes 2 % plus grosses | Pertes 5 % plus grosses |
+|---|---|---|---|
+| 1,50 % | 249 k$ (coussin 5 %) | 241 k$ | 229 k$ |
+| 2,00 % | 320 k$ (10 %) | 309 k$ | 293 k$ |
+| **2,15 %** | 340 k$ (15 %) | 329 k$ | **311 k$ (meilleur)** |
+| 2,20 % | 347 k$ (15 %) | **336 k$ (meilleur)** | 298 k$ |
+| 2,25 % | **355 k$ (15 %, meilleur)** | 320 k$ | 304 k$ |
+
+- 2,25 % est le maximum des données, mais la pire journée des 3 ans (−2,21 R) y fait −4,97 % : 0,03 % de marge avant la perte du jour. Dès que les pertes réelles dépassent un peu celles du backtest (glissement, écart sur les stops), 2,20 % puis 2,15 % deviennent meilleurs. À 2,15 %, la pire journée fait −4,75 %, et la combinaison reste meilleure dans les trois cas.
+- Tous ces risques financés sont au-dessus de 1,59 % : une journée à 3 pertes pleines (jamais vue en 3 ans) ferait perdre le compte.
+- Coussin : 10 à 15 % sur 24 mois (sur 12 mois, 5 % ; le coussin encore sur le compte à la fin n'est pas compté).
+
+**Comparaison** (200 k$, gain net moyen · 1 parcours sur 10 au pire · challenges achetés · comptes financés perdus) :
+
+| Combinaison (challenge / financé / coussin) | 12 mois | 24 mois | 24 mois, pertes 5 % plus grosses |
+|---|---|---|---|
+| 1,6 % / 2,2 % / 0 % | 145 k$ · 40 k$ · 3,0 · 66 % | 325 k$ · 172 k$ · 5,0 · 81 % | 291 k$ · 5,7 challenges |
+| **1,4 % / 2,15 % / 10 %** | 138 k$ · 26 k$ · 1,9 · 37 % | **339 k$ · 176 k$ · 2,5 · 54 %** | **308 k$ · 3,0 challenges** |
+| 1,4 % / 2,25 % / 10 % | 144 k$ · 28 k$ · 1,9 · 39 % | 352 k$ · 181 k$ · 2,7 · 57 % | 302 k$ · 3,5 challenges |
+| 1,4 % / 1,5 % / 5 % (sous 1,59 %) | 103 k$ · 30 k$ · 1,6 · 26 % | 249 k$ · 140 k$ · 2,1 · 43 % | 229 k$ · 2,4 challenges |
+
+**Repère retenu : challenge 1,40 % (2 800 $ par trade sur 200 k$), financé 2,15 % (4 300 $), coussin 10 %.** Premier compte financé vers 2 mois (médiane) ; environ 1 compte financé sur 4 est perdu avant son premier versement. Sur 200 k$, tous les montants sont le double de ceux d'un compte de 100 k$ (le prix du challenge double aussi).
+
 ## 4 octodecies. Stratégie de comptes : challenge agressif, financé à un autre risque — 27/11/2026
 
 Parcours simulés de 12 ou 24 mois (même tirage par blocs de mois que 4 septdecies) : achat d'un challenge (540 $), phases 1 et 2 au risque « challenge », compte financé au risque « financé », versement chaque mois de 80 % des gains au-dessus du coussin laissé sur le compte (prix du challenge remboursé au premier versement). Compte perdu ou challenge échoué : nouveau challenge acheté. Gain net = versements − challenges payés. Compte de 100 k$. Page interactive (carte des 100 combinaisons) : https://claude.ai/artifact/7fiv2m6ytSdhsvFKCzFe5Q
