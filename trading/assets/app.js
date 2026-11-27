@@ -181,6 +181,9 @@
     const xs = [a, b].filter(Boolean);
     return { r: xs.reduce((x, y) => x + (isFinite(y.r) ? y.r : 0), 0), net: xs.reduce((x, y) => x + (y.net || 0), 0), vol: xs[0].vol, pi: xs[0].pi, px: xs[0].px, n: xs.length, t2: b };
   }
+  // délai entre la cassure (clôture M1) et la touche du 50 %, en minutes
+  const delayOf = d => d && d.mss && d.mss.t && d.fill ? Math.round((d.fill - d.mss.t) / 60) : NaN;
+  const delayCell = d => { const m = delayOf(d); return isFinite(m) ? (m > 20 ? `<span class="tag D" title="touché plus de 20 min après la cassure">${m} min</span>` : `<span class="mono">${m} min</span>`) : '—'; };
   const takenIds = () => { const m = new Map(); SETUPS.forEach(s => { if (s.data.pris) m.set(String(s.data.pris.id), s); if (s.data.pris2) m.set(String(s.data.pris2.id), s); }); return m; };
   const todaySetup = p => SETUPS.find(s => s.profile === p.id && s.date === nyToday().str);
 
@@ -412,6 +415,10 @@
     const realR = reals.reduce((a, x) => a + (isFinite(x.r) ? x.r : 0), 0), realNet = reals.reduce((a, x) => a + (x.net || 0), 0);
     const redDays = rows.filter(s => sousRouge(s.data)).length, traded = filled.filter(s => !bloqueRouge(s.data));
     const tradedR = traded.reduce((a, s) => a + (resOf(s.data) || 0), 0);
+    // touches lentes (plus de 20 min après la cassure) contre rapides : piste suivie (backtests.md 4 quindecies)
+    const withD = filled.filter(s => isFinite(delayOf(s.data))), slow = withD.filter(s => delayOf(s.data) > 20), fast = withD.filter(s => delayOf(s.data) <= 20);
+    const sumOf = arr => arr.reduce((a, s) => a + (resOf(s.data) || 0), 0);
+    const dKpi = (lab, arr) => `<div class="kpi"><small>${lab}</small><b class="${cls(sumOf(arr))}">${arr.length ? fmtR(sumOf(arr)) : '—'}</b>${arr.length ? `<div class="muted" style="font-size:12px;margin-top:2px">${arr.length} entrée${arr.length > 1 ? 's' : ''} · ${fmtR(sumOf(arr) / arr.length)} par entrée · ${pct(arr.filter(s => resOf(s.data) > 0).length / arr.length)} gagnants</div>` : ''}</div>`;
     $('#jSummary').innerHTML = `
       <div class="kpi"><small>Jours</small><b>${rows.length}</b></div>
       <div class="kpi"><small>Setups validés</small><b>${rows.filter(s => s.data.entry).length}</b></div>
@@ -419,6 +426,7 @@
       <div class="kpi"><small>Win rate règle (${PREF.tp}R)</small><b>${filled.length ? pct(wins / filled.length) : '—'}</b></div>
       <div class="kpi"><small>Règle (${PREF.tp}R)</small><b class="${cls(sumR)}">${fmtR(sumR)}</b></div>
       <div class="kpi"><small>Équivalent à ${fmtE(PREF.risk)} / trade</small><b class="${cls(sumR)}">${fmtM(sumR * PREF.risk)}</b></div>
+      ${withD.length ? dKpi('Touché dans les 20 min après la cassure', fast) + dKpi('Touché plus de 20 min après la cassure', slow) : ''}
       ${redDays ? `<div class="kpi"><small>Jours sous feu rouge</small><b>${redDays}</b></div><div class="kpi"><small>Règle telle que tradée (sans le feu rouge)</small><b class="${cls(tradedR)}">${fmtR(tradedR)}</b></div>` : ''}
       <div class="kpi"><small>Trades pris</small><b>${taken.length}</b></div>
       <div class="kpi"><small>Résultat réel</small><b class="${cls(realNet)}">${reals.length ? fmtM(realNet) : '—'}</b></div>`;
@@ -430,18 +438,18 @@
       const main = `<tr class="jrow" data-k="${esc(key)}">
         <td class="mono">${dateFr(s.date)}</td><td>${pname(s.profile)}</td><td>${dirTag(d.dir)}</td><td>${feuTag(d)}</td>
         <td><span class="tag ${e[0] === 'live' || e[0] === 'info' ? 'bull' : e[0] === 'warn' ? 'D' : 'range'}">${esc(e[1])}</span>${d.etat === 'pas_de_trade' && d.raison ? ` <small class="muted">${esc(d.raison)}</small>` : ''}${d.live ? '' : ' <small class="muted" title="calculé après coup par Desk Key">histo</small>'}</td>
-        <td class="mono">${d.entry ? fmtP(d.entry) : '—'}</td><td class="mono">${d.sl ? fmtP(d.sl) : '—'}</td><td class="mono">${isFinite(tp) ? fmtP(tp) : '—'}</td>
+        <td class="mono">${d.entry ? fmtP(d.entry) : '—'}</td><td class="mono">${d.sl ? fmtP(d.sl) : '—'}</td><td class="mono">${isFinite(tp) ? fmtP(tp) : '—'}</td><td>${d.etat === 'rempli' ? delayCell(d) : '—'}</td>
         <td class="${res > 0 ? 'r-pos' : res < 0 ? 'r-neg' : 'r-zero'}">${d.etat === 'rempli' ? fmtR(res) + (d.fini && (!s2Filled(d) || d.s2.fini) ? '' : ' …') + (s2Filled(d) ? ' <small class="muted" title="trade 1 avec stop remonté + second trade">2 trades</small>' : '') : '—'}</td>
         <td>${d.pris ? (real && !real.open ? `<span class="${real.r >= 0 ? 'r-pos' : 'r-neg'}">${fmtR(real.r)} · ${fmtM(real.net)}</span>${real.n > 1 ? ' <small class="muted">2 trades</small>' : ''}` : '<span class="tag mt5">en cours</span>') : d.etat === 'rempli' ? (bloqueRouge(d) ? '<span class="muted">feu rouge</span>' : '<span class="muted">non pris</span>') : ''}</td></tr>`;
       if (openRow !== key) return main;
       const tr = v => isFinite(v) ? fmtR(v) : '—';
-      return main + `<tr class="jdetail"><td colspan="10"><div class="steps">
+      return main + `<tr class="jdetail"><td colspan="11"><div class="steps">
         ${stepRow(null, 'Tendance', `H4 ${sens(d.h4)} · Daily ${sens(d.d1)} · H1 ${sens(d.h1)}${d.raison ? ' · ' + esc(d.raison) : ''}`)}
         ${d.feu ? stepRow(sousRouge(d) ? false : true, 'Feu', feuTag(d, true)) : ''}
         ${d.pre ? stepRow(null, 'Pré-marché', `haut <span class="mono">${fmtP(d.pre.hi)}</span> · bas <span class="mono">${fmtP(d.pre.lo)}</span>`) : ''}
         ${d.judas ? stepRow(true, 'Judas', `à ${hmP(d.judas.t)} · extrême <span class="mono">${fmtP(d.judas.ext)}</span> à ${hmP(d.judas.text)}`) : ''}
         ${d.mss ? stepRow(true, 'Cassure M1', `à ${hmP(d.mss.t)} · niveau <span class="mono">${fmtP(d.mss.niveau)}</span> · +${fmtN(d.mss.pts, 1)} ${unit}${d.mss.fvg ? ' · FVG' : ''}`) : d.info ? stepRow(false, 'Cassure', esc(d.info)) : ''}
-        ${d.entry ? stepRow(d.etat === 'rempli', 'Ordre', `entrée <span class="mono">${fmtP(d.entry)}</span> · SL <span class="mono">${fmtP(d.sl)}</span> · risque ${fmtN(d.risk, 1)} ${unit} · TP 2R <span class="mono">${fmtP(d.tp && d.tp['2'])}</span> · 2,5R <span class="mono">${fmtP(d.tp && d.tp['2.5'])}</span> · 3R <span class="mono">${fmtP(d.tp && d.tp['3'])}</span>${d.fill ? ` · touché à ${hmP(d.fill)}` : ''}`) : ''}
+        ${d.entry ? stepRow(d.etat === 'rempli', 'Ordre', `entrée <span class="mono">${fmtP(d.entry)}</span> · SL <span class="mono">${fmtP(d.sl)}</span> · risque ${fmtN(d.risk, 1)} ${unit} · TP 2R <span class="mono">${fmtP(d.tp && d.tp['2'])}</span> · 2,5R <span class="mono">${fmtP(d.tp && d.tp['2.5'])}</span> · 3R <span class="mono">${fmtP(d.tp && d.tp['3'])}</span>${d.fill ? ` · touché à ${hmP(d.fill)}${isFinite(delayOf(d)) ? ', ' + delayOf(d) + ' min après la cassure' : ''}` : ''}`) : ''}
         ${d.res ? stepRow(null, 'Résultat de la règle', `2R ${tr(num(d.res['2']))} · 2,5R ${tr(num(d.res['2.5']))} · 3R ${tr(num(d.res['3']))}${s2Filled(d) ? ' (trade 1 seul, sans second trade)' : ''}`) : ''}
         ${d.s2 ? stepRow(d.s2.etat === 'rempli' ? true : d.s2.etat === 'annule' ? false : null, 'Second trade', s2Text(d)) : ''}
         ${s2Filled(d) ? stepRow(null, 'Or : résultat des 2 trades', `trade 1 avec stop remonté ${tr(num(d.s2.t1))} + second trade ${tr(num(d.s2.r))} = <b>${tr(num(d.s2.t1) + num(d.s2.r))}</b>`) : ''}
@@ -449,7 +457,7 @@
         ${d.pris2 ? stepRow(null, 'Second trade réel', (() => { const b = realOf(d, 'pris2'); return b && !b.open ? `${fmtN(b.vol, 2)} lot · entrée <span class="mono">${fmtP(b.pi)}</span> · sortie <span class="mono">${fmtP(b.px)}</span> · ${fmtR(b.r)} · ${fmtM(b.net)}` : 'position ouverte'; })()) : ''}
       </div></td></tr>`;
     }).join('');
-    $('#jTable').innerHTML = rows.length ? `<thead><tr><th>Date</th><th>Actif</th><th>Sens</th><th title="feu rouge de l'indice ce jour-là">Feu</th><th>Étape</th><th>Entrée</th><th>SL</th><th>TP ${PREF.tp}R</th><th>Règle</th><th>Trade réel</th></tr></thead><tbody>${body}</tbody>`
+    $('#jTable').innerHTML = rows.length ? `<thead><tr><th>Date</th><th>Actif</th><th>Sens</th><th title="feu rouge de l'indice ce jour-là">Feu</th><th>Étape</th><th>Entrée</th><th>SL</th><th>TP ${PREF.tp}R</th><th title="délai entre la cassure et la touche du 50 %">Délai</th><th>Règle</th><th>Trade réel</th></tr></thead><tbody>${body}</tbody>`
       : '<tbody><tr><td class="muted">Aucun setup sur cette période. Desk Key envoie les 7 derniers jours dès son installation, puis chaque séance.</td></tr></tbody>';
     // trades MT5 hors Desk Key
     const linked = takenIds();
@@ -462,10 +470,10 @@
   $('#jTable').addEventListener('click', ev => { const tr = ev.target.closest('tr.jrow'); if (!tr) return; openRow = openRow === tr.dataset.k ? null : tr.dataset.k; renderJournal(); });
   ['#jProfile', '#jPeriod', '#jType'].forEach(s => $(s).addEventListener('change', renderJournal));
   $('#jCsv').addEventListener('click', () => {
-    const head = ['date', 'actif', 'sens', 'feu', 'feu_10_setups_R', 'etape', 'raison', 'entree', 'sl', 'tp2', 'tp2.5', 'tp3', 'risque_pts', 'judas', 'cassure', 'touche', 'regle_2R', 'regle_2.5R', 'regle_3R', 'or_2e_trade_entree', 'or_2e_trade_sl', 'or_2e_trade_R', 'or_trade1_stop_remonte_R', 'regle_retenue_R', 'pris', 'reel_R', 'reel_net'];
+    const head = ['date', 'actif', 'sens', 'feu', 'feu_10_setups_R', 'etape', 'raison', 'entree', 'sl', 'tp2', 'tp2.5', 'tp3', 'risque_pts', 'judas', 'cassure', 'touche', 'delai_min', 'regle_2R', 'regle_2.5R', 'regle_3R', 'or_2e_trade_entree', 'or_2e_trade_sl', 'or_2e_trade_R', 'or_trade1_stop_remonte_R', 'regle_retenue_R', 'pris', 'reel_R', 'reel_net'];
     const lines = filteredSetups().map(s => {
       const d = s.data, real = realAll(d) || {}, t = v => v ? hmP(v) : '', f = feuOf(d), s2 = d.s2 || {};
-      return [s.date, s.profile, d.dir, f ? (f.rouge ? 'rouge' : 'vert') : '', f ? f.s : '', d.etat, d.raison || d.info || '', d.entry, d.sl, d.tp && d.tp['2'], d.tp && d.tp['2.5'], d.tp && d.tp['3'], d.risk, d.judas ? t(d.judas.t) : '', d.mss ? t(d.mss.t) : '', t(d.fill), d.res && d.res['2'], d.res && d.res['2.5'], d.res && d.res['3'],
+      return [s.date, s.profile, d.dir, f ? (f.rouge ? 'rouge' : 'vert') : '', f ? f.s : '', d.etat, d.raison || d.info || '', d.entry, d.sl, d.tp && d.tp['2'], d.tp && d.tp['2.5'], d.tp && d.tp['3'], d.risk, d.judas ? t(d.judas.t) : '', d.mss ? t(d.mss.t) : '', t(d.fill), isFinite(delayOf(d)) ? delayOf(d) : '', d.res && d.res['2'], d.res && d.res['2.5'], d.res && d.res['3'],
         s2.etat === 'rempli' ? s2.e : '', s2.etat === 'rempli' ? s2.sl : '', s2.etat === 'rempli' ? s2.r : '', s2.etat === 'rempli' ? s2.t1 : '', d.etat === 'rempli' && isFinite(resOf(d)) ? resOf(d).toFixed(2) : '', d.pris ? (d.pris2 ? 'oui (2 trades)' : 'oui') : '', isFinite(real.r) ? real.r.toFixed(2) : '', real.net != null ? real.net : '']
         .map(v => v == null ? '' : /[;"\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v)).join(';');
     });
