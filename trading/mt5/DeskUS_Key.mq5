@@ -12,6 +12,9 @@
 //|    backtest : achat au marché si le 50 % est touché sans que     |
 //|    l'ordre soit rempli (spread) ; ventes du SP500 et de l'or :   |
 //|    stop et objectif décalés du spread.                           |
+//|  - 1.11 : alertes pour passer l'ordre soi-même depuis le         |
+//|    téléphone quand Desk Key n'a pas d'ordre (niveaux, 50 %       |
+//|    déplacé, entrée touchée, fin de fenêtre, 13:00 NY).           |
 //|  - Détecte le setup en direct, exactement comme le backtest :    |
 //|    tendance -> Judas sur le pré-marché -> cassure M1 -> limite   |
 //|    au 50 % (Fibo retracé) -> SL derrière le Judas -> TP en R.    |
@@ -21,12 +24,12 @@
 //|    leur résultat), et envoie les niveaux à l'application.        |
 //+------------------------------------------------------------------+
 #property copyright "Desk US"
-#property version   "1.10"
+#property version   "1.11"
 #property description "Règle A Desk US (US100 / SP500 / or) : détection, dessin, historique, feu rouge et exécution en une touche."
 
 #include <Trade\Trade.mqh>
 
-#define DK_VERSION "1.10"
+#define DK_VERSION "1.11"
 
 enum ENUM_DK_PROFIL
   {
@@ -84,6 +87,7 @@ input int            InpCoin        = 0;               // Coin du panneau (0 = h
 input group          "Notifications"
 input bool           InpNotifPush   = true;            // Notification sur le téléphone (application MT5, MetaQuotes ID)
 input bool           InpNotifTout   = false;           // Aussi le sens du jour et le Judas (sinon : setup prêt, ordre, entrée, sortie)
+input bool           InpAlertesTel  = true;            // Alertes pour trader depuis le téléphone quand Desk Key n'a pas d'ordre (niveaux, 50 % déplacé, entrée touchée, fin, 13:00 NY)
 input bool           InpAlertePC    = true;            // Fenêtre d'alerte et son sur l'ordinateur
 input string         InpTgToken     = "";              // Telegram : jeton du bot (vide = pas de Telegram)
 input string         InpTgChat      = "";              // Telegram : identifiant du chat
@@ -955,6 +959,10 @@ string RisqueAnalyse(color &c)
 #define N_S2REMPLI 2048
 #define N_S2SORTIE 4096
 #define N_S2ANNULE 8192
+#define N_M_TOUCHE 16384    // 1.11 · alertes « téléphone »
+#define N_M_FIN    32768
+#define N_M_13H    65536
+#define N_M_DEPART 131072
 string UrlEnc(string s)
   {
    uchar b[]; int n = StringToCharArray(s, b, 0, WHOLE_ARRAY, CP_UTF8);
@@ -1123,6 +1131,20 @@ void Marquer(int bit)
   }
 void NotifierUneFois(int bit, string texte, bool fort) { if(DejaNotifie(bit)) return; Marquer(bit); Notifier(texte, fort); }
 string ModeTexte() { return g_auto ? "AUTO : l'ordre part tout seul" : "manuel : touche " + InpTouche; }
+//--- 1.11 · alertes pour passer l'ordre soi-même depuis le téléphone --
+// seulement quand Desk Key n'a ni ordre ni position et ne va pas en placer (pas d'AUTO, pas armé)
+bool   Manuel() { return InpAlertesTel && !g_auto && !g_arme && !g_tradeFait && MonOrdre() == 0 && MaPosition() == 0; }
+string HnYP(long utc) { return Hm(NyLocal(utc)) + " NY (" + Hm(ParisLocal(utc)) + " Paris)"; }
+// l'ordre tel que Desk Key le placerait : ventes SP500 / or avec stop et objectif + spread, lot pour le risque réglé
+string OrdreTexte(int dir, double e, double sl, double tp)
+  {
+   double sp = SpreadPx();
+   if(dir < 0 && VenteDecalee() && sp > 0) { sl = NormPx(sl + sp); tp = NormPx(tp + sp); }
+   double lots = Lot(e, sl);
+   return (dir > 0 ? "ACHAT" : "VENTE") + " LIMITE " + Px(e) + " · SL " + Px(sl) + " · TP " + Px(tp) + " · " + Fr(lots, 2) + " lot (risque " + Fr(RisqueArgent(e, sl, lots), 0) + " " + AccountInfoString(ACCOUNT_CURRENCY) + ")";
+  }
+double g_mE = 0;          // dernier 50 % envoyé en alerte « téléphone »
+datetime g_mT = 0;
 string HnY(long utc) { return Hm(NyLocal(utc)) + " NY"; }
 //--- feu rouge (US100, SP500) ----------------------------------------
 bool FeuBloque() { return P.feu && g_feuOn && g_feuCalc && g_feuRouge; }
@@ -1161,8 +1183,8 @@ void SuivreNotifs()
   {
    if(!G.ok || g_jour == "") return;
    long now = NowUtc();
-   if(InpNotifTout && G.dir != 0 && now >= G.t925 && now < G.t11)
-      NotifierUneFois(N_SENS, (G.dir > 0 ? "ACHATS" : "VENTES") + " uniquement aujourd'hui (H4 " + Sens(G.h4) + (P.tendance == 1 ? ", Daily " + Sens(G.d1) : (P.tendance == 2 ? ", H1 " + Sens(G.h1) : "")) + ")"
+   if((InpNotifTout || InpAlertesTel) && G.dir != 0 && now >= G.t925 && now < G.t11)
+      NotifierUneFois(N_SENS, "Desk Key en marche · " + (G.dir > 0 ? "ACHATS" : "VENTES") + " uniquement aujourd'hui (H4 " + Sens(G.h4) + (P.tendance == 1 ? ", Daily " + Sens(G.d1) : (P.tendance == 2 ? ", H1 " + Sens(G.h1) : "")) + ")"
                       + (FeuBloque() ? " · FEU ROUGE : pas d'ordre aujourd'hui" : ""), false);
    if(InpNotifTout && S.sweepT > 0 && now < G.t11)
       NotifierUneFois(N_JUDAS, "Judas fait à " + Hm(ParisLocal(S.sweepT)) + " Paris · attente de la cassure", false);
@@ -1171,14 +1193,49 @@ void SuivreNotifs()
       double e = NormPx(S.entry), sl = NormPx(S.sl), lots = Lot(e, sl);
       if(FeuBloque())
          NotifierUneFois(N_PRET, "setup du jour (" + (G.dir > 0 ? "achat" : "vente") + " limite " + Px(e) + ") · FEU ROUGE : pas d'ordre, la règle est suivie à blanc", false);
+      else if(Manuel())
+        {
+         if(!DejaNotifie(N_PRET))
+           {
+            g_mE = e; g_mT = TimeLocal();
+            if(now >= G.t10) Marquer(N_M_DEPART);   // envoyé après 10:00 NY : pas besoin du « c'est l'heure »
+            NotifierUneFois(N_PRET, "SETUP PRÊT · À PLACER DEPUIS TON TÉLÉPHONE : " + OrdreTexte(G.dir, e, sl, NormPx(TpPrix(S, G.dir, g_tp))) + " · "
+                            + (now < G.t10 ? "PAS AVANT " + HnYP(G.t10) + " (touché avant = pas de trade) · " : "") + "expiration " + HnYP(G.tF)
+                            + " · Desk Key te préviendra si le 50 % bouge", true);
+           }
+        }
       else
          NotifierUneFois(N_PRET, "SETUP PRÊT · " + (G.dir > 0 ? "ACHAT" : "VENTE") + " limite " + Px(e) + " · SL " + Px(sl) + " · TP " + Px(NormPx(TpPrix(S, G.dir, g_tp))) + " (" + Fr(g_tp, 1) + "R) · "
                          + Fr(lots, 2) + " lot · risque " + Fr(RisqueArgent(e, sl, lots), 0) + " " + AccountInfoString(ACCOUNT_CURRENCY) + " · "
                          + (now < G.t10 ? "départ 10:00 NY (" + Hm(ParisLocal(G.t10)) + " Paris) · " : "") + "entrées jusqu'à " + HnY(G.tF) + " · " + ModeTexte()
                          + (g_protect ? " · protection annonces ON" : "") + (P.feu && g_feuRouge && !g_feuOn ? " · feu rouge désactivé" : ""), true);
      }
+   if(S.etape == E_PRET && now < G.tF && !FeuBloque() && DejaNotifie(N_PRET) && Manuel())
+     {
+      double e = NormPx(S.entry), sl = NormPx(S.sl), tp = NormPx(TpPrix(S, G.dir, g_tp));
+      if(now >= G.t10) { if(!DejaNotifie(N_M_DEPART)) { g_mE = e; g_mT = TimeLocal(); } NotifierUneFois(N_M_DEPART, "C'EST L'HEURE (" + HnYP(G.t10) + ") · place ton ordre : " + OrdreTexte(G.dir, e, sl, tp) + " · expiration " + HnYP(G.tF), true); }
+      if(g_mE <= 0) g_mE = e;
+      double seuil = MathMax(SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE), 0.02 * MathAbs(e - sl));
+      if(now >= G.t10 && DejaNotifie(N_M_DEPART) && MathAbs(e - g_mE) >= seuil && TimeLocal() - g_mT >= 60)   // avant 10:00 NY, l'ordre n'est pas encore placé
+        {
+         g_mE = e; g_mT = TimeLocal();
+         Notifier("NOUVEAU 50 % (la jambe s'allonge) · déplace ton ordre : " + OrdreTexte(G.dir, e, sl, tp), true);
+        }
+     }
+   if(S.etape == E_TOUCHE && S.fillT > 0 && DejaNotifie(N_PRET) && !FeuBloque() && Manuel() && now < G.tF + 1800)
+     {
+      double e = NormPx(S.entry), rk = MathAbs(S.entry - S.sl);
+      NotifierUneFois(N_M_TOUCHE, "ENTRÉE TOUCHÉE à " + Hm(ParisLocal(S.fillT)) + " Paris sur le graphique · "
+                      + (G.dir > 0 ? "si ton achat limite n'est pas rempli (spread), achète au marché tant que le prix est sous " + Px(NormPx(e + InpRattrapMaxR * rk)) + ", même SL et même TP"
+                                   : "ta vente limite doit être remplie : vérifie-la")
+                      + " · sortie à " + HnYP(G.t13) + " si ni le SL ni le TP ne sont touchés", true);
+     }
+   if(S.etape == E_EXPIRE && DejaNotifie(N_PRET) && !FeuBloque() && Manuel())
+      NotifierUneFois(N_M_FIN, "FIN DE LA FENÊTRE (" + HnYP(G.tF) + ") sans entrée : annule ton ordre limite, pas de trade aujourd'hui", true);
+   if(S.etape == E_TOUCHE && DejaNotifie(N_PRET) && !FeuBloque() && Manuel() && now >= G.t13 && now < G.t13 + 3600 && S.exitT >= G.t13)
+      NotifierUneFois(N_M_13H, HnYP(G.t13) + " : ferme ta position si elle est encore ouverte (sortie de la règle)", true);
    if(S.etape == E_IGNORE && DejaNotifie(N_PRET))
-      NotifierUneFois(N_AVANT10, "setup annulé : le 50 % a été touché avant 10:00 NY (pas de trade, comme le backtest)", false);
+      NotifierUneFois(N_AVANT10, "setup annulé : le 50 % a été touché avant 10:00 NY (pas de trade, comme le backtest) · annule ton ordre s'il est placé", false);
    ulong pos = MaPosition(), ord = MonOrdre();
    if(ord != 0) g_ordSuivi = ord;
    else if(g_ordSuivi != 0 && pos == 0)
@@ -1219,6 +1276,14 @@ void SuivreNotifs()
 void SuivreNotifs2(long now, ulong pos1)
   {
    if(!P.second || !g_second) return;
+   if(S.s2etat == 4 && now < G.t12 && pos1 == 0 && S.etape == E_TOUCHE && Manuel())
+     {
+      // 1.11 : trade 1 passé depuis le téléphone (Desk Key ne voit pas la position)
+      double e = NormPx(S.s2e), sl = NormPx(S.s2sl), sp = SpreadPx(), sl1 = sl;
+      if(G.dir < 0 && VenteDecalee() && sp > 0) sl1 = NormPx(sl + sp);
+      NotifierUneFois(N_S2PRET, "SECOND TRADE PRÊT · À PLACER DEPUIS TON TÉLÉPHONE (si ton trade 1 est en position) : " + OrdreTexte(G.dir, e, sl, NormPx(S.s2tp))
+                      + " · au remplissage, remonte le stop du trade 1 à " + Px(sl1) + " · expiration " + HnYP(G.t12), true);
+     }
    if(S.s2etat == 4 && now < G.t12 && pos1 != 0 && MonOrdre2() == 0 && MaPosition2() == 0 && !g_t2Fait)
      {
       double e = NormPx(S.s2e), sl = NormPx(S.s2sl), lots = Lot(e, sl);
@@ -2134,6 +2199,7 @@ void Tick()
       g_tradeFait = TradeDejaFait();
       g_t2Fait = P.second && Trade2DejaFait();
       g_arme = false; g_arme2 = false;
+      g_mE = 0; g_mT = 0;
       g_lastBar = 0;
       if(g_histJour != jour) { g_histJour = jour; g_feuCalc = false; Historique(true); SuivreFeu(); }
      }

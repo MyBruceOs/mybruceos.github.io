@@ -177,6 +177,16 @@ Desk Key prévient à chaque étape importante, une seule fois par jour et par �
 - **problème** : ordre refusé par le serveur, lot impossible ;
 - en option (réglage « Aussi le sens du jour et le Judas ») : le sens du jour à 9:25 NY et le Judas.
 
+**Alertes pour trader depuis le téléphone (Desk Key 1.11)** · réglage « Alertes pour trader depuis le téléphone », activé par défaut. Elles ne partent que si Desk Key n'a ni ordre ni position ce jour-là et n'en placera pas (pas d'AUTO, rien d'armé) : quand on n'est pas devant MT5, on passe l'ordre soi-même depuis l'application MT5 du téléphone. Le PC doit rester allumé, MT5 ouvert, Desk Key sur ses graphiques.
+- **Chaque matin (9:25 NY, 15:25 Paris)** : « Desk Key en marche · ACHATS / VENTES uniquement aujourd'hui ». Pas de message : le PC ou MT5 s'est arrêté.
+- **SETUP PRÊT · À PLACER DEPUIS TON TÉLÉPHONE** : sens, prix limite, SL, TP, lots et risque, expiration (11:00 NY / 17:00 Paris, 12:00 NY pour l'or). Ventes du SP500 et de l'or : stop et objectif déjà décalés du spread (comme Desk Key les placerait). Setup prêt avant 10:00 NY : « PAS AVANT 10:00 NY », puis à 10:00 NY « C'EST L'HEURE · place ton ordre » avec les niveaux du moment.
+- **NOUVEAU 50 %** : la jambe s'allonge, déplacer l'ordre aux nouveaux niveaux (au plus une alerte par minute, à partir de 10:00 NY, si le 50 % bouge d'au moins 2 % du risque).
+- **ENTRÉE TOUCHÉE** (heure de Paris) : achat non rempli à cause du spread : acheter au marché tant que le prix reste sous le 50 % + 10 % du risque, même SL et même TP ; vente : vérifier qu'elle est remplie.
+- **FIN DE LA FENÊTRE** sans entrée : annuler l'ordre. Setup annulé (50 % touché avant 10:00 NY) : annuler l'ordre s'il est placé.
+- **13:00 NY (19:00 Paris)** : fermer la position si elle est encore ouverte (sortie de la règle).
+- **Or, SECOND TRADE PRÊT** : l'ordre à placer et le niveau où remonter le stop du trade 1 au remplissage.
+- Sous feu rouge, seul le message « setup du jour · FEU ROUGE : pas d'ordre » est envoyé.
+
 Canaux, à choisir dans les paramètres de Desk Key (onglet Paramètres, groupe « Notifications ») :
 1. **Téléphone, application MT5** (activé par défaut, gratuit, rien à installer de plus) :
    - sur le téléphone, application MetaTrader 5 → Paramètres → **Messages** : noter le **MetaQuotes ID** ;
