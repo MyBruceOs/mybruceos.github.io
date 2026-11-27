@@ -79,6 +79,9 @@
   let COMBINED = store.get('dk.combined', null); // attentes pour l'ensemble
   let SETUPS = [];                                // [{profile, date, data, at}]
   let SETUPS_AT = 0;
+  // lectures incrémentales : on ne télécharge que ce qui a changé (quota de transfert Supabase)
+  const SINCE = { key: '', setups: 0, trades: 0, full: 0 };
+  function sinceFor(key) { if (SINCE.key !== key || Date.now() - SINCE.full > 30 * 60 * 1000) { SINCE.key = key; SINCE.setups = 0; SINCE.trades = 0; SINCE.full = Date.now(); } }
   let EVENTS = [];
 
   function liveAge() { const d = LIVE.data; if (!d || !d.updated_at) return Infinity; return (d.now - d.updated_at) + (Date.now() - LIVE.readAt) / 1000; }
@@ -601,7 +604,21 @@
   }
   async function loadSetups() {
     if (!LIVE.key) return;
-    try { SETUPS = await rpc('desk_setups_read', { p_key: LIVE.key, p_days: 400 }) || []; SETUPS_AT = Date.now(); renderAll(); } catch (e) { /* nouvel essai */ }
+    try {
+      sinceFor(LIVE.key);
+      const first = !SINCE.setups;
+      const r = await rpc('desk_setups_since', { p_key: LIVE.key, p_since: SINCE.setups, p_days: 400 });
+      const rows = (r && r.rows) || [];
+      if (first) SETUPS = rows;
+      else if (rows.length) {
+        const m = new Map(SETUPS.map(x => [x.profile + '|' + x.date, x]));
+        rows.forEach(x => m.set(x.profile + '|' + x.date, x));
+        SETUPS = [...m.values()].sort((a, b) => (b.date > a.date) - (b.date < a.date) || (a.profile > b.profile) - (a.profile < b.profile));
+      }
+      if (r && r.now) SINCE.setups = r.now;
+      SETUPS_AT = Date.now();
+      if (first || rows.length) renderAll(); else renderLight();
+    } catch (e) { /* nouvel essai */ }
   }
   async function loadEvents() {
     const t = nyToday(), to = new Date(Date.UTC(t.y, t.m - 1, t.d) + 10 * 86400000).toISOString().slice(0, 10);
@@ -612,9 +629,20 @@
     if (!force && document.hidden && LIVE.n % 4 !== 0) { LIVE.n++; return; }
     LIVE.busy = true;
     try {
-      const d = await rpc('desk_read', { p_key: LIVE.key, p_trades: force || LIVE.n % 10 === 0, p_bars_after: 9e12 });
+      sinceFor(LIVE.key);
+      const full = force || !SINCE.trades;
+      const d = await rpc('desk_read', { p_key: LIVE.key, p_trades: full, p_bars_after: 9e12 });
       LIVE.readAt = Date.now(); LIVE.err = '';
-      if (d.trades) { LIVE.trades = d.trades; delete d.trades; }
+      if (d.trades) { LIVE.trades = d.trades; delete d.trades; SINCE.trades = d.now || 0; }
+      else if (LIVE.n % 10 === 0) {
+        const t = await rpc('desk_trades_since', { p_key: LIVE.key, p_since: SINCE.trades });
+        if (t && t.trades && t.trades.length) {
+          const m = new Map(LIVE.trades.map(x => [String(x.data && x.data.id), x]));
+          t.trades.forEach(x => m.set(String(x.data && x.data.id), x));
+          LIVE.trades = [...m.values()].sort((a, b) => ((b.data && b.data.tc) || 0) - ((a.data && a.data.tc) || 0));
+        }
+        if (t && t.now) SINCE.trades = t.now;
+      }
       LIVE.data = d;
       if (d.account && d.account.cur && d.account.cur !== CUR) { CUR = d.account.cur; store.set('td.cur', CUR); }
       if (Date.now() - SETUPS_AT > 10000) await loadSetups(); else renderLight();

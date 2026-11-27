@@ -1,6 +1,6 @@
 # Règles de trading Desk US — référence A
 
-*Version du 27 novembre 2026 (Desk Key 1.06, nouvelle application). Règles validées par le backtest M1 FTMO (décembre 2025 – novembre 2026). Les chiffres détaillés sont dans [backtests.md](backtests.md).*
+*Version du 27 novembre 2026 (Desk Key 1.07, nouvelle application). Règles validées par le backtest M1 FTMO (décembre 2025 – novembre 2026). Les chiffres détaillés sont dans [backtests.md](backtests.md).*
 
 > **Un indice = un profil = un graphique.** On ne mélange jamais les règles de l'US100 et du SP500.
 
@@ -95,7 +95,7 @@ Fichier : `trading/mt5/DeskUS_Key.mq5`.
 - Bouton **AUTO** : mode automatique, désactivé par défaut. À n'activer que si la prop firm l'autorise.
 - Gestion faite par Desk Key :
   - l'ordre suit le 50 % quand la jambe s'allonge, avec le lot recalculé ;
-  - il est annulé à 11:00 NY s'il n'est pas rempli ;
+  - il est annulé à 11:00 NY s'il n'est pas rempli : l'ordre porte une **date d'expiration à 11:00 NY chez FTMO**, il est donc annulé par le serveur même si MT5 est fermé (si le serveur refuse l'expiration, Desk Key l'annule lui-même) ;
   - la position est fermée à 13:00 NY (réglage modifiable).
 - Chaque profil a son **numéro magique** : US100 = 7710100, SP500 = 7710500. Le commentaire de l'ordre indique le profil (« DeskKey US100 3R »), pour le suivi dans le journal.
 

@@ -5,7 +5,7 @@
 //|  Le robot ne passe AUCUN ordre : il lit et il envoie, c'est tout.|
 //+------------------------------------------------------------------+
 #property copyright   "Desk US"
-#property version     "1.05"
+#property version     "1.06"
 #property description "Pont MT5 -> Desk US. Lecture seule : aucun ordre n'est passé."
 
 //--- paramètres (onglet « Entrées »)
@@ -18,13 +18,15 @@ input string InpUrl      = "https://xakrdapoxthvvqpyjuji.supabase.co/rest/v1/rpc
 input string InpApiKey   = "sb_publishable_Hzn2bTrae-TflG_HCzLVWg_QYF4l0ec";                 // Clé publique du service
 input bool   InpHistExport  = true;   // Exporter l'historique (une seule fois) pour les backtests
 input int    InpHistDaysM1  = 365;    // Profondeur de l'export M1 (jours)
+input string InpHistExtra   = "US30.cash,XAUUSD"; // Symboles à exporter seulement pour les backtests (pas suivis en direct)
 input int    InpHistDaysM5  = 1095;   // Profondeur de l'export M5 (jours)
 input bool   InpHistRestart = false;  // Recommencer l'export depuis le début
 input string InpHistUrl     = "https://xakrdapoxthvvqpyjuji.supabase.co/rest/v1/rpc/desk_hist_push"; // Adresse de l'export
 
-#define EA_VERSION "1.05"
+#define EA_VERSION "1.06"
 
 string   g_syms[];
+string   g_hsyms[];   // symboles exportés (suivis + export seul)
 string   g_qsyms[];   // symboles suivis + intermarché (cotations seulement)
 long     g_srvOff      = 0;     // décalage heure serveur - UTC (secondes)
 datetime g_lastBars    = 0;     // dernier envoi des bougies (heure locale PC)
@@ -489,7 +491,7 @@ string RatesArray(MqlRates &r[], int got, int dg)
 void HistStep()
   {
    if(!InpHistExport || g_histDone) return;
-   for(int k = 0; k < ArraySize(g_syms); k++)
+   for(int k = 0; k < ArraySize(g_hsyms); k++)
      {
       for(int j = 0; j < 2; j++)
         {
@@ -497,7 +499,7 @@ void HistStep()
          string tfn = (j == 0) ? "M1" : "M5";
          int days = (j == 0) ? InpHistDaysM1 : InpHistDaysM5;
          long span = (j == 0) ? 86400 : 7 * 86400;
-         string gv = HistGV(g_syms[k], tfn);
+         string gv = HistGV(g_hsyms[k], tfn);
          long limit = (long)TimeTradeServer() - (long)days * 86400;
          long cursor;
          if(GlobalVariableCheck(gv)) cursor = (long)GlobalVariableGet(gv);
@@ -516,18 +518,18 @@ void HistStep()
             MqlRates r[];
             ArraySetAsSeries(r, false);
             ResetLastError();
-            int got = CopyRates(g_syms[k], tf, (datetime)from, (datetime)(cursor - 1), r);
+            int got = CopyRates(g_hsyms[k], tf, (datetime)from, (datetime)(cursor - 1), r);
             if(got < 0)
               {
                // historique pas encore chargé par le terminal : on réessaie au prochain cycle
                g_histFail++;
                if(g_histFail > 40)
                  {
-                  Print("Desk US : historique ", g_syms[k], " ", tfn, " indisponible avant ", TimeToString((datetime)cursor), ", export arrêté pour cette série.");
+                  Print("Desk US : historique ", g_hsyms[k], " ", tfn, " indisponible avant ", TimeToString((datetime)cursor), ", export arrêté pour cette série.");
                   GlobalVariableSet(gv, (double)limit);
                   g_histFail = 0;
                  }
-               g_histStatus = "Historique : chargement " + g_syms[k] + " " + tfn + " par MT5…";
+               g_histStatus = "Historique : chargement " + g_hsyms[k] + " " + tfn + " par MT5…";
                return;
               }
             if(got == 0)
@@ -537,15 +539,15 @@ void HistStep()
                continue;
               }
             g_histFail = 0;
-            int dg = (int)SymbolInfoInteger(g_syms[k], SYMBOL_DIGITS);
-            string body = "{\"p_key\":" + Q(InpKey) + ",\"p_sym\":" + Q(g_syms[k]) + ",\"p_tf\":" + Q(tfn) + ",\"p_bars\":" + RatesArray(r, got, dg) + "}";
+            int dg = (int)SymbolInfoInteger(g_hsyms[k], SYMBOL_DIGITS);
+            string body = "{\"p_key\":" + Q(InpKey) + ",\"p_sym\":" + Q(g_hsyms[k]) + ",\"p_tf\":" + Q(tfn) + ",\"p_bars\":" + RatesArray(r, got, dg) + "}";
             string resp;
             int code = PostTo(InpHistUrl, body, resp, 20000);
             if(code >= 200 && code < 300)
               {
                GlobalVariableSet(gv, (double)from);
                g_histSent++;
-               g_histStatus = "Historique : " + IntegerToString(g_histSent) + " paquets envoyés · " + g_syms[k] + " " + tfn + " jusqu'au " + TimeToString((datetime)from, TIME_DATE);
+               g_histStatus = "Historique : " + IntegerToString(g_histSent) + " paquets envoyés · " + g_hsyms[k] + " " + tfn + " jusqu'au " + TimeToString((datetime)from, TIME_DATE);
               }
             else
               {
@@ -603,6 +605,26 @@ int OnInit()
       return INIT_PARAMETERS_INCORRECT;
      }
    ArrayCopy(g_qsyms, g_syms);
+   // nouvel export à chaque démarrage : un symbole ajouté à la liste est exporté
+   // (les séries déjà finies sont sautées tout de suite grâce aux variables globales du terminal)
+   g_histDone = false; g_histFail = 0; g_histSent = 0;
+   ArrayCopy(g_hsyms, g_syms);
+   string xparts[];
+   int xn = StringSplit(InpHistExtra, ',', xparts);
+   for(int i = 0; i < xn; i++)
+     {
+      string s = xparts[i];
+      StringTrimLeft(s);
+      StringTrimRight(s);
+      if(s == "") continue;
+      bool deja = false;
+      for(int j = 0; j < ArraySize(g_hsyms); j++) if(g_hsyms[j] == s) deja = true;
+      if(deja) continue;
+      if(!SymbolSelect(s, true)) { Print("Desk US : export, symbole absent chez ce broker : ", s); continue; }
+      int k = ArraySize(g_hsyms);
+      ArrayResize(g_hsyms, k + 1);
+      g_hsyms[k] = s;
+     }
    string mparts[];
    int mn = StringSplit(InpMacro, ',', mparts);
    for(int i = 0; i < mn; i++)
@@ -618,10 +640,10 @@ int OnInit()
      }
    if(InpHistRestart)
      {
-      for(int k = 0; k < ArraySize(g_syms); k++)
+      for(int k = 0; k < ArraySize(g_hsyms); k++)
         {
-         GlobalVariableDel(HistGV(g_syms[k], "M1"));
-         GlobalVariableDel(HistGV(g_syms[k], "M5"));
+         GlobalVariableDel(HistGV(g_hsyms[k], "M1"));
+         GlobalVariableDel(HistGV(g_hsyms[k], "M5"));
         }
      }
    PartagerCle();
