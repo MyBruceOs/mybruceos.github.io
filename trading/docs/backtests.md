@@ -547,6 +547,32 @@ Robustesse (fenêtre de 6 à 20 setups, seuil −2, 0 ou +2 R) : toutes les vari
 
 Variantes moins bonnes : mi-risque au lieu de pause (2025 −14 à −16 R) ; un seul feu pour les deux indices (2025 −17 R).
 
+## 4 duovicies. Et si l'avantage réel n'est que de 75 % ou 50 % du backtest ? — 28/11/2026
+
+Les règles ont été choisies sur ces 3 ans : en réel, une partie de l'avantage peut disparaître. Scénario prudent (simulateur, réglage « Avantage gardé en réel ») : les gains des jours gagnants sont réduits pour que le total des 35 mois passe de 188 R à 141 R (75 %) ou 94 R (50 %) ; les pertes restent les mêmes (211 R).
+
+**Challenge, une tentative** (les deux phases réussies · durée médiane) :
+
+| Risque | Avantage 100 % | 75 % | 50 % |
+|---|---|---|---|
+| 1,0 % | 90 % · 2,9 mois | 86 % · 3,4 mois | 78 % · 4,2 mois |
+| 1,2 % | 84 % · 2,4 mois | 79 % · 2,8 mois | 71 % · 3,3 mois |
+| 1,5 % | 78 % · 1,9 mois | 72 % · 2,2 mois | 61 % · 2,5 mois |
+| 1,8 % | 71 % · 1,6 mois | 65 % · 1,8 mois | 59 % · 2,0 mois |
+
+**Stratégie proposée** (1 × 50k + réserve, réinvestir en 100k jusqu'à 400 k$, challenge 1,5 %, financé 2,15 %, coussin 5 %, budget 1 200 €) :
+
+| Avantage | 12 mois : moyenne · médiane | Aucun versement (12 mois) | 1er versement | 24 mois : moyenne · médiane |
+|---|---|---|---|---|
+| 100 % | 143 k€ · 124 k€ | 6 % | 3,2 mois | 434 k€ · 444 k€ |
+| 75 % | 84 k€ · 54 k€ | 10 % | 3,8 mois | 284 k€ · 284 k€ |
+| 50 % | 39 k€ · **6 k€** | **21 %** | 4,6 mois | 143 k€ · 116 k€ |
+
+- À 50 %, la stratégie reste gagnante en moyenne, mais sur 12 mois elle devient une loterie : la moitié des parcours gagne moins de 7 k€ et un sur trois finit perdant (les 1 200 € perdus). Sur 24 mois, elle redevient nettement gagnante (médiane 116 k€).
+- Les mêmes risques restent les meilleurs à 50 % (challenge 1,5 à 1,8 %, financé 2 à 2,15 %) ; baisser le risque du compte financé n'améliore pas la moyenne (financé 1,5 % : 117 k€ sur 24 mois au lieu de 142 k€).
+- Compte propre de 10 000 € à 1 % du solde, 12 mois : gain médian +82 % (100 %), +56 % (75 %), +34 % (50 %) ; pire baisse médiane 10 à 11 % ; finir l'année perdant : 0 %, 1 %, 7 %.
+- Le test en réel des prochains mois (onglet Suivi du test) dira dans quel cas on se trouve.
+
 ## 4 unvicies. Le spread : ce que le backtest (sur le Bid) ne voit pas — 27/11/2026
 
 Point de départ : le 27/11/2026, achat limite US100 à 26230,08 non rempli. La bougie de 10:09 NY a fait le sommet de la jambe (26297,83) puis un plus bas Bid de 26229,13 ; avec un spread de 1,45, l'Ask n'est pas descendu sous 26230,58. La règle (et le backtest) comptent l'entrée à 10:10 NY ; le compte, non.
