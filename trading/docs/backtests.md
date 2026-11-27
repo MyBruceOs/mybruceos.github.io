@@ -547,6 +547,17 @@ Robustesse (fenêtre de 6 à 20 setups, seuil −2, 0 ou +2 R) : toutes les vari
 
 Variantes moins bonnes : mi-risque au lieu de pause (2025 −14 à −16 R) ; un seul feu pour les deux indices (2025 −17 R).
 
+## 4 sexdecies. Mois négatifs, disettes et fréquence des trades (3 actifs, configuration retenue) — 27/11/2026
+
+Compte tel qu'il se trade : US100 et SP500 avec feu rouge, or avec second trade ; 755 séances du 22/12/2023 au 25/11/2026 ; 456 trades.
+
+- **Mois négatifs : 7 sur 36** (février 2024 −4,4 R, mars 2024 −8,1, novembre 2024 −2,4, janvier 2025 −3,9, février 2025 −2,4, mars 2025 −0,6, juin 2025 −4,0). **Aucun en 2026** (11 mois positifs sur 11) : c'est de 2026 seulement que venait « aucun mois négatif ».
+- **Avril–mai 2026** : avril reste positif (+2,0 R) grâce aux 1er et 2 avril (+9 R), puis **9 journées perdantes d'affilée du 6 avril au 5 mai** (environ −8,6 R ; le compte retrouve son plus haut le 14 mai). C'est la plus longue série des 3 ans, à égalité avec juin 2024 (9 journées du 17 au 25 juin).
+- **Plus longues périodes sans aucun trade** : 12 séances (16 jours, du 9 au 26 juin 2025), 10 séances (14 au 29 janvier 2026), 9 séances (13 au 27 avril 2026).
+- **Plus longues périodes sans trade gagnant** : 25 séances (28 mai → 3 juillet 2025, 5 trades perdants), 21 séances (2 avril → 6 mai 2026, 8 trades perdants), 17 séances (25 janvier → 20 février 2024).
+- **Plus longues périodes sans nouveau plus haut du compte** : 150 séances (31 décembre 2024 → 31 juillet 2025, creux −9,2 R), 70 séances (septembre → décembre 2024, −10,1 R), 53 séances (janvier → avril 2024, −13,6 R).
+- **Fréquence** : un jour avec au moins un trade sur 2,2 séances (344 jours sur 755, 46 %) ; environ 150 trades par an, 12 à 13 par mois, 3 par semaine. Par actif : or un jour sur 3,9 séances, US100 un sur 5,3, SP500 un sur 9,4. Semaines : 8 % sans aucun trade, 21 % avec un seul jour de trade, la plupart avec 2 ou 3 jours. Par mois : de 2 à 16 jours de trade (médiane 9).
+
 ## 4 quindecies. Jour de la semaine et délai entre la cassure et la touche (27/11/2026)
 
 Question de l'utilisateur, à partir d'une analyse de 2026 seulement (vendredi faible, mardi fort, délai médian de 9 min) : faut-il une règle différente le vendredi ou le lundi (money management), et le délai entre la cassure et la touche du 50 % est-il un vrai signal ? Analyse sur 3 ans (2024–2026) : 310 entrées des indices (règles actuelles) et 194 jours d'or (trade 1 + second trade). Un écart est retenu seulement s'il tient chaque année et résiste au test du hasard (jours ou résultats mélangés au hasard).
