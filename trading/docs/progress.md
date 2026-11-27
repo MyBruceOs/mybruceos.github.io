@@ -1,6 +1,6 @@
 # Progress · Desk US
 
-*Mis à jour le 27/11/2026. Fichier tenu à jour à chaque étape du projet.*
+*Mis à jour le 27/11/2026 (nuit). Fichier tenu à jour à chaque étape du projet.*
 
 ## Où on en est
 
@@ -23,9 +23,10 @@
 - En attente : l'export M1 de US30 et XAUUSD par le Bridge 1.06 (MT5 ouvert environ 1 h).
 
 ## À faire par l'utilisateur
-- [ ] Installer Bridge 1.06 (remplacer l'ancien, compiler) et laisser MT5 ouvert pour l'export.
-- [ ] Installer Desk Key 1.07 (remplacer l'ancien, compiler) sur les deux graphiques.
-- [ ] Notifications : jeton Telegram et identifiant de chat dans les paramètres de Desk Key (F7 → Paramètres → groupe Notifications), puis bouton TESTER LES NOTIFS.
+- [x] Installer Desk Key 1.07 sur les deux graphiques (vu en ligne le 27/11 à 2:01 Paris).
+- [ ] **Remettre DeskUS_Bridge 1.06 sur un graphique à lui** (un seul robot par graphique dans MT5 : Desk Key l'a remplacé). Il n'envoie plus rien depuis le 27/11 à 0:17 Paris, d'où pas d'export US30 / XAUUSD et un compte figé dans l'application.
+- [x] Notifications sur le téléphone (application MT5) : fonctionnent.
+- [ ] Notifications Telegram : n'arrivent pas encore. Lire le message de l'onglet Experts après TESTER LES NOTIFS.
 
 ## Plus tard
 - Installer MT5, Desk Key et le Bridge sur le **VPS de l'utilisateur** (MT5 allumé 24 h/24 : sortie de 13:00 NY assurée même PC éteint).
