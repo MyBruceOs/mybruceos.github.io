@@ -281,6 +281,17 @@ Moteur v10 : Judas, pivot, cassure, FVG et Fibonacci sur bougies M5 ; remplissag
 - Mais **toutes les versions perdent sur la première moitié de l'année** (décembre–mai) et gagnent sur la seconde : le résultat dépend de la période, pas de la règle. Et l'échantillon est petit (14 à 31 trades par an).
 - Sortie à 14:00 au lieu de 13:00 : moins bien partout.
 
+**Entrées dès l'ouverture (9:30 NY, 15:30 Paris) au lieu de 10:00** : on garde les remplissages entre 9:30 et 10:00 au lieu de les annuler.
+
+| | Entrées 9:30–10:00 ajoutées | Leur résultat (3R) | Total 10:00 → 9:30 | 1re moitié |
+|---|---|---|---|---|
+| US100 (référence A) | 12 | 17 % de gagnants, −4 000 $ | +30 790 $ → +26 790 $ (47 % → 41 %) | +10 840 $ → +4 840 $ |
+| SP500 (référence A) | 0 (Judas après 9:50 : impossible avant 10:00) | — | inchangé | inchangé |
+| US30 M1, règles US100 | 11 | +1 000 $ | +910 $ → +1 910 $, pire baisse −17 260 $ → −19 260 $ | −9 840 $ → −6 840 $ |
+| US30 M5, règles US100 + Daily | 1 | −1 000 $ | +4 810 $ → +3 810 $ | inchangé (−5 520 $) |
+
+Entrer dès l'ouverture **dégrade l'US100** et ne sauve pas l'US30 : la règle « remplissage à partir de 10:00 NY » est confirmée.
+
 **Conclusion : US30 toujours rejeté**, y compris en M5. À retester dans quelques mois avec les nouveaux mois (si la seconde moitié se confirme, le M5 avec le Daily serait le candidat).
 
 ## 5. Idées testées et rejetées

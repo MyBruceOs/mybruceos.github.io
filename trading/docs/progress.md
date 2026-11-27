@@ -18,7 +18,7 @@
 - Application : Aujourd'hui, Mon compte, Journal, Suivi du test, Règles, Réglages ; profils lus dans la base (un actif validé apparaît tout seul).
 
 ## En cours
-- ~~Backtest US30~~ : **fait le 27/11, rejeté** en M1 (win rate 23–32 %) **et en M5** (moteur v10 : structure M5, exécution M1 ; win rate 43–54 % mais toutes les versions perdent sur la première moitié de l'année). À retester dans quelques mois. Détails : backtests.md, section 4 sexies.
+- ~~Backtest US30~~ : **fait le 27/11, rejeté** en M1 (win rate 23–32 %) **et en M5** (moteur v10 : structure M5, exécution M1 ; win rate 43–54 % mais toutes les versions perdent sur la première moitié de l'année). Entrées dès 9:30 NY testées aussi : ne changent rien au verdict et dégradent l'US100 (12 trades ajoutés, 17 % de gagnants). À retester dans quelques mois. Détails : backtests.md, section 4 sexies.
 - **Backtest XAUUSD** : séance de Londres (range asiatique, Judas après 2:00 NY, entrée 3:00–5:00 NY, sortie 8:00 NY) contre séance de New York.
 - Export : US100, US500 et US30 complets (doublons M5 nettoyés) ; XAUUSD en cours (environ 7 jours de M1 par minute). Backtests or lancés automatiquement vers 4:05 Paris.
 
