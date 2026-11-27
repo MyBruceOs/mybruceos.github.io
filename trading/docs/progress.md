@@ -25,6 +25,10 @@
 - **US30 abandonné** (décision de l'utilisateur le 27/11, après la recherche ICT / SMC).
 - **Validation de l'US100 et du SP500 sur 2024 et 2025** : l'approximation M5 ne permet pas de juger la règle A (calibrée sur 2026, voir backtests.md 4 septies). En attente de l'export M1 sur 3 ans.
 
+- **Règles de l'or écrites** dans regles.md (section 3 bis, candidat) : séance New York, sens « H4 ou H1, sans conflit », entrées 10:00–12:00 NY, stop Judas ± 1 $, TP 3R, sortie 13:00 NY.
+- Vérification sur l'historique réel 2026 (un compte, 3 actifs, 1 % par trade) : pire creux −9,5 % début avril–début mai (9 pertes d'affilée) ; repère 0,75 % en challenge, 0,5 % en financé.
+- Export M1 sur 3 ans (27/11, 5:00 Paris) : US100 complet (depuis le 27/11/2023), SP500 en cours (depuis le 13/08/2024), or ensuite.
+
 ## À faire par l'utilisateur
 - [x] Installer Desk Key 1.07 sur les deux graphiques (vu en ligne le 27/11 à 2:01 Paris).
 - [x] DeskUS_Bridge 1.06 remis sur son propre graphique (US30.cash M5) : en ligne depuis le 27/11 à 2:15 Paris, export en cours.

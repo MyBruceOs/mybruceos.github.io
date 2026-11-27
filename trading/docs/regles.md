@@ -2,7 +2,7 @@
 
 *Version du 27 novembre 2026 (Desk Key 1.08, nouvelle application). Règles validées par le backtest M1 FTMO (décembre 2025 – novembre 2026). Les chiffres détaillés sont dans [backtests.md](backtests.md).*
 
-> **Un indice = un profil = un graphique.** On ne mélange jamais les règles de l'US100 et du SP500.
+> **Un actif = un profil = un graphique.** On ne mélange jamais les règles de l'US100, du SP500 et de l'or.
 
 ---
 
@@ -44,6 +44,24 @@
 | Marge du stop | **2 pts** au-delà du Judas. |
 | Résultats du backtest (3R) | 31 trades, 13 % des jours, 55 % de gagnants, +24 440 $, pire baisse −3 000 $. |
 
+## 3 bis. Profil XAUUSD (or) — candidat, en attente de la validation 2024–2025
+
+Même mécanique que les indices (section 1 : liquidité du pré-marché 8:00–9:30 NY, Judas après 9:30, cassure M1 au-delà du dernier pivot avant le Judas, entrée limite au 50 %, retracée si la jambe s'allonge, stop derrière le Judas, sortie 13:00 NY), avec ces différences :
+
+| Règle | Valeur |
+|---|---|
+| Séance | **New York** uniquement. La séance de Londres a été testée et ne marche pas avec cette règle. |
+| Sens du jour | **H4 ou H1, sans conflit** : à 9:25 NY, si le H4 ou le H1 donne un sens et que l'autre ne le contredit pas (même sens ou neutre), on prend ce sens. Si l'un dit achat et l'autre vente, ou si les deux sont neutres : pas de trade. |
+| Fenêtre d'entrée | L'ordre doit être rempli **entre 10:00 et 12:00 NY** (16:00–18:00 Paris), une heure de plus que les indices : l'or reste très volatil jusqu'à 12:00 NY. Touché avant 10:00 : pas de trade. Pas rempli à 12:00 : annulé. |
+| FVG M1 | Non exigé (presque toujours présent sur l'or, il ne change rien). |
+| Cassure nette / Judas après 9:50 | Non. |
+| Marge du stop | **1 $** au-delà du Judas (stop moyen 7 à 18 $ selon la volatilité). |
+| Objectif | **3R** (2R donne plus de gagnants mais environ 10 R de moins par an). |
+| Sortie | 13:00 NY (19:00 Paris). |
+| Résultats du backtest (22/12/2025 – 25/11/2026, 3R) | 53 trades (environ 4 à 5 par mois, de 1 à 8), 55 % de gagnants, +37,7 R, pire baisse −4,5 R, 11 mois positifs et 0 négatif ; 1re moitié +23,2 R, 2de moitié +14,5 R. |
+
+À ne pas faire sur l'or : entrer entre 9:30 et 10:00 NY (23 % de gagnants), trader la séance de Londres, sortir à 12:00.
+
 ## 4. Ce qu'il faut attendre (simulations)
 
 Référence A, les deux indices ensemble, TP 3R, 0,05 R de frais par trade :
@@ -52,12 +70,20 @@ Référence A, les deux indices ensemble, TP 3R, 0,05 R de frais par trade :
 - **signal d'alarme** : plus de 13 pertes d'affilée ou un creux de plus de −17 R, il faut alors arrêter et analyser ;
 - si l'avantage réel n'est que la moitié du backtest : environ +25 R par an, avec un creux médian de −10 R.
 
+Avec l'or en plus (les 3 actifs sur le même compte, si l'or est validé) :
+- environ **142 trades par an** sur 113 jours ; 3 actifs le même jour seulement 2 fois dans l'année, 2 trades le même jour 25 fois (les deux perdants 7 fois) ; pire journée −2 R (−3 R possible) ;
+- historique 2026 : +92,9 R, **12 mois positifs sur 12**, pire creux **−9 R** (9 pertes d'affilée du 6 avril au 5 mai, réparties sur les 3 actifs) ;
+- simulations : creux d'une année sur 10 **−11,6 R**, une année sur 100 **−16,8 R** ; séries de 6 à 9 pertes normales, 13 au pire ;
+- **money management** (limite FTMO de 10 %) : à **1 % par trade**, un challenge démarré début avril 2026 serait descendu à **−9,5 %** (frais compris) avant de réussir, à 0,5 % de l'échec. Au cours de l'année, les 212 challenges démarrés à chaque séance auraient tous réussi à 1 % (32 jours en médiane) ; à 1,5 %, 17 auraient échoué. Repères : **0,75 % par trade en challenge** (pire creux historique environ −7 %), **0,5 % sur un compte financé**. Le même compte peut porter les 3 actifs : les séparer sur plusieurs comptes ne réduit pas le risque.
+
 ## 5. Ce qui ne sert pas (testé et rejeté)
 
 - Entrer au 61,8 %, entrer du bon côté du prix d'ouverture, break-even ou sortie partielle à 1R.
 - Fondamentaux en filtre, divergence SMT, jour de la semaine.
 - Stop élargi sur l'US100, entrées entre 9:30 et 10:00 NY.
 - Annonces de 10:00 NY : pas un motif de perte. Les jours d'annonce sont même favorables au SP500.
+- Dow Jones (US30) : rejeté, en M1 comme en M5, avec les concepts ICT / SMC testés (OTE, SMT, premium / discount, draw on liquidity).
+- Or : séance de Londres, killzone ICT de New York (7:30–9:00), entrées avant 10:00 NY, OTE 70,5 %.
 
 ---
 
