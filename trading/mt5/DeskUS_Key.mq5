@@ -14,12 +14,12 @@
 //|    leur résultat), et envoie les niveaux à l'application.        |
 //+------------------------------------------------------------------+
 #property copyright "Desk US"
-#property version   "1.06"
+#property version   "1.07"
 #property description "Règle A Desk US (US100 / SP500) : détection, dessin, historique et exécution en une touche."
 
 #include <Trade\Trade.mqh>
 
-#define DK_VERSION "1.06"
+#define DK_VERSION "1.07"
 
 enum ENUM_DK_PROFIL
   {
@@ -169,6 +169,7 @@ double   g_capital  = 0;       // capital de départ (dépôts)
 int      g_notif    = 0;       // notifications déjà envoyées aujourd'hui (bits)
 string   g_notifJour = "";
 ulong    g_posSuivie = 0;      // position Desk Key en cours (pour la notification de sortie)
+ulong    g_ordSuivi  = 0;      // ordre en attente (pour la notification d'expiration à 11:00 NY)
 // déclarations (fonctions définies plus bas)
 string Sens(int v);
 double RisqueVoulu();
@@ -679,6 +680,8 @@ double RisqueArgent(double entry, double sl, double lots)
    return -p;
   }
 double TpPrix(Setup &s, int dir, double r) { return s.entry + dir * r * MathAbs(s.entry - s.sl); }
+// le symbole accepte-t-il une date d'expiration précise sur les ordres en attente ?
+bool ExpirationPossible() { return (SymbolInfoInteger(_Symbol, SYMBOL_EXPIRATION_MODE) & SYMBOL_EXPIRATION_SPECIFIED) != 0; }
 
 void Msg(string s) { g_msg = s; g_msgT = TimeLocal(); Print("Desk Key ", P.nom, " : ", s); }
 
@@ -855,7 +858,14 @@ void SuivreNotifs()
      }
    if(S.etape == E_IGNORE && DejaNotifie(N_PRET))
       NotifierUneFois(N_AVANT10, "setup annulé : le 50 % a été touché avant 10:00 NY (pas de trade, comme le backtest)", false);
-   ulong pos = MaPosition();
+   ulong pos = MaPosition(), ord = MonOrdre();
+   if(ord != 0) g_ordSuivi = ord;
+   else if(g_ordSuivi != 0 && pos == 0)
+     {
+      g_ordSuivi = 0;
+      if(now >= G.t11 - 5) NotifierUneFois(N_ANNULE, "ordre expiré à 11:00 NY sans remplissage (pas de trade aujourd'hui)", false);
+     }
+   if(pos != 0) g_ordSuivi = 0;
    if(pos != 0 && g_posSuivie == 0)
      {
       g_posSuivie = pos;
@@ -910,14 +920,26 @@ bool Placer()
    string cmt = "DeskKey " + P.nom + " " + Fr(g_tp, 1) + "R";
    double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK), bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
    bool ok;
-   if(G.dir > 0) ok = (ask <= entry) ? trade.Buy(lots, _Symbol, 0, sl, tp, cmt) : trade.BuyLimit(lots, entry, _Symbol, sl, tp, ORDER_TIME_GTC, 0, cmt);
-   else          ok = (bid >= entry) ? trade.Sell(lots, _Symbol, 0, sl, tp, cmt) : trade.SellLimit(lots, entry, _Symbol, sl, tp, ORDER_TIME_GTC, 0, cmt);
+   // ordre limite : expiration à 11:00 NY chez FTMO, pour qu'il soit annulé même si MT5 est fermé
+   bool marche = G.dir > 0 ? ask <= entry : bid >= entry;
+   bool expire = !marche && ExpirationPossible() && G.t11 - now >= 120;
+   ENUM_ORDER_TYPE_TIME tt = expire ? ORDER_TIME_SPECIFIED : ORDER_TIME_GTC;
+   datetime ex = expire ? ToSrv(G.t11) : 0;
+   if(G.dir > 0) ok = marche ? trade.Buy(lots, _Symbol, 0, sl, tp, cmt) : trade.BuyLimit(lots, entry, _Symbol, sl, tp, tt, ex, cmt);
+   else          ok = marche ? trade.Sell(lots, _Symbol, 0, sl, tp, cmt) : trade.SellLimit(lots, entry, _Symbol, sl, tp, tt, ex, cmt);
+   if(!ok && expire && trade.ResultRetcode() == TRADE_RETCODE_INVALID_EXPIRATION)
+     {
+      Print("Desk Key : expiration refusée par le serveur, ordre placé sans expiration (annulation par Desk Key à 11:00 NY)");
+      if(G.dir > 0) ok = trade.BuyLimit(lots, entry, _Symbol, sl, tp, ORDER_TIME_GTC, 0, cmt);
+      else          ok = trade.SellLimit(lots, entry, _Symbol, sl, tp, ORDER_TIME_GTC, 0, cmt);
+      expire = false;
+     }
    if(ok && (trade.ResultRetcode() == TRADE_RETCODE_DONE || trade.ResultRetcode() == TRADE_RETCODE_PLACED))
      {
       g_arme = false;
-      Msg((G.dir > 0 ? "ACHAT" : "VENTE") + " " + Fr(lots, 2) + " lot à " + Px(entry) + " · SL " + Px(sl) + " · TP " + Px(tp));
+      Msg((G.dir > 0 ? "ACHAT" : "VENTE") + " " + Fr(lots, 2) + " lot à " + Px(entry) + " · SL " + Px(sl) + " · TP " + Px(tp) + (expire ? " · expire à 11:00 NY chez FTMO" : ""));
       NotifierUneFois(N_ORDRE, "ORDRE PLACÉ · " + (G.dir > 0 ? "achat" : "vente") + " limite " + Px(entry) + " · " + Fr(lots, 2) + " lot · SL " + Px(sl) + " · TP " + Px(tp)
-                      + " · annulé à 11:00 NY s'il n'est pas rempli", false);
+                      + (expire ? " · expire chez FTMO à 11:00 NY (même si MT5 est fermé)" : " · annulé par Desk Key à 11:00 NY"), false);
       return true;
      }
    Msg("refusé par le serveur : " + trade.ResultRetcodeDescription());
