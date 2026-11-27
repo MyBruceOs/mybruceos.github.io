@@ -8,6 +8,10 @@
 //|  - Feu rouge (US100, SP500) : pas de trade quand les 10 derniers |
 //|    setups de l'indice sont négatifs (règle suivie à blanc).      |
 //|  - Or : second trade de continuation, stop du trade 1 remonté.   |
+//|  - 1.10 : exécution alignée sur le graphique (Bid), comme le     |
+//|    backtest : achat au marché si le 50 % est touché sans que     |
+//|    l'ordre soit rempli (spread) ; ventes du SP500 et de l'or :   |
+//|    stop et objectif décalés du spread.                           |
 //|  - Détecte le setup en direct, exactement comme le backtest :    |
 //|    tendance -> Judas sur le pré-marché -> cassure M1 -> limite   |
 //|    au 50 % (Fibo retracé) -> SL derrière le Judas -> TP en R.    |
@@ -17,12 +21,12 @@
 //|    leur résultat), et envoie les niveaux à l'application.        |
 //+------------------------------------------------------------------+
 #property copyright "Desk US"
-#property version   "1.09"
+#property version   "1.10"
 #property description "Règle A Desk US (US100 / SP500 / or) : détection, dessin, historique, feu rouge et exécution en une touche."
 
 #include <Trade\Trade.mqh>
 
-#define DK_VERSION "1.09"
+#define DK_VERSION "1.10"
 
 enum ENUM_DK_PROFIL
   {
@@ -37,6 +41,13 @@ enum ENUM_DK_RISQUE
    RISQUE_MONTANT  = 0, // Montant fixe (devise du compte)
    RISQUE_POURCENT = 1, // Pourcentage du solde
    RISQUE_LOT_FIXE = 2  // Lot fixe
+  };
+
+enum ENUM_DK_VENTE
+  {
+   VENTE_AUTO = 0, // Selon l'actif (SP500 et or : oui ; US100 : non)
+   VENTE_OUI  = 1, // Oui, tous les actifs
+   VENTE_NON  = 2  // Non
   };
 
 enum ENUM_DK_HEURE
@@ -56,6 +67,9 @@ input string         InpTouche      = "K";             // Touche : placer l'ordr
 input string         InpToucheAnnul = "X";             // Touche : annuler l'ordre en attente
 input bool           InpAuto        = false;           // Mode automatique (place l'ordre sans vous)
 input bool           InpSuivreFibo  = true;            // Déplacer l'ordre quand la jambe s'allonge (comme le backtest)
+input bool           InpRattrapage  = true;            // Achats : 50 % touché sur le graphique mais ordre non rempli (spread) -> achat au marché
+input double         InpRattrapMaxR = 0.10;            // Achats : prix maximal accepté au-dessus du 50 %, en R (0,10 = 10 % du risque)
+input ENUM_DK_VENTE  InpVenteSpread = VENTE_AUTO;      // Ventes : stop et objectif décalés du spread (sortie quand le graphique les touche)
 input bool           InpSortie13h   = true;            // Fermer la position à 13:00 NY (19:00 Paris)
 input bool           InpFiltreH1    = false;           // US100 : pas de trade si le H1 va contre (filtre optionnel)
 input bool           InpFeuRouge    = true;            // US100, SP500 : feu rouge (pas de trade si les 10 derniers setups < 0 R) · bouton FEU
@@ -93,6 +107,7 @@ struct Profil
    int               finH, finM; // fin des entrées (heure de New York)
    bool              feu;        // feu rouge appliqué à ce profil
    bool              second;     // second trade de continuation
+   bool              venteSpread;// ventes : stop et objectif décalés du spread (1.10, réglage « selon l'actif »)
    string            unite;      // unité de prix affichée (pts, $)
    long              magic;
    color             couleur;
@@ -819,6 +834,11 @@ double RisqueArgent(double entry, double sl, double lots)
    return -p;
   }
 double TpPrix(Setup &s, int dir, double r) { return s.entry + dir * r * MathAbs(s.entry - s.sl); }
+// 1.10 : le graphique montre le Bid, comme le backtest. Un achat limite se remplit sur l'Ask, le stop et l'objectif d'une vente
+// se déclenchent sur l'Ask : écart = spread (mesure sur 3 ans : backtests.md 4 unvicies).
+double SpreadPx() { double a = SymbolInfoDouble(_Symbol, SYMBOL_ASK), b = SymbolInfoDouble(_Symbol, SYMBOL_BID); return a > b ? a - b : 0; }
+bool VenteDecalee() { return InpVenteSpread == VENTE_OUI || (InpVenteSpread == VENTE_AUTO && P.venteSpread); }
+double RattrapMax(double entry, double sl) { return InpRattrapMaxR * MathAbs(entry - sl); }
 // le symbole accepte-t-il une date d'expiration précise sur les ordres en attente ?
 bool ExpirationPossible() { return (SymbolInfoInteger(_Symbol, SYMBOL_EXPIRATION_MODE) & SYMBOL_EXPIRATION_SPECIFIED) != 0; }
 
@@ -1244,6 +1264,9 @@ bool Placer()
       return false;
      }
    double entry = NormPx(S.entry), sl = NormPx(S.sl), tp = NormPx(TpPrix(S, G.dir, g_tp));
+   double sp = SpreadPx();
+   bool decal = G.dir < 0 && VenteDecalee() && sp > 0;
+   if(decal) { sl = NormPx(sl + sp); tp = NormPx(tp + sp); }   // 1.10 : déclenchés (sur l'Ask) quand le graphique (Bid) touche le stop / l'objectif de la règle
    double lots = Lot(entry, sl);
    if(lots <= 0)
      {
@@ -1256,7 +1279,10 @@ bool Placer()
    double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK), bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
    bool ok;
    // ordre limite : expiration à la fin des entrées chez FTMO, pour qu'il soit annulé même si MT5 est fermé
-   bool marche = G.dir > 0 ? ask <= entry : bid >= entry;
+   // 1.10 : achat au marché aussi quand le graphique (Bid) est déjà au 50 % et que seul le spread empêche le remplissage
+   bool rattrape = G.dir > 0 && InpRattrapage && ask > entry && bid <= entry && ask - entry <= RattrapMax(entry, sl);
+   bool marche = G.dir > 0 ? (ask <= entry || rattrape) : bid >= entry;
+   if(rattrape) { double l2 = Lot(ask, sl); if(l2 > 0) lots = l2; }
    bool expire = !marche && ExpirationPossible() && G.tF - now >= 120;
    ENUM_ORDER_TYPE_TIME tt = expire ? ORDER_TIME_SPECIFIED : ORDER_TIME_GTC;
    datetime ex = expire ? ToSrv(G.tF) : 0;
@@ -1272,7 +1298,8 @@ bool Placer()
    if(ok && (trade.ResultRetcode() == TRADE_RETCODE_DONE || trade.ResultRetcode() == TRADE_RETCODE_PLACED))
      {
       g_arme = false;
-      Msg((G.dir > 0 ? "ACHAT" : "VENTE") + " " + Fr(lots, 2) + " lot à " + Px(entry) + " · SL " + Px(sl) + " · TP " + Px(tp) + (expire ? " · expire à " + HnY(G.tF) + " chez FTMO" : ""));
+      Msg((G.dir > 0 ? "ACHAT" : "VENTE") + " " + Fr(lots, 2) + " lot à " + (rattrape ? Px(ask) + " (50 % touché, au marché)" : Px(entry)) + " · SL " + Px(sl) + " · TP " + Px(tp)
+          + (decal ? " (stop et objectif + spread " + Px(sp) + ")" : "") + (expire ? " · expire à " + HnY(G.tF) + " chez FTMO" : ""));
       NotifierUneFois(N_ORDRE, "ORDRE PLACÉ · " + (G.dir > 0 ? "achat" : "vente") + " limite " + Px(entry) + " · " + Fr(lots, 2) + " lot · SL " + Px(sl) + " · TP " + Px(tp)
                       + (expire ? " · expire chez FTMO à " + HnY(G.tF) + " (même si MT5 est fermé)" : " · annulé par Desk Key à " + HnY(G.tF)), false);
       return true;
@@ -1296,11 +1323,15 @@ bool PlacerT2()
    if(Bloque(now, ev)) { g_arme2 = true; Msg("annonce " + g_evNom[ev] + " : second trade différé (protection)"); return false; }
    double entry = NormPx(S.s2e), sl = NormPx(S.s2sl), tp = NormPx(S.s2tp);
    if((tp - entry) * G.dir <= 0 || (entry - sl) * G.dir <= 0) { Msg("second trade : niveaux incohérents, pas d'ordre"); return false; }
+   double sp = SpreadPx();
+   if(G.dir < 0 && VenteDecalee() && sp > 0) { sl = NormPx(sl + sp); tp = NormPx(tp + sp); }   // 1.10 : comme le trade 1
    double lots = Lot(entry, sl);
    if(lots <= 0) { Msg("second trade : risque trop faible pour le lot minimum"); return false; }
    string cmt = "DeskKey " + P.nom + " 2e";
    double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK), bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-   bool marche = G.dir > 0 ? ask <= entry : bid >= entry;
+   bool rattrape = G.dir > 0 && InpRattrapage && ask > entry && bid <= entry && ask - entry <= RattrapMax(entry, sl);
+   bool marche = G.dir > 0 ? (ask <= entry || rattrape) : bid >= entry;
+   if(rattrape) { double l2 = Lot(ask, sl); if(l2 > 0) lots = l2; }
    bool expire = !marche && ExpirationPossible() && G.t12 - now >= 120;
    ENUM_ORDER_TYPE_TIME tt = expire ? ORDER_TIME_SPECIFIED : ORDER_TIME_GTC;
    datetime ex = expire ? ToSrv(G.t12) : 0;
@@ -1386,6 +1417,48 @@ void GererT2()
    if(S.s2etat == 4 && now < G.t12 && (g_arme2 || g_auto) && !Bloque(now, ev) && TimeLocal() - essai2 >= 30) { essai2 = TimeLocal(); PlacerT2(); }
   }
 
+//+------------------------------------------------------------------+
+//| 1.10 · Rattrapage des achats                                     |
+//| Le graphique (Bid) touche le 50 % mais l'ordre ne se remplit pas |
+//| parce que l'Ask reste au-dessus (spread). Le backtest compte     |
+//| l'entrée : Desk Key achète alors au marché, tant que l'écart     |
+//| reste sous InpRattrapMaxR (10 % du risque). Sur 3 ans : 7 achats |
+//| US100 gagnants ratés (13 R), backtests.md 4 unvicies.            |
+//+------------------------------------------------------------------+
+void Rattraper(CTrade &tr, ulong ord, long tFin, string quoi, int k)
+  {
+   static datetime dernier[2] = {0, 0};
+   if(!InpRattrapage || G.dir <= 0 || ord == 0 || !OrderSelect(ord)) return;
+   if((ENUM_ORDER_TYPE)OrderGetInteger(ORDER_TYPE) != ORDER_TYPE_BUY_LIMIT) return;
+   if(NowUtc() >= tFin) return;
+   double px = OrderGetDouble(ORDER_PRICE_OPEN), sl = OrderGetDouble(ORDER_SL), tp = OrderGetDouble(ORDER_TP), vol = OrderGetDouble(ORDER_VOLUME_CURRENT);
+   double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID), ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+   if(bid > px || ask <= px) return;                          // pas touché sur le graphique, ou l'ordre se remplit tout seul
+   if(sl <= 0 || ask - px > RattrapMax(px, sl)) return;       // trop cher : on garde l'ordre limite
+   if(TimeLocal() - dernier[k] < 2) return;
+   dernier[k] = TimeLocal();
+   string cmt = OrderGetString(ORDER_COMMENT);
+   ENUM_ORDER_TYPE_TIME tt = (ENUM_ORDER_TYPE_TIME)OrderGetInteger(ORDER_TYPE_TIME);
+   datetime ex = (datetime)OrderGetInteger(ORDER_TIME_EXPIRATION);
+   double lots = Lot(ask, sl);                                // même risque en argent avec l'entrée à l'Ask
+   if(lots <= 0) lots = vol;
+   if(!tr.OrderDelete(ord)) return;
+   if(tr.Buy(lots, _Symbol, 0, sl, tp, cmt) && tr.ResultRetcode() == TRADE_RETCODE_DONE)
+     {
+      Msg(quoi + " : 50 % touché sur le graphique, ordre non rempli à cause du spread -> achat au marché à " + Px(tr.ResultPrice()) + " (" + Fr(lots, 2) + " lot)");
+      return;
+     }
+   string err = tr.ResultRetcodeDescription();
+   bool remis = tr.BuyLimit(vol, px, _Symbol, sl, tp, tt, ex, cmt) || tr.BuyLimit(vol, px, _Symbol, sl, tp, ORDER_TIME_GTC, 0, cmt);
+   Msg(quoi + " : achat au marché refusé (" + err + ")" + (remis ? ", ordre limite remis à " + Px(px) : ", ordre limite NON remis : vérifiez MT5"));
+   if(!remis) Notifier(quoi + " : ordre limite perdu après un rattrapage refusé (" + err + ") · vérifiez MT5", true);
+  }
+void Rattrapage()
+  {
+   Rattraper(trade, MonOrdre(), G.tF, "trade", 0);
+   if(P.second) Rattraper(trade2, MonOrdre2(), G.t12, "second trade", 1);
+  }
+
 void Gerer()
   {
    long now = NowUtc();
@@ -1412,7 +1485,7 @@ void Gerer()
            { if(trade.OrderDelete(ord)) { Msg("la jambe s'allonge : ordre déplacé au nouveau 50 %"); Placer(); } }
          else
            {
-            double lv = Lot(NormPx(S.entry), NormPx(S.sl));
+            double slo = OrderGetDouble(ORDER_SL), lv = Lot(NormPx(S.entry), slo > 0 ? slo : NormPx(S.sl));   // stop réel (décalé du spread sur les ventes)
             if(lv > 0 && MathAbs(OrderGetDouble(ORDER_VOLUME_CURRENT) - lv) > 1e-6 && trade.OrderDelete(ord)) { Msg("risque modifié : ordre remis avec " + Fr(lv, 2) + " lot"); Placer(); }
            }
         }
@@ -2030,13 +2103,13 @@ bool ChoisirProfil()
    if(pf == PROFIL_US100 && !isNq) { Alert("Desk Key : le profil US100 ne peut pas tourner sur ", _Symbol); return false; }
    if(pf == PROFIL_SP500 && !isSp) { Alert("Desk Key : le profil SP500 ne peut pas tourner sur ", _Symbol); return false; }
    if(pf == PROFIL_OR && !isAu)    { Alert("Desk Key : le profil or ne peut pas tourner sur ", _Symbol); return false; }
-   P.finH = 11; P.finM = 0; P.feu = false; P.second = false; P.unite = "pts"; P.tendance = 0;
+   P.finH = 11; P.finM = 0; P.feu = false; P.second = false; P.unite = "pts"; P.tendance = 0; P.venteSpread = false;
    if(pf == PROFIL_US100)
      { P.nom = "US100"; P.fvg = true;  P.marge = 3.0; P.cassureMin = 0.05; P.judasMin = 0;  P.daily = false; P.magic = 7710100; P.couleur = clrDodgerBlue; P.feu = true; }
    else if(pf == PROFIL_SP500)
-     { P.nom = "SP500"; P.fvg = false; P.marge = 2.0; P.cassureMin = 0;    P.judasMin = 20; P.daily = true;  P.tendance = 1; P.magic = 7710500; P.couleur = clrDarkOrange; P.feu = true; }
+     { P.nom = "SP500"; P.fvg = false; P.marge = 2.0; P.cassureMin = 0;    P.judasMin = 20; P.daily = true;  P.tendance = 1; P.magic = 7710500; P.couleur = clrDarkOrange; P.feu = true; P.venteSpread = true; }
    else if(pf == PROFIL_OR)   // validé sur 3 ans (backtests.md 4 terdecies) : séance de New York, H4 ou H1 sans conflit, entrées 10:00–12:00 NY
-     { P.nom = "XAUUSD"; P.fvg = false; P.marge = 1.0; P.cassureMin = 0; P.judasMin = 0; P.daily = false; P.tendance = 2; P.finH = 12; P.magic = 7710900; P.couleur = clrGoldenrod; P.second = true; P.unite = "$"; }
+     { P.nom = "XAUUSD"; P.fvg = false; P.marge = 1.0; P.cassureMin = 0; P.judasMin = 0; P.daily = false; P.tendance = 2; P.finH = 12; P.magic = 7710900; P.couleur = clrGoldenrod; P.second = true; P.unite = "$"; P.venteSpread = true; }
    else { Alert("Desk Key : symbole ", _Symbol, " non reconnu. Choisissez le profil US100, SP500 ou or."); return false; }
    PFX = "DK_" + P.nom + "_";
    return true;
@@ -2077,6 +2150,7 @@ void Tick()
    SuivreNotifs();   // avant Gerer : « setup prêt » arrive avant « ordre placé »
    Gerer();
    GererT2();
+   Rattrapage();
    EnvoyerJour();
    Panneau();
   }
@@ -2123,7 +2197,7 @@ void OnDeinit(const int reason)
    ChartRedraw();
   }
 void OnTimer() { Tick(); }
-void OnTick()  { if(MQLInfoInteger(MQL_TESTER)) Tick(); }
+void OnTick()  { if(MQLInfoInteger(MQL_TESTER)) Tick(); else Rattrapage(); }   // 1.10 : le rattrapage réagit à chaque tick
 
 // touche K / bouton : trade 1, ou second trade de l'or quand le trade 1 est pris
 void Touche()

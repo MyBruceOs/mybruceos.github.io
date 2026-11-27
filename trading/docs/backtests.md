@@ -547,6 +547,93 @@ Robustesse (fenêtre de 6 à 20 setups, seuil −2, 0 ou +2 R) : toutes les vari
 
 Variantes moins bonnes : mi-risque au lieu de pause (2025 −14 à −16 R) ; un seul feu pour les deux indices (2025 −17 R).
 
+## 4 unvicies. Le spread : ce que le backtest (sur le Bid) ne voit pas — 27/11/2026
+
+Point de départ : le 27/11/2026, achat limite US100 à 26230,08 non rempli. La bougie de 10:09 NY a fait le sommet de la jambe (26297,83) puis un plus bas Bid de 26229,13 ; avec un spread de 1,45, l'Ask n'est pas descendu sous 26230,58. La règle (et le backtest) comptent l'entrée à 10:10 NY ; le compte, non.
+
+Méthode : 504 trades de la configuration retenue (toutes les entrées des indices, feu rouge compris, et le trade 1 de l'or), bougies M1 (Bid) des 3 ans, spreads relevés le 27/11 à 10:16 NY (US100 1,45 pt, SP500 0,60 pt, or 0,47 $). Un achat limite au prix E se remplit quand le Bid descend à E − spread ; le stop et l'objectif d'une vente se déclenchent quand le Bid atteint le niveau − spread. Résultats à 3R, avant les frais de 0,05 R par trade.
+
+**Achats** (122 US100, 71 SP500, 104 or) :
+
+| Actif | Pas remplis au même moment | Jamais remplis | Backtest | Exécution actuelle | Ordre toujours + spread | Rattrapage (spread payé seulement si besoin) |
+|---|---|---|---|---|---|---|
+| US100 | 25 | 7 (13,3 R de gagnants) | 17,4 R | 4,1 R | 11,0 R | **15,8 R** |
+| SP500 | 25 | 6 | 12,4 R | 10,2 R | 6,1 R | 9,8 R |
+| Or | 45 | 4 | 45,0 R | 36,9 R | 34,8 R | **40,5 R** |
+
+**Ventes** (84 US100, 33 SP500, 90 or) :
+
+| Actif | Backtest | Exécution actuelle | Stop + spread | Stop et objectif + spread |
+|---|---|---|---|---|
+| US100 | 36,0 R | **35,7 R** | 32,4 R | 31,4 R |
+| SP500 | 26,4 R | 18,3 R | 23,6 R | **22,7 R** |
+| Or | 30,6 R | 17,0 R | 19,6 R | **21,8 R** |
+
+- Les achats ratés sont surtout des gagnants : un repli qui s'arrête pile au 50 % annonce un mouvement fort.
+- Ajouter le spread à tous les achats paie le spread même quand le prix descend bien plus bas : bon sur l'US100, mauvais sur le SP500 et l'or. Le **rattrapage** (acheter au marché seulement quand le graphique touche le 50 % sans remplissage) est meilleur partout ; chiffre maximal (il suppose un achat à 50 % + spread au moment exact de la touche).
+- Ventes : sur le SP500 et l'or, le spread pèse 5 à 7 % du risque ; des stops sont touchés par l'Ask sans que le graphique les touche. Décaler stop et objectif d'un spread y rapporte ; sur l'US100 (spread de 3,5 % du risque), il coûte.
+- **Total** (trade 1, 3 ans) : backtest sur le Bid 167,8 R ; exécution actuelle 122,2 R (−45,6 R, environ 0,09 R par trade, presque le double des 0,05 R de frais comptés) ; **avec Desk Key 1.10** (rattrapage des achats, ventes SP500 et or décalées) environ 146,3 R (−21,5 R, environ 0,04 R par trade : dans les frais déjà comptés).
+- Limites : un seul relevé de spread (il varie, surtout à l'ouverture) ; rattrapage supposé parfait ; second trade de l'or non mesuré ; choix par actif sur 33 à 122 trades.
+
+## 4 vicies. Plusieurs comptes FTMO avec un budget de 1 200 € (simulateur de l'application) — 27/11/2026
+
+Moteur `trading/assets/sim.js` (le même dans l'application, onglet Simulateur). Hypothèses :
+- 35 mois réels (janvier 2024 – 25/11/2026), séance par séance, tirés par blocs de mois.
+- **Tous les comptes d'un parcours prennent les mêmes trades le même jour.**
+- Prix FTMO 2-Step : 50k 345 €, 100k 540 €, 200k 1 080 €.
+- Versements tous les 14 jours (80 % des gains, en $, 1 € = 1,15 $) ; prix du challenge remboursé au premier versement de chaque compte financé.
+- Plafond FTMO de 400 k$ au total ; attente d'une séance après la phase 1 et de deux avant le compte financé.
+- Un challenge n'est racheté que si la caisse (budget + versements reçus) le permet. Gain net = versements reçus − challenges payés.
+- Règles FTMO vérifiées seulement par des sources tierces le 27/11 (site FTMO non joignable depuis l'environnement de travail).
+
+La phase 2 enchaîne maintenant sur la phase 1 dans le temps (avant : tirée à part). Sur nos 35 mois, elle réussit 2 à 3 points de moins : à 1,40 %, phase 1 89,7 %, phase 2 88,3 %, les deux 79,2 % (au lieu de 90,4 / 91,3 / 82,5 %).
+
+**Challenge seul, une tentative** (attentes FTMO comprises) :
+
+| Risque | Phase 1 | Phase 2 | Les deux | Durée médiane | Réussis finis en 2 mois |
+|---|---|---|---|---|---|
+| 1,2 % | 92 % | 91 % | 83 % | 2,4 mois | 36 % |
+| 1,4 % | 90 % | 88 % | 79 % | 2,1 mois | 49 % |
+| **1,5 %** | 89 % | 87 % | **77 %** | **1,9 mois** | 56 % |
+| 1,8 % | 85 % | 83 % | 71 % | 1,6 mois | 67 % |
+| 2,2 % | 81 % | 81 % | 66 % | 1,4 mois | 80 % |
+
+Aucun risque ne garantit 2 mois : la durée dépend des périodes sans trade ou à plat. ≥ 90 % par phase et ≥ 80 % pour les deux imposent 1,2–1,4 % ; une durée médiane sous 2 mois impose 1,5 % ou plus.
+
+**Stratégies sur 12 mois** (challenge 1,5 %, financé 2,15 %, coussin 5 %, budget 1 200 €) :
+
+| Stratégie | Gain net moyen | Médiane | Aucun versement en 12 mois | 1er versement | Mois sans versement |
+|---|---|---|---|---|---|
+| 1 × 200k d'un coup | 91,6 k€ | 87,1 k€ | 36 % | 2,5 mois | 7,9 |
+| 2 × 100k d'un coup | 91,7 k€ | 87,1 k€ | 36 % | 2,5 mois | 7,9 |
+| 3 × 50k d'un coup | 68,6 k€ | 65,1 k€ | 36 % | 2,5 mois | 7,9 |
+| 2 × 100k l'un après l'autre | 90,2 k€ | 84,6 k€ | 20 % | 2,9 mois | 6,9 |
+| Double challenge 2 × 100k (le 2e à 2,2 %) | 95,5 k€ | 94,6 k€ | 30 % | 2,3 mois | 7,1 |
+| 2 × 100k, puis réinvestir en 100k | 145,9 k€ | 116,4 k€ | 36 % | 2,5 mois | 7,8 |
+| 1 × 100k + réserve, puis réinvestir en 100k | 152,9 k€ | 138,0 k€ | 15 % | 3,0 mois | 6,7 |
+| **1 × 50k + réserve, puis réinvestir en 100k** | 143,7 k€ | 124,8 k€ | **6 %** | 3,2 mois | 6,4 |
+| Double 2 × 50k (le 2e à 2,2 %), puis réinvestir | 154,6 k€ | 138,9 k€ | 19 % | 2,4 mois | 6,4 |
+
+- **2 × 100k = 1 × 200k** : mêmes trades, même capital, même prix. **3 × 50k** : 150 k$ pour presque le même prix, donc moins bien.
+- **Tout acheter d'un coup** laisse 36 % de parcours sans aucun versement : un échec ou un compte perdu avant son premier versement, et il ne reste plus de quoi racheter.
+- **Réinvestir les versements** jusqu'au plafond de 400 k$ est le premier levier (de +50 % à +60 % sur 12 mois).
+- **Garder une réserve** est le second : commencer petit (un 50k) laisse deux autres essais.
+- Retour au financé après un compte perdu : 1,9 mois (médiane, le temps d'un nouveau challenge).
+- Sur 12 mois, environ 6,5 mois sans versement : 3 avant le premier, puis 2,6 quand tous les comptes tombent ensemble (mêmes trades).
+- Comptes financés à des risques différents (2,15 / 1,5 %) : moins de trous (24 mois : 6,0 mois au lieu de 7,3), mais environ 10 % de gain en moins ; écarté.
+
+**Comparaison finale** (financé 2,15 %, coussin 5 %, réinvestir en 100k jusqu'à 400 k$, 3 000 parcours) :
+
+| Départ (challenge) | 12 mois | 12 mois, pertes +5 % | 24 mois | 24 mois, pertes +5 % | Aucun versement |
+|---|---|---|---|---|---|
+| **1 × 50k + réserve (1,5 %)** | 143 k€ | 126 k€ | **434 k€** | **385 k€** | **6 %** |
+| 1 × 50k + réserve (1,8 %) | 157 k€ | 136 k€ | 452 k€ | 394 k€ | 7 % |
+| 1 × 100k + réserve (1,5 %) | 152 k€ | 134 k€ | 420 k€ | 370 k€ | 15 % |
+| Double 2 × 50k, le 2e à 2,2 % (1,5 %) | 153 k€ | 131 k€ | 403 k€ | 350 k€ | 19 % |
+| 2 × 100k d'un coup (1,5 %) | 143 k€ | 125 k€ | 343 k€ | 302 k€ | 37 % |
+
+**Proposition : un challenge 50k à 1,5 % (1,8 % pour aller plus vite), 855 € gardés pour deux autres essais, puis chaque versement rachète des challenges 100k jusqu'au plafond de 400 k$ ; compte financé à 2,15 %, coussin 5 %.** C'est la meilleure sur 24 mois dans tous les cas testés et celle qui risque le moins de ne rien toucher. Sur 12 mois, partir d'un 100k rapporte environ 9 k€ de plus, mais 15 % des parcours ne touchent rien (au lieu de 6 %).
+
 ## 4 novemdecies. Combinaison retenue pour un compte de 200 k$ (critères de l'utilisateur) — 27/11/2026
 
 Critères : challenge validé vite, mais au moins 90 % de réussite pour chaque phase et 80 % pour les deux ; compte financé au gain moyen le plus haut. Même simulation que 4 octodecies, compte de 200 k$, challenge à 1 080 $, 80 % des gains, 3 000 à 4 000 parcours par combinaison.

@@ -224,3 +224,11 @@ tr.jrow:hover td{background:var(--panel2)}
 tr.jdetail td{background:rgba(255,255,255,.02)}
 .tag.info{background:rgba(91,156,240,.2);color:var(--info)}
 @media (max-width:600px){.sbar-seg span{font-size:9px;padding:9px 3px}}
+/* ---------- Simulateur ---------- */
+.sm-tbl table{min-width:640px}
+.sm-tbl td.mono{white-space:nowrap}
+#simBody [hidden]{display:none !important}
+#simBody .kpi b{font-size:17px}
+#simBody .verdict{font-size:14px;line-height:1.5}
+#simBody h3{color:var(--muted);font-weight:600}
+@media (max-width:600px){.sm-tbl table{min-width:560px}#simBody .seg button{padding:5px 8px}}
