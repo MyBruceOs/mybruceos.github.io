@@ -521,6 +521,32 @@ US100 2025 par mois (R) : janv. −3,6 ; févr. −0,5 ; mars +1,5 ; avr. +6,0 ;
 - Second trade sur 2024–2025 : US100 18 trades, 4 gagnants, −5,6 R ; SP500 18 trades, 10 gagnants, +9,2 R.
 - **L'or n'est validé que sur 2026** : ses chiffres sont à revoir de la même façon dès que l'export M1 de 3 ans est terminé.
 
+## 4 duodecies. Ce qui distingue 2025, et un « feu rouge » qui ne touche pas à la règle (27/11/2026)
+
+Ce qui **n'explique pas** 2025 (US100 et SP500, mêmes règles) :
+- le sens : achats et ventes perdent tous les deux (US100 2025 : achats 25 % de gagnants, ventes 26 %) ;
+- la volatilité : range moyen de la séance (9:30–13:00 NY) de l'US100 de 167 à 452 pts en 2025, du même ordre qu'en 2024 (142 à 304) et 2026 ;
+- l'« efficacité » de la séance ((clôture 13:00 − ouverture 9:30) / range) : 0,39 à 0,56 en 2025 contre 0,37 à 0,58 en 2024 ;
+- la justesse du biais H4 (sens de la séance 9:30–13:00 NY) : 53 % des jours en 2024, 50 % en 2025 ;
+- les mesures du trade (profondeur du Judas, taille du stop, jambe, heure) : 2025 entre 2024 et 2026.
+
+2025 ressemble à une **période prolongée où les retournements après le Judas ne tiennent pas**, sans signature simple dans les prix. La seule mesure qui la détecte à temps est **le résultat récent de la règle elle-même**.
+
+**Feu rouge par actif** (la règle ne change pas) : la règle continue d'être suivie chaque jour, trades pris ou non (Desk Key calcule déjà le résultat de chaque setup). Si la somme des **10 derniers setups** de l'actif (en R, à 3R) est **négative**, on ne trade pas cet actif (feu rouge) ; on reprend dès qu'elle redevient positive ou nulle.
+
+| US100 + SP500 | Sans feu rouge | Avec feu rouge (10 derniers < 0 R) |
+|---|---|---|
+| 2024 | 106 trades, +58,9 R, creux −11,8 R | 97 trades, +55,9 R, creux −7,8 R |
+| **2025** | 115 trades, **−22,0 R**, creux **−29,1 R** | **43 trades, −6,0 R, creux −11,7 R** |
+| 2026 | 89 trades, +55,2 R, creux −5,3 R | 82 trades, +48,5 R, creux −5,3 R |
+| **3 ans** | 310 trades, +92,1 R, **creux −29,1 R** | 222 trades, **+98,4 R**, **creux −11,7 R** |
+
+Par actif : US100 2025, 26 trades pris sur 75 (−6,6 R au lieu de −19,2 R) ; SP500 2025, 17 sur 40 (+0,6 R au lieu de −2,8 R). En 2024 et 2026, le feu rouge ne s'allume presque pas (US100 64 sur 73 et 52 sur 58 ; SP500 33 sur 33 et 30 sur 31).
+
+Robustesse (fenêtre de 6 à 20 setups, seuil −2, 0 ou +2 R) : toutes les variantes réduisent le creux sur 3 ans (−10 à −22 R au lieu de −29 R) avec un total de +64 à +105 R (+92 R sans filtre). La variante « 10 setups, seuil 0 » est dans la zone stable ; les chiffres précis varient selon le réglage (2025 entre −3 et −15 R).
+
+Variantes moins bonnes : mi-risque au lieu de pause (2025 −14 à −16 R) ; un seul feu pour les deux indices (2025 −17 R).
+
 ## 4 septies. Années précédentes (2024, 2025) : il faut du M1
 
 Pour juger l'US100 et le SP500 sur 2024 et 2025, on n'avait que du M5 (3 ans). Calibration : les mêmes règles calculées en M5 sur 2026, comparées au vrai résultat M1 de 2026.

@@ -34,6 +34,8 @@
 
 - **Validation 3 ans US100 / SP500 (27/11)** : 2024 gagnant (+41,8 R / +17,1 R), **2025 perdant** (−19,2 R / −2,8 R, creux combiné −29 R, 14 pertes d'affilée), 2026 gagnant. Sur 3 ans : +92 R, pire creux réel −32,7 R. Risque à revoir : environ 0,33 % par trade pour rester sous −10 % (backtests.md 4 undecies). À faire : chercher ce qui distingue 2025 (filtre de régime ?) ; recalculer les bornes de l'application sur 3 ans ; valider l'or sur 3 ans (export en cours, depuis le 06/08/2025).
 
+- **2025 analysé** (backtests.md 4 duodecies) : ni le sens, ni la volatilité, ni le biais H4 ne l'expliquent ; seul le résultat récent de la règle le détecte. **Feu rouge par actif** (pause si les 10 derniers setups < 0 R, la règle continue d'être suivie) : 3 ans +98 R au lieu de +92 R, creux −11,7 R au lieu de −29 R, 2025 −6 R au lieu de −22 R. À valider sur l'or, puis à ajouter dans Desk Key et l'application.
+
 ## À faire par l'utilisateur
 - [x] Installer Desk Key 1.07 sur les deux graphiques (vu en ligne le 27/11 à 2:01 Paris).
 - [x] DeskUS_Bridge 1.06 remis sur son propre graphique (US30.cash M5) : en ligne depuis le 27/11 à 2:15 Paris, export en cours.
