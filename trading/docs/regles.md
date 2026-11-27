@@ -151,6 +151,12 @@ Fichier : `trading/mt5/DeskUS_Key.mq5`.
 - Notification à chaque changement de couleur (début de séance).
 - Pas de feu rouge sur l'or (backtests.md 4 terdecies).
 
+### Exécution et spread — Desk Key 1.10
+Le graphique MT5 et le backtest utilisent le prix **Bid**. Or un **achat limite se remplit sur l'Ask** (Bid + spread), et le **stop et l'objectif d'une vente se déclenchent sur l'Ask**. Sans correction, des achats « touchés » sur le graphique ne sont pas remplis (27/11/2026 : US100, plus bas Bid 26229,13 pour un ordre à 26230,08, spread 1,45 : ordre manqué de 0,5 pt), et des ventes sont sorties au stop sans que le graphique le touche. Mesure sur 3 ans : backtests.md 4 unvicies.
+- **Rattrapage des achats** (paramètre « Achats : … achat au marché », activé par défaut) : si le graphique (Bid) atteint le prix de l'achat limite sans que l'ordre se remplisse, Desk Key l'annule et **achète au marché**, au même stop et au même objectif, avec un lot recalculé pour garder le même risque en argent. Seulement si l'Ask est à moins de **10 % du risque** au-dessus du 50 % (paramètre « prix maximal accepté », en R) ; sinon l'ordre limite reste. Vérifié à chaque tick, pour le trade 1 et le second trade de l'or. Au placement, même règle : si le graphique est déjà au 50 %, l'achat part au marché.
+- **Ventes** (paramètre « Ventes : stop et objectif décalés du spread », réglé « selon l'actif ») : sur le **SP500 et l'or**, le stop et l'objectif de l'ordre sont placés **un spread plus haut** que ceux de la règle (spread lu au placement) : ils se déclenchent quand le graphique touche les niveaux de la règle. Le lot est calculé sur ce stop (même risque en argent). Pas sur l'US100 : son spread est petit par rapport au risque et le décalage y coûte plus qu'il ne rapporte. Réglages possibles : selon l'actif, oui, non.
+- Rien ne change dans la détection, le dessin, le suivi de la règle et l'application : la règle reste celle du backtest (Bid).
+
 ### Or (XAUUSD) et second trade — Desk Key 1.09
 - Mettre Desk Key sur un **graphique M1 XAUUSD** : le profil or se choisit tout seul (symbole contenant XAU ou GOLD).
 - Règles du profil : section 3 bis. Fenêtre d'entrée **10:00–12:00 NY** : l'ordre expire chez FTMO à 12:00 NY ; panneau, dessins et notifications suivent cette heure.
@@ -210,5 +216,5 @@ Le bouton **TESTER LES NOTIFS** du panneau envoie un message de test sur tous le
 - **Or dans l'application** : carte du jour avec l'étape du second trade ; journal : résultat de la règle = trade 1 avec stop remonté + second trade (mention « 2 trades »), détail des deux trades réels.
 
 ### Différences possibles avec le backtest
-- Le backtest utilise les prix Bid. En réel, un achat limite se remplit quand l'Ask touche le prix : avec le spread, quelques remplissages « de justesse » n'auront pas lieu.
+- Le backtest utilise les prix Bid. En réel, un achat limite se remplit quand l'Ask touche le prix, et le stop et l'objectif d'une vente se déclenchent sur l'Ask : sans correction, environ 0,09 R par trade perdu sur 3 ans. Desk Key 1.10 rattrape les achats et décale les ventes du SP500 et de l'or (section 6, « Exécution et spread ») : environ 0,04 R par trade, dans les 0,05 R de frais déjà comptés.
 - Pour tester dans le **testeur de stratégie**, choisir « Serveur = New York + 7 h » dans le réglage Heure du serveur.

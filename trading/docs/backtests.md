@@ -547,6 +547,34 @@ Robustesse (fenêtre de 6 à 20 setups, seuil −2, 0 ou +2 R) : toutes les vari
 
 Variantes moins bonnes : mi-risque au lieu de pause (2025 −14 à −16 R) ; un seul feu pour les deux indices (2025 −17 R).
 
+## 4 unvicies. Le spread : ce que le backtest (sur le Bid) ne voit pas — 27/11/2026
+
+Point de départ : le 27/11/2026, achat limite US100 à 26230,08 non rempli. La bougie de 10:09 NY a fait le sommet de la jambe (26297,83) puis un plus bas Bid de 26229,13 ; avec un spread de 1,45, l'Ask n'est pas descendu sous 26230,58. La règle (et le backtest) comptent l'entrée à 10:10 NY ; le compte, non.
+
+Méthode : 504 trades de la configuration retenue (toutes les entrées des indices, feu rouge compris, et le trade 1 de l'or), bougies M1 (Bid) des 3 ans, spreads relevés le 27/11 à 10:16 NY (US100 1,45 pt, SP500 0,60 pt, or 0,47 $). Un achat limite au prix E se remplit quand le Bid descend à E − spread ; le stop et l'objectif d'une vente se déclenchent quand le Bid atteint le niveau − spread. Résultats à 3R, avant les frais de 0,05 R par trade.
+
+**Achats** (122 US100, 71 SP500, 104 or) :
+
+| Actif | Pas remplis au même moment | Jamais remplis | Backtest | Exécution actuelle | Ordre toujours + spread | Rattrapage (spread payé seulement si besoin) |
+|---|---|---|---|---|---|---|
+| US100 | 25 | 7 (13,3 R de gagnants) | 17,4 R | 4,1 R | 11,0 R | **15,8 R** |
+| SP500 | 25 | 6 | 12,4 R | 10,2 R | 6,1 R | 9,8 R |
+| Or | 45 | 4 | 45,0 R | 36,9 R | 34,8 R | **40,5 R** |
+
+**Ventes** (84 US100, 33 SP500, 90 or) :
+
+| Actif | Backtest | Exécution actuelle | Stop + spread | Stop et objectif + spread |
+|---|---|---|---|---|
+| US100 | 36,0 R | **35,7 R** | 32,4 R | 31,4 R |
+| SP500 | 26,4 R | 18,3 R | 23,6 R | **22,7 R** |
+| Or | 30,6 R | 17,0 R | 19,6 R | **21,8 R** |
+
+- Les achats ratés sont surtout des gagnants : un repli qui s'arrête pile au 50 % annonce un mouvement fort.
+- Ajouter le spread à tous les achats paie le spread même quand le prix descend bien plus bas : bon sur l'US100, mauvais sur le SP500 et l'or. Le **rattrapage** (acheter au marché seulement quand le graphique touche le 50 % sans remplissage) est meilleur partout ; chiffre maximal (il suppose un achat à 50 % + spread au moment exact de la touche).
+- Ventes : sur le SP500 et l'or, le spread pèse 5 à 7 % du risque ; des stops sont touchés par l'Ask sans que le graphique les touche. Décaler stop et objectif d'un spread y rapporte ; sur l'US100 (spread de 3,5 % du risque), il coûte.
+- **Total** (trade 1, 3 ans) : backtest sur le Bid 167,8 R ; exécution actuelle 122,2 R (−45,6 R, environ 0,09 R par trade, presque le double des 0,05 R de frais comptés) ; **avec Desk Key 1.10** (rattrapage des achats, ventes SP500 et or décalées) environ 146,3 R (−21,5 R, environ 0,04 R par trade : dans les frais déjà comptés).
+- Limites : un seul relevé de spread (il varie, surtout à l'ouverture) ; rattrapage supposé parfait ; second trade de l'or non mesuré ; choix par actif sur 33 à 122 trades.
+
 ## 4 vicies. Plusieurs comptes FTMO avec un budget de 1 200 € (simulateur de l'application) — 27/11/2026
 
 Moteur `trading/assets/sim.js` (le même dans l'application, onglet Simulateur). Hypothèses :
