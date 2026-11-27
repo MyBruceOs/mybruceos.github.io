@@ -6,9 +6,9 @@
 
 | Élément | Version | En ligne | Remarque |
 |---|---|---|---|
-| Desk Key (MT5, exécution en une touche) | **1.09** (prête) / 1.08 en ligne | non (en attente de « mets en ligne ») | 1.09 : profil or (XAUUSD) avec second trade et stop du trade 1 remonté, feu rouge US100 / SP500 désactivable (bouton FEU ROUGE). 1.08 : Telegram / WhatsApp par le relais du serveur si MT5 échoue. |
+| Desk Key (MT5, exécution en une touche) | **1.09** | oui (27/11) | 1.09 : profil or (XAUUSD) avec second trade et stop du trade 1 remonté, feu rouge US100 / SP500 désactivable (bouton FEU ROUGE). 1.08 : Telegram / WhatsApp par le relais du serveur si MT5 échoue. |
 | DeskUS_Bridge (MT5, données) | **1.06** | oui | Exporte aussi US30 et XAUUSD pour les backtests. |
-| Application web | — | oui (version or / feu rouge prête, pas en ligne) | Prête : or, second trade, colonne « Feu » et filtres du journal, statistiques et bornes d'alarme sur 3 ans. |
+| Application web | — | oui (or et feu rouge en ligne le 27/11) | Prête : or, second trade, colonne « Feu » et filtres du journal, statistiques et bornes d'alarme sur 3 ans. |
 | Base Supabase | — | — | Plan gratuit : 133 Mo / 500 Mo (projet partagé avec une autre application). |
 | Moteur de backtest `desk-bt-m1` | **v14** | — | v14 : chemin du prix et 34 gestions de sortie (backtests.md 4 quaterdecies). v13 : second trade. |
 | (ancien) moteur | v11 | — | Séance paramétrable (Londres / New York) ; structure M5 avec exécution M1 (`tf=5`) ; historique M5 sur 3 ans (`src=M5`). Vérifié : redonne les trades de référence. |
@@ -38,6 +38,8 @@
 - **2025 analysé** (backtests.md 4 duodecies) : ni le sens, ni la volatilité, ni le biais H4 ne l'expliquent ; seul le résultat récent de la règle le détecte. **Feu rouge par actif** (pause si les 10 derniers setups < 0 R, la règle continue d'être suivie) : 3 ans +98 R au lieu de +92 R, creux −11,7 R au lieu de −29 R, 2025 −6 R au lieu de −22 R. À valider sur l'or, puis à ajouter dans Desk Key et l'application.
 
 ## À faire par l'utilisateur
+- [ ] Compiler Desk Key 1.09 dans MetaEditor (télécharger le fichier depuis l'onglet Réglages de l'application) et me transmettre les erreurs s'il y en a.
+- [ ] Mettre Desk Key 1.09 sur 3 graphiques M1 : US100, SP500 et XAUUSD (le profil or se choisit tout seul).
 - [x] Installer Desk Key 1.07 sur les deux graphiques (vu en ligne le 27/11 à 2:01 Paris).
 - [x] DeskUS_Bridge 1.06 remis sur son propre graphique (US30.cash M5) : en ligne depuis le 27/11 à 2:15 Paris, export en cours.
 - [x] Notifications sur le téléphone (application MT5) : fonctionnent.
@@ -52,8 +54,10 @@
 - **Proposé, à décider par l'utilisateur** : mi-risque automatique quand le compte est à 4 R sous son plus haut (retour au risque normal à 2 R du plus haut) : pire creux 3 ans −8,8 R au lieu de −13,6 R pour +176 R au lieu de +211 R ; à sécurité égale (5 % de chances de toucher −10 %), 0,87 % par trade au lieu de 0,54 %, gain médian simulé +45 % au lieu de +35 %.
 
 - **Pas de mi-risque automatique** quand le compte est en creux : proposé le 27/11, refusé par l'utilisateur.
+- **Mise en ligne de Desk Key 1.09 et de l'application (27/11)** : demande de fusion n° 14 fusionnée ; base à jour (profil XAUUSD, statistiques 3 ans, second trade réel conservé).
+- **Jour de la semaine et délai cassure → touche (27/11, backtests.md 4 quindecies)** : le vendredi faible n'existe qu'en 2026 (sur 3 ans : +25,9 R, deuxième meilleur jour) ; aucune règle par jour ne tient d'une année sur l'autre (indices et or). Annuler l'ordre s'il n'est pas touché vite fait toujours perdre. Piste à surveiller sur les indices : touche plus de 20 min après la cassure meilleure (+0,59 R contre +0,23 R par entrée, chaque année ; test du hasard 7 %) ; l'or fait l'inverse.
 
-## Mise à jour or + feu rouge (27/11) — prête, en attente de « mets en ligne »
+## Mise à jour or + feu rouge (27/11) — en ligne
 - **Desk Key 1.09** : profil or (H4 ou H1 sans conflit, stop Judas ± 1 $, entrées 10:00–12:00 NY, TP 3R, sortie 13:00 NY) ; second trade (détection copiée du moteur de backtest : identique sur 20 000 séries de test) avec stop du trade 1 remonté au remplissage ; feu rouge US100 / SP500 calculé chaque matin sur les 10 derniers setups, bouton FEU ROUGE ON / OFF ; envoi du feu et du second trade à l'application. À compiler dans MetaEditor (pas de compilateur MQL5 ici).
 - **Application** : or et second trade (Aujourd'hui, Journal, Mon compte, Suivi), colonne « Feu » et filtres « Sous feu vert / rouge » dans le journal, alerte du jour, règles et statistiques sur 3 ans (bornes d'alarme recalculées).
 - **Base** (appliquée à la mise en ligne) : profil XAUUSD, règles et statistiques 3 ans des trois profils et de l'ensemble, second trade réel conservé par `desk_setup_push`.

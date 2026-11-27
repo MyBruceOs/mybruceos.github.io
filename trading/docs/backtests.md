@@ -547,6 +547,44 @@ Robustesse (fenêtre de 6 à 20 setups, seuil −2, 0 ou +2 R) : toutes les vari
 
 Variantes moins bonnes : mi-risque au lieu de pause (2025 −14 à −16 R) ; un seul feu pour les deux indices (2025 −17 R).
 
+## 4 quindecies. Jour de la semaine et délai entre la cassure et la touche (27/11/2026)
+
+Question de l'utilisateur, à partir d'une analyse de 2026 seulement (vendredi faible, mardi fort, délai médian de 9 min) : faut-il une règle différente le vendredi ou le lundi (money management), et le délai entre la cassure et la touche du 50 % est-il un vrai signal ? Analyse sur 3 ans (2024–2026) : 310 entrées des indices (règles actuelles) et 194 jours d'or (trade 1 + second trade). Un écart est retenu seulement s'il tient chaque année et résiste au test du hasard (jours ou résultats mélangés au hasard).
+
+**Jour de la semaine, indices (toutes les entrées de la règle)** :
+
+| Jour | Entrées | Total | Moyenne | % gagnants | 2024 | 2025 | 2026 |
+|---|---|---|---|---|---|---|---|
+| Lundi | 60 | +6,1 R | +0,10 | 33 % | +2,1 | −4,0 | +8,0 |
+| Mardi | 69 | +28,4 R | +0,41 | 42 % | +10,5 | −3,3 | +21,3 |
+| Mercredi | 55 | +12,1 R | +0,22 | 36 % | +10,2 | −9,1 | +11,0 |
+| Jeudi | 57 | +19,6 R | +0,34 | 42 % | +16,8 | −4,3 | +7,1 |
+| Vendredi | 69 | +25,9 R | +0,37 | 41 % | +19,3 | −1,3 | +7,9 |
+
+- Le **vendredi faible n'existe qu'en 2026** : sur 3 ans, c'est le deuxième meilleur jour (+25,9 R). Le mardi est le meilleur jour, mais il a été perdant en 2025.
+- Le **lundi** est le jour le plus faible (+0,10 R par entrée), mais pas chaque année, et des jours tirés au hasard donnent un pire jour aussi faible 2 fois sur 3 : **pas un signal**.
+- Or : aucun jour faible (lundi +0,53, mardi +0,72, mercredi +0,34, jeudi +0,57, vendredi +0,78 R par jour ; le mercredi a été négatif en 2024 et 2025 seulement).
+- Règles de money management testées sur le compte 3 actifs (feu rouge sur les indices ; actuel : +211,2 R, pire creux −13,6 R) : vendredi à mi-risque +200,6 R (creux −14,2) ; lundi à mi-risque +207,3 R (−12,6) ; lundi et vendredi à mi-risque +196,7 R (−13,2) ; pas de trade le lundi +203,3 R (−11,6, mais −8,9 R en 2026) ; pas de trade le vendredi +190,1 R (−14,9) ; mardi et jeudi à 1,5× +241,0 R mais creux −16,1 R. **Aucune ne tient d'une année sur l'autre : pas de règle par jour.**
+
+**Délai entre la cassure et la touche du 50 %** (indices : médiane 6 min, quartiles 3 et 15 min, maximum 66 min ; or : médiane 12 min) :
+
+| Délai | Indices : entrées | Total | Moyenne | % gagnants | 2024 | 2025 | 2026 | Or : moyenne par jour |
+|---|---|---|---|---|---|---|---|---|
+| 0–2 min | 52 | +17,1 R | +0,33 | 37 % | +6,2 | +2,9 | +8,0 | +1,25 |
+| 3–5 min | 87 | +22,1 R | +0,25 | 34 % | +32,9 | −22,4 | +11,6 | +0,55 |
+| 6–10 min | 60 | +5,9 R | +0,10 | 30 % | −3,6 | −11,0 | +20,6 | +0,59 |
+| 11–20 min | 53 | +12,7 R | +0,24 | 42 % | +11,7 | −0,1 | +1,1 | +0,64 |
+| 21–40 min | 40 | +24,9 R | +0,62 | 52 % | +9,3 | +6,2 | +9,4 | +0,33 |
+| 41 min et + | 18 | +9,4 R | +0,52 | 61 % | +2,4 | +2,4 | +4,6 | +0,41 |
+
+- **Annuler l'ordre s'il n'est pas touché vite** (5, 10, 15, 20, 30 ou 45 min après la cassure) fait **toujours perdre** (−5 à −53 R sur les indices, −4 à −71 R sur l'or). Ne pas prendre les touches très rapides aussi (−9 à −39 R).
+- **Seule piste** : sur les indices, une touche **plus de 20 min après la cassure** est meilleure (58 entrées, +0,59 R par entrée et 55 % de gagnants, contre +0,23 R), chaque année (+11,7 / +8,6 / +14,0 R), et quelle que soit l'heure de la cassure (cassure avant 10:00 : +0,66 contre +0,16 ; 10:00–10:29 : +0,42 contre +0,01 ; 10:30–10:59 : +1,05 contre +0,46). Lecture SMC : un retour lent au 50 % (le prix consolide après la cassure) vaut mieux qu'un retour brutal (cassure ratée). Mais le seuil de 20 min a été choisi en regardant les tranches, et le test du hasard donne 7 % : **pas encore une preuve**.
+- Ce que donnerait une règle « lot × 1,5 si l'ordre est touché plus de 20 min après la cassure » (indices seulement) sur le compte 3 actifs : +222,0 R au lieu de +211,2 R, pire creux −13,4 R (+4,8 / +0,2 / +5,7 R par année). Gain faible.
+- **L'or fait l'inverse** : ses meilleures touches sont les plus rapides (0–2 min : +1,25 R par jour), et la touche lente n'y est pas meilleure (test du hasard : 86 %). La piste des indices ne s'applique pas à l'or.
+- **Heure de la cassure** (indices) : avant 10:00 NY +0,47 R par entrée, 10:00–10:29 +0,08, 10:30–10:59 +0,49 ; mais 10:00–10:29 a été le meilleur créneau en 2026 (+32,9 R) : pas stable.
+
+**Conclusion** : pas de règle par jour de la semaine, ni sur les indices ni sur l'or ; ne pas couper les ordres touchés tard. À surveiller dans l'application : le délai entre la cassure et la touche sur les indices (touche lente meilleure) ; à revoir avec quelques mois de trades réels avant d'en faire une règle de taille de position.
+
 ## 4 quaterdecies. Or : réduire les séries de pertes et les retournements (27/11/2026)
 
 Demande : trouver, sur l'or, un motif qui réduise les séries de pertes sans changer la fréquence, ou une gestion des gains qui évite les retournements, sans perdre en efficacité. Moteur **v14** (desk-bt-m1) : mêmes trades que v13 (résultats identiques vérifiés), plus le chemin du prix après l'entrée, 34 gestions de sortie du trade 1 (combinées au second trade) et 16 nouvelles mesures par trade. 194 trades d'or sur 3 ans (configuration retenue : second trade, stop du trade 1 remonté).
