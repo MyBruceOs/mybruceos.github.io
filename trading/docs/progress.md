@@ -1,12 +1,12 @@
 # Progress · Desk US
 
-*Mis à jour le 27/11/2026. Fichier tenu à jour à chaque étape du projet.*
+*Mis à jour le 27/11/2026 (nuit). Fichier tenu à jour à chaque étape du projet.*
 
 ## Où on en est
 
 | Élément | Version | En ligne | Remarque |
 |---|---|---|---|
-| Desk Key (MT5, exécution en une touche) | **1.07** | oui | Expiration de l'ordre à 11:00 NY chez FTMO. 1.06 : risque réglable dans le panneau, notifications. |
+| Desk Key (MT5, exécution en une touche) | **1.08** | oui | Telegram / WhatsApp : nettoyage des valeurs collées, relais par le serveur si MT5 échoue (erreur 1009), résultat du test dans le panneau. 1.07 : expiration de l'ordre à 11:00 NY chez FTMO. |
 | DeskUS_Bridge (MT5, données) | **1.06** | oui | Exporte aussi US30 et XAUUSD pour les backtests. |
 | Application web | — | oui | Onglet Mon compte ; lecture incrémentale (quota Supabase). |
 | Base Supabase | — | — | Plan gratuit : 133 Mo / 500 Mo (projet partagé avec une autre application). |
@@ -23,9 +23,10 @@
 - En attente : l'export M1 de US30 et XAUUSD par le Bridge 1.06 (MT5 ouvert environ 1 h).
 
 ## À faire par l'utilisateur
-- [ ] Installer Bridge 1.06 (remplacer l'ancien, compiler) et laisser MT5 ouvert pour l'export.
-- [ ] Installer Desk Key 1.07 (remplacer l'ancien, compiler) sur les deux graphiques.
-- [ ] Notifications : jeton Telegram et identifiant de chat dans les paramètres de Desk Key (F7 → Paramètres → groupe Notifications), puis bouton TESTER LES NOTIFS.
+- [x] Installer Desk Key 1.07 sur les deux graphiques (vu en ligne le 27/11 à 2:01 Paris).
+- [x] DeskUS_Bridge 1.06 remis sur son propre graphique (US30.cash M5) : en ligne depuis le 27/11 à 2:15 Paris, export en cours.
+- [x] Notifications sur le téléphone (application MT5) : fonctionnent.
+- [x] Desk Key 1.08 installé ; notifications Telegram OK (27/11, 2:36 Paris), par le relais du serveur Desk US car MT5 renvoie l'erreur 1009 / 5203 vers api.telegram.org.
 
 ## Plus tard
 - Installer MT5, Desk Key et le Bridge sur le **VPS de l'utilisateur** (MT5 allumé 24 h/24 : sortie de 13:00 NY assurée même PC éteint).

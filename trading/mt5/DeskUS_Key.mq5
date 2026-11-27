@@ -14,12 +14,12 @@
 //|    leur résultat), et envoie les niveaux à l'application.        |
 //+------------------------------------------------------------------+
 #property copyright "Desk US"
-#property version   "1.07"
+#property version   "1.08"
 #property description "Règle A Desk US (US100 / SP500) : détection, dessin, historique et exécution en une touche."
 
 #include <Trade\Trade.mqh>
 
-#define DK_VERSION "1.07"
+#define DK_VERSION "1.08"
 
 enum ENUM_DK_PROFIL
   {
@@ -177,6 +177,8 @@ string RisqueTexte();
 string RisqueAnalyse(color &c);
 void   NotifierUneFois(int bit, string texte, bool fort);
 void   Notifier(string texte, bool fort);
+void   Panneau();
+string LireCle();
 
 //+------------------------------------------------------------------+
 //| Heures                                                           |
@@ -794,15 +796,127 @@ string UrlEnc(string s)
      }
    return o;
   }
-bool HttpGet(string url, string quoi)
+// valeurs collées nettoyées (espaces, retours à la ligne, guillemets)
+string Nettoyer(string v) { StringReplace(v, " ", ""); StringReplace(v, "\r", ""); StringReplace(v, "\n", ""); StringReplace(v, "\t", ""); StringReplace(v, "\"", ""); StringReplace(v, "'", ""); return v; }
+string g_tgTok = "", g_tgChat = "", g_waTel = "", g_waCle = "";
+bool   g_tgRelais = false, g_waRelais = false;   // MT5 n'arrive pas à joindre le service : passage par le serveur Desk US
+bool   g_enTest = false;
+long   g_testIds[];
+string g_testCh[];
+datetime g_testT = 0;
+void LireNotifs() { g_tgTok = Nettoyer(InpTgToken); g_tgChat = Nettoyer(InpTgChat); g_waTel = Nettoyer(InpWaPhone); g_waCle = Nettoyer(InpWaApiKey); }
+// appel d'une fonction du serveur Desk US (même adresse que l'envoi des setups)
+int Rpc(string fn, string body, string &resp)
   {
-   char data[], res[]; string rh;
+   char data[], result[]; string rh;
+   int len = StringToCharArray(body, data, 0, WHOLE_ARRAY, CP_UTF8);
+   if(len > 0) ArrayResize(data, len - 1);
    ResetLastError();
-   int code = WebRequest("GET", url, "", 8000, data, res, rh);
-   if(code == 200) return true;
-   if(code == -1 && GetLastError() == 4014) Print("Desk Key : ajoutez l'adresse de ", quoi, " dans Outils > Options > Expert Advisors > WebRequest");
-   else Print("Desk Key : notification ", quoi, " refusée (code ", code, ") ", CharArrayToString(res));
-   return false;
+   int code = WebRequest("POST", "https://xakrdapoxthvvqpyjuji.supabase.co/rest/v1/rpc/" + fn, "Content-Type: application/json\r\napikey: " + API_KEY + "\r\n", 8000, data, result, rh);
+   resp = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
+   return code;
+  }
+// relais par le serveur : renvoie l'identifiant de la requête (0 si échec)
+long Relais(string canal, string a, string b, string texte)
+  {
+   if(g_key == "") g_key = LireCle();
+   if(g_key == "") { Print("Desk Key : relais impossible, clé Desk US absente"); return 0; }
+   string resp;
+   int code = Rpc("desk_notify", "{\"p_key\":" + Q(g_key) + ",\"p_channel\":" + Q(canal) + ",\"p_a\":" + Q(a) + ",\"p_b\":" + Q(b) + ",\"p_text\":" + Q(texte) + "}", resp);
+   if(code < 200 || code >= 300)
+     {
+      string why = resp;
+      if(StringFind(resp, "bad telegram token") >= 0) why = "jeton Telegram mal copié (format attendu 123456789:AAH…)";
+      else if(StringFind(resp, "bad telegram chat id") >= 0) why = "identifiant de chat Telegram invalide (un nombre, pas le @ du bot)";
+      else if(StringFind(resp, "bad phone") >= 0) why = "numéro WhatsApp invalide (format +33612345678)";
+      else if(StringFind(resp, "bad callmebot key") >= 0) why = "clé CallMeBot invalide";
+      Print("Desk Key : relais ", canal, " refusé : ", why);
+      if(g_enTest) Msg((canal == "tg" ? "Telegram" : "WhatsApp") + " : " + why);
+      return 0;
+     }
+   return (long)StringToInteger(resp);
+  }
+void SuivreRelais(long id, string canal)
+  {
+   if(!g_enTest || id <= 0) return;
+   int k = ArraySize(g_testIds);
+   ArrayResize(g_testIds, k + 1); ArrayResize(g_testCh, k + 1);
+   g_testIds[k] = id; g_testCh[k] = canal; g_testT = TimeLocal();
+  }
+void Telegram(string texte)
+  {
+   if(g_tgTok == "" || g_tgChat == "") return;
+   if(!g_tgRelais)
+     {
+      char data[], res[]; string rh;
+      string body = "chat_id=" + UrlEnc(g_tgChat) + "&text=" + UrlEnc(texte);
+      int len = StringToCharArray(body, data, 0, WHOLE_ARRAY, CP_UTF8);
+      if(len > 0) ArrayResize(data, len - 1);
+      ResetLastError();
+      int code = WebRequest("POST", "https://api.telegram.org/bot" + g_tgTok + "/sendMessage", "Content-Type: application/x-www-form-urlencoded\r\n", 5000, data, res, rh);
+      int err = GetLastError();
+      if(code == 200) { if(g_enTest) Msg("Telegram : OK (envoi direct)"); return; }
+      string rep = CharArrayToString(res, 0, WHOLE_ARRAY, CP_UTF8);
+      if(code >= 400 && code < 500)   // Telegram a répondu : le problème vient du jeton ou de l'identifiant
+        {
+         Print("Desk Key : Telegram refuse (", code, ") ", rep);
+         if(g_enTest) Msg("Telegram : refusé " + I(code) + " · " + (StringFind(rep, "chat not found") >= 0 ? "identifiant de chat faux, ou /start pas envoyé au bot" : (code == 401 ? "jeton faux" : (code == 403 ? "envoyez /start à votre bot dans Telegram" : StringSubstr(rep, 0, 80)))));
+         return;
+        }
+      Print("Desk Key : MT5 n'arrive pas à joindre Telegram (code ", code, ", erreur ", err, "), passage par le relais du serveur Desk US");
+      g_tgRelais = true;
+     }
+   SuivreRelais(Relais("tg", g_tgTok, g_tgChat, texte), "tg");
+  }
+void WhatsApp(string texte)
+  {
+   if(g_waTel == "" || g_waCle == "") return;
+   if(!g_waRelais)
+     {
+      char data[], res[]; string rh;
+      ResetLastError();
+      int code = WebRequest("GET", "https://api.callmebot.com/whatsapp.php?phone=" + UrlEnc(g_waTel) + "&text=" + UrlEnc(texte) + "&apikey=" + UrlEnc(g_waCle), "", 5000, data, res, rh);
+      int err = GetLastError();
+      if(code == 200) { if(g_enTest) Msg("WhatsApp : OK (envoi direct)"); return; }
+      if(code >= 400 && code < 500) { Print("Desk Key : CallMeBot refuse (", code, ") ", CharArrayToString(res)); if(g_enTest) Msg("WhatsApp : refusé " + I(code) + " (numéro ou clé CallMeBot)"); return; }
+      Print("Desk Key : MT5 n'arrive pas à joindre CallMeBot (code ", code, ", erreur ", err, "), passage par le relais du serveur Desk US");
+      g_waRelais = true;
+     }
+   SuivreRelais(Relais("wa", g_waTel, g_waCle, texte), "wa");
+  }
+// résultat d'un test passé par le relais (lu quelques secondes après)
+string ExtraitNum(string r, string champ)
+  {
+   int p = StringFind(r, "\"" + champ + "\":"); if(p < 0) return "";
+   p += StringLen(champ) + 3;
+   while(p < StringLen(r) && StringGetCharacter(r, p) == ' ') p++;
+   int q = p; while(q < StringLen(r) && StringGetCharacter(r, q) >= '0' && StringGetCharacter(r, q) <= '9') q++;
+   return StringSubstr(r, p, q - p);
+  }
+void SuivreTest()
+  {
+   if(g_testT == 0 || ArraySize(g_testIds) == 0 || TimeLocal() - g_testT < 3) return;
+   if(g_key == "") g_key = LireCle();
+   string bilan = ""; bool attente = false;
+   for(int i = 0; i < ArraySize(g_testIds); i++)
+     {
+      string resp;
+      Rpc("desk_notify_result", "{\"p_key\":" + Q(g_key) + ",\"p_id\":" + I(g_testIds[i]) + "}", resp);
+      string nom = g_testCh[i] == "tg" ? "Telegram" : "WhatsApp";
+      if(StringFind(resp, "\"pending\": true") >= 0 || StringFind(resp, "\"pending\":true") >= 0) { attente = true; continue; }
+      string st = ExtraitNum(resp, "status");
+      string r = resp; StringReplace(r, "\\", "");
+      string why = "";
+      if(StringFind(r, "chat not found") >= 0) why = "identifiant de chat faux, ou /start pas envoyé au bot";
+      else if(StringFind(r, "Unauthorized") >= 0) why = "jeton faux";
+      else if(StringFind(r, "Forbidden") >= 0) why = "envoyez /start à votre bot dans Telegram";
+      bilan += (bilan != "" ? " · " : "") + nom + (st == "200" ? " : OK (par le serveur Desk US)" : " : erreur " + (st != "" ? st : "réseau") + (why != "" ? " · " + why : ""));
+     }
+   if(attente && TimeLocal() - g_testT < 20) return;
+   if(bilan == "") bilan = "notifications : pas de réponse du serveur";
+   Msg(bilan);
+   ArrayResize(g_testIds, 0); ArrayResize(g_testCh, 0); g_testT = 0;
+   Panneau();
   }
 void Notifier(string texte, bool fort)
   {
@@ -814,10 +928,8 @@ void Notifier(string texte, bool fort)
      }
    if(InpAlertePC && fort && !MQLInfoInteger(MQL_TESTER)) Alert(m);
    if(MQLInfoInteger(MQL_TESTER)) { Print("[notif] ", m); return; }
-   if(InpTgToken != "" && InpTgChat != "")
-      HttpGet("https://api.telegram.org/bot" + InpTgToken + "/sendMessage?chat_id=" + UrlEnc(InpTgChat) + "&text=" + UrlEnc((fort ? "🔔 " : "") + m), "Telegram (https://api.telegram.org)");
-   if(InpWaPhone != "" && InpWaApiKey != "")
-      HttpGet("https://api.callmebot.com/whatsapp.php?phone=" + UrlEnc(InpWaPhone) + "&text=" + UrlEnc((fort ? "🔔 " : "") + m) + "&apikey=" + UrlEnc(InpWaApiKey), "WhatsApp (https://api.callmebot.com)");
+   Telegram((fort ? "🔔 " : "") + m);
+   WhatsApp((fort ? "🔔 " : "") + m);
   }
 // une seule fois par jour et par événement, même si MT5 redémarre
 bool DejaNotifie(int bit)
@@ -1534,6 +1646,7 @@ void Tick()
       DessinerJour();
      }
    SuivreRisque();
+   SuivreTest();
    SuivreNotifs();   // avant Gerer : « setup prêt » arrive avant « ordre placé »
    Gerer();
    EnvoyerJour();
@@ -1559,6 +1672,7 @@ int OnInit()
       g_protect = InpProtection;
      }
    ChargerRisque();
+   LireNotifs();
    UpdateServerOffset();
    EventSetTimer(1);
    if(garder) g_lastBar = 0;
@@ -1607,8 +1721,12 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
       else if(b == "RPLUS") ChangerRisque(g_rMode, g_rVal + PasRisque());
       else if(b == "NT")
         {
+         ArrayResize(g_testIds, 0); ArrayResize(g_testCh, 0); g_testT = 0;
+         g_tgRelais = false; g_waRelais = false;   // on réessaie l'envoi direct à chaque test
+         Msg("notification de test envoyée (téléphone" + (g_tgTok != "" ? ", Telegram" : "") + (g_waTel != "" ? ", WhatsApp" : "") + ")…");
+         g_enTest = true;
          Notifier("TEST · les notifications fonctionnent. Risque " + RisqueTexte() + " · " + ModeTexte(), true);
-         Msg("notification de test envoyée (téléphone" + (InpTgToken != "" ? ", Telegram" : "") + (InpWaPhone != "" ? ", WhatsApp" : "") + ")");
+         g_enTest = false;
         }
       else if(b == "PER")
         {
