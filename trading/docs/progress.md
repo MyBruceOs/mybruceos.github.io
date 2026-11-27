@@ -29,6 +29,7 @@
 - Vérification sur l'historique réel 2026 (un compte, 3 actifs, 1 % par trade) : pire creux −9,5 % début avril–début mai (9 pertes d'affilée) ; repère 0,75 % en challenge, 0,5 % en financé.
 - Export M1 sur 3 ans (27/11, 5:00 Paris) : US100 complet (depuis le 27/11/2023), SP500 en cours (depuis le 13/08/2024), or ensuite.
 
+- **Second trade sur l'or seulement, avec le stop du trade 1 remonté au stop du second trade** (moteur v13) : or +51,2 R au lieu de +37,7 R, pire creux −4,0 R ; compte 3 actifs +106,4 R, pire creux −8,5 R. Ajouté comme option dans regles.md (or), à confirmer sur 2024–2025.
 - Second trade de continuation testé (moteur v12, backtests.md 4 decies) : +21 trades par an, +15,8 R avec l'objectif du trade 1, mais creux −10 R et le second trade perd à chaque fois que le trade 1 perd ; pas mis en place, à retester sur 2024–2025 (or seul).
 
 ## À faire par l'utilisateur

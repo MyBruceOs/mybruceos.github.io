@@ -60,7 +60,20 @@ Même mécanique que les indices (section 1 : liquidité du pré-marché 8:00–
 | Sortie | 13:00 NY (19:00 Paris). |
 | Résultats du backtest (22/12/2025 – 25/11/2026, 3R) | 53 trades (environ 4 à 5 par mois, de 1 à 8), 55 % de gagnants, +37,7 R, pire baisse −4,5 R, 11 mois positifs et 0 négatif ; 1re moitié +23,2 R, 2de moitié +14,5 R. |
 
-À ne pas faire sur l'or : entrer entre 9:30 et 10:00 NY (23 % de gagnants), trader la séance de Londres, sortir à 12:00.
+**Option : second trade de continuation (or seulement, à confirmer sur 2024–2025)**
+
+| Règle | Valeur |
+|---|---|
+| Quand | Seulement pendant que le trade 1 est ouvert (pas après son stop ni son TP), ordre rempli avant 12:00 NY (18:00 Paris). |
+| Setup | Le prix dépasse le haut de la jambe du trade 1 (impulsion), fait un repli qui forme un creux plus haut (pivot M1 de 2 bougies) au-dessus du stop du trade 1, puis une bougie M1 clôture au-dessus du sommet d'avant le repli (seconde cassure). Inverse pour une vente. |
+| Entrée | Limite au **50 %** de la nouvelle jambe (creux du repli → plus haut), retracée si la jambe s'allonge. |
+| Stop | Sous le creux du repli, **1 $** de marge. |
+| Objectif | **Le même prix que le TP du trade 1** (3R du trade 1), pas 1R. |
+| **Gestion obligatoire** | Dès que le second trade est rempli, **remonter le stop du trade 1 au stop du second trade**. Sans cette règle, le second trade double les pertes des mauvaises journées. |
+| Risque | Même risque que le trade 1. |
+| Backtest 2026 | 10 seconds trades (environ 1 par mois), 6 gagnants ; or : +51,2 R au lieu de +37,7 R, pire creux −4,0 R au lieu de −4,5 R ; compte 3 actifs : +106,4 R au lieu de +92,9 R, pire creux −8,5 R au lieu de −9 R. |
+
+À ne pas faire sur l'or : entrer entre 9:30 et 10:00 NY (23 % de gagnants), trader la séance de Londres, sortir à 12:00. Second trade sur l'US100 ou le SP500 : non (trop rare ou neutre, et aggrave le creux).
 
 ## 4. Ce qu'il faut attendre (simulations)
 

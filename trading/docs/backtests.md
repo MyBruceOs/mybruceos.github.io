@@ -482,6 +482,21 @@ Effet sur le portefeuille 3 actifs (1 an) :
 - Le second trade renforce les mauvaises journées : à 1 % par trade, le creux d'avril passerait de −9,5 % à environ −10,5 % frais compris, soit l'échec d'un challenge.
 - Échantillons très petits (3 à 10 trades par actif) : **pas mis en place**. À retester sur 2024–2025, éventuellement pour l'or seul.
 
+**Or seul, avec une règle de gestion en plus** (moteur v13) : dès que le second trade est rempli, le stop du trade 1 est remonté au stop du second trade (sous le nouveau creux, comme un stop suiveur SMC). Les jours où le second trade perd, le trade 1 sort sur ce stop à +0,61 R, +0,45 R et −0,23 R au lieu de −1 R ; les jours gagnants ne changent pas.
+
+| Or | Trades | Gagnants | Total | 1re / 2de moitié | Pire creux | Plus longue série de pertes | Pire journée |
+|---|---|---|---|---|---|---|---|
+| Trade 1 seul | 53 | 55 % | +37,7 R | +23,2 / +14,5 | −4,5 R | 4 | −1 R |
+| + second trade | 63 | 56 % | +47,4 R | +27,1 / +20,3 | −5,5 R | 5 | −2 R |
+| **+ second trade + stop du trade 1 remonté** | **63** | **59 %** | **+51,2 R** | **+30,1 / +21,1** | **−4,0 R** | **3** | **−1,2 R** |
+| idem, second trade à mi-risque | 63 | 59 % | +46,4 R | +28,2 / +18,2 | −3,5 R | 3 | −1 R |
+
+Or par mois (R), trade 1 seul → avec second trade et stop remonté : déc. +1,3 → +2,1 ; janv. +5,1 → +9,3 ; févr. +8,9 → +9,8 ; mars +1,4 → +2,0 ; avr. +4,0 → +4,0 ; mai +2,5 → +3,0 ; juin 0,0 → 0,0 ; juil. +7,6 → +12,5 ; août +3,3 → +5,0 ; sept. +0,3 → +0,4 ; oct. +2,4 → +2,4 ; nov. +1,0 → +0,8.
+
+Compte 3 actifs (second trade sur l'or seulement, stop remonté) : 152 trades, 53 % de gagnants, **+106,4 R** (au lieu de +92,9 R), pire creux **−8,5 R** (au lieu de −9 R), plus longue série 8, 0 mois négatif. Monte Carlo : résultat médian +97,7 R ; creux d'une année sur 10 −11,5 R, sur 100 −16,8 R (inchangé). À 1 % par trade : creux historique −9,0 % (au lieu de −9,5 %), probabilité de toucher −10 % dans l'année 19 % (au lieu de 21 %) ; à 0,75 % : −6,8 % et 4,3 %.
+
+Conclusion : pour l'or, le second trade **avec** le stop du trade 1 remonté améliore tout (résultat, creux, séries, pire journée). Sans cette règle, il aggrave les mauvaises journées. Seulement 10 seconds trades sur l'année : à confirmer sur 2024–2025.
+
 ## 4 septies. Années précédentes (2024, 2025) : il faut du M1
 
 Pour juger l'US100 et le SP500 sur 2024 et 2025, on n'avait que du M5 (3 ans). Calibration : les mêmes règles calculées en M5 sur 2026, comparées au vrai résultat M1 de 2026.
