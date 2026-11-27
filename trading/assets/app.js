@@ -385,10 +385,30 @@
   }
 
   /* ================= Journal ================= */
+  // au-delà de 400 jours (1 à 3 ans) : historique chargé à la demande, une seule fois (les vieux jours ne changent plus)
+  let HIST = null, HIST_BUSY = false, HIST_MERGED = null, HIST_AT = 0;
+  async function loadHist() {
+    if (HIST || HIST_BUSY || !LIVE.key) return;
+    HIST_BUSY = true;
+    try { const r = await rpc('desk_setups_since', { p_key: LIVE.key, p_since: 0, p_days: 1200 }); HIST = (r && r.rows) || []; HIST_MERGED = null; }
+    catch (e) { HIST = null; }
+    finally { HIST_BUSY = false; if (active('journal')) renderJournal(); }
+  }
+  function journalSource(days) {
+    if (days <= 400) return SETUPS;
+    if (!HIST) { loadHist(); return SETUPS; }
+    if (!HIST_MERGED || HIST_AT !== SETUPS_AT) {
+      const m = new Map(HIST.map(x => [x.profile + '|' + x.date, x]));
+      SETUPS.forEach(x => m.set(x.profile + '|' + x.date, x));
+      HIST_MERGED = [...m.values()].sort((a, b) => (b.date > a.date) - (b.date < a.date) || (a.profile > b.profile) - (a.profile < b.profile));
+      HIST_AT = SETUPS_AT;
+    }
+    return HIST_MERGED;
+  }
   function filteredSetups() {
     const prof = $('#jProfile').value, days = +$('#jPeriod').value, type = $('#jType').value;
     const t = nyToday(); const from = new Date(Date.UTC(t.y, t.m - 1, t.d) - days * 86400000).toISOString().slice(0, 10);
-    return SETUPS.filter(s => (prof === 'all' || s.profile === prof) && s.date >= from).filter(s => {
+    return journalSource(days).filter(s => (prof === 'all' || s.profile === prof) && s.date >= from).filter(s => {
       const d = s.data;
       if (type === 'setup') return !!d.entry;
       if (type === 'filled') return d.etat === 'rempli';
@@ -419,7 +439,8 @@
     const withD = filled.filter(s => isFinite(delayOf(s.data))), slow = withD.filter(s => delayOf(s.data) > 20), fast = withD.filter(s => delayOf(s.data) <= 20);
     const sumOf = arr => arr.reduce((a, s) => a + (resOf(s.data) || 0), 0);
     const dKpi = (lab, arr) => `<div class="kpi"><small>${lab}</small><b class="${cls(sumOf(arr))}">${arr.length ? fmtR(sumOf(arr)) : '—'}</b>${arr.length ? `<div class="muted" style="font-size:12px;margin-top:2px">${arr.length} entrée${arr.length > 1 ? 's' : ''} · ${fmtR(sumOf(arr) / arr.length)} par entrée · ${pct(arr.filter(s => resOf(s.data) > 0).length / arr.length)} gagnants</div>` : ''}</div>`;
-    $('#jSummary').innerHTML = `
+    const waitHist = +$('#jPeriod').value > 400 && !HIST;
+    $('#jSummary').innerHTML = (waitHist ? '<p class="muted" style="margin:0 0 8px;width:100%">Chargement de l\'historique sur 3 ans…</p>' : '') + `
       <div class="kpi"><small>Jours</small><b>${rows.length}</b></div>
       <div class="kpi"><small>Setups validés</small><b>${rows.filter(s => s.data.entry).length}</b></div>
       <div class="kpi"><small>Entrées touchées</small><b>${filled.length}</b></div>
@@ -437,7 +458,7 @@
       const tp = d.tp ? d.tp[tpKey()] : NaN;
       const main = `<tr class="jrow" data-k="${esc(key)}">
         <td class="mono">${dateFr(s.date)}</td><td>${pname(s.profile)}</td><td>${dirTag(d.dir)}</td><td>${feuTag(d)}</td>
-        <td><span class="tag ${e[0] === 'live' || e[0] === 'info' ? 'bull' : e[0] === 'warn' ? 'D' : 'range'}">${esc(e[1])}</span>${d.etat === 'pas_de_trade' && d.raison ? ` <small class="muted">${esc(d.raison)}</small>` : ''}${d.live ? '' : ' <small class="muted" title="calculé après coup par Desk Key">histo</small>'}</td>
+        <td><span class="tag ${e[0] === 'live' || e[0] === 'info' ? 'bull' : e[0] === 'warn' ? 'D' : 'range'}">${esc(e[1])}</span>${d.etat === 'pas_de_trade' && d.raison ? ` <small class="muted">${esc(d.raison)}</small>` : ''}${d.live ? '' : d.src === 'backtest' ? ' <small class="muted" title="jour avant l\'installation de Desk Key : résultat du moteur de backtest (mêmes règles)">backtest</small>' : ' <small class="muted" title="calculé après coup par Desk Key">histo</small>'}</td>
         <td class="mono">${d.entry ? fmtP(d.entry) : '—'}</td><td class="mono">${d.sl ? fmtP(d.sl) : '—'}</td><td class="mono">${isFinite(tp) ? fmtP(tp) : '—'}</td><td>${d.etat === 'rempli' ? delayCell(d) : '—'}</td>
         <td class="${res > 0 ? 'r-pos' : res < 0 ? 'r-neg' : 'r-zero'}">${d.etat === 'rempli' ? fmtR(res) + (d.fini && (!s2Filled(d) || d.s2.fini) ? '' : ' …') + (s2Filled(d) ? ' <small class="muted" title="trade 1 avec stop remonté + second trade">2 trades</small>' : '') : '—'}</td>
         <td>${d.pris ? (real && !real.open ? `<span class="${real.r >= 0 ? 'r-pos' : 'r-neg'}">${fmtR(real.r)} · ${fmtM(real.net)}</span>${real.n > 1 ? ' <small class="muted">2 trades</small>' : ''}` : '<span class="tag mt5">en cours</span>') : d.etat === 'rempli' ? (bloqueRouge(d) ? '<span class="muted">feu rouge</span>' : '<span class="muted">non pris</span>') : ''}</td></tr>`;
@@ -628,7 +649,7 @@
       setTimeout(() => { ev.target.textContent = 'Copier la clé'; }, 2500);
     }
     if (id === 'mt5Forget' && confirm('Oublier la clé sur cet appareil ? Notez-la avant si vous ne l\'avez pas ailleurs.')) {
-      store.del('td.mt5key'); LIVE.key = ''; LIVE.data = null; LIVE.trades = []; LIVE.err = ''; SETUPS = []; renderAll();
+      store.del('td.mt5key'); LIVE.key = ''; LIVE.data = null; LIVE.trades = []; LIVE.err = ''; SETUPS = []; HIST = null; HIST_MERGED = null; renderAll();
     }
   });
   function initPrefs() {
