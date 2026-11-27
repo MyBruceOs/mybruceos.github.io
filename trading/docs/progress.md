@@ -18,9 +18,9 @@
 - Application : Aujourd'hui, Mon compte, Journal, Suivi du test, Règles, Réglages ; profils lus dans la base (un actif validé apparaît tout seul).
 
 ## En cours
-- **Backtest US30** avec les règles US100 puis SP500 (stop mis à l'échelle : 6 et 13 pts).
+- ~~Backtest US30~~ : **fait le 27/11, rejeté** (aucune version positive sur les deux moitiés de l'année, win rate 23–32 % ; détails dans backtests.md, section 4 sexies).
 - **Backtest XAUUSD** : séance de Londres (range asiatique, Judas après 2:00 NY, entrée 3:00–5:00 NY, sortie 8:00 NY) contre séance de New York.
-- En attente : l'export M1 de US30 et XAUUSD par le Bridge 1.06 (MT5 ouvert environ 1 h).
+- Export : US100, US500 et US30 complets (doublons M5 nettoyés) ; XAUUSD en cours (environ 7 jours de M1 par minute). Backtests or lancés automatiquement vers 4:05 Paris.
 
 ## À faire par l'utilisateur
 - [x] Installer Desk Key 1.07 sur les deux graphiques (vu en ligne le 27/11 à 2:01 Paris).

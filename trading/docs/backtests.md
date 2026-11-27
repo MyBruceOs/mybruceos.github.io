@@ -248,6 +248,24 @@ Simulations : 20 000 années tirées au hasard parmi les vraies séances. On gar
 
 ![Séries, drawdown et variance](img/variance-drawdown.png)
 
+## 4 sexies. US30 (Dow Jones) : rejeté (27/11/2026)
+
+Données : M1 FTMO `US30.cash`, 22/12/2025 – 25/11/2026, même méthode que l'US100 et le SP500 (entrée remplie entre 10:00 et 11:00 NY, résultats pour 1 000 $ de risque). Marges de stop mises à l'échelle du prix du Dow (environ 50 000) : 6 pts pour les règles US100, 14 pts pour les règles SP500.
+
+| Règles appliquées au US30 | Trades | Gagnants 3R | Résultat 3R | Résultat 2R | 1re moitié (3R) | 2de moitié (3R) |
+|---|---|---|---|---|---|---|
+| Règles US100 (H4, FVG, cassure nette) | 69 | 29 % | +910 $ | +8 940 $ | −9 840 $ | +10 750 $ |
+| Règles SP500 (H4 + Daily, Judas après 9:50) | 43 | 23 % | −13 260 $ | −4 060 $ | −11 430 $ | −1 830 $ |
+| Règles US100 + H1 d'accord | 31 | 32 % | +4 280 $ | +12 860 $ | −5 580 $ | +9 860 $ |
+| Sans filtre de tendance (FVG) | 142 | 32 % | +10 720 $ | +13 910 $ | −2 950 $ | +13 670 $ |
+
+- **Aucune version n'est positive sur les deux moitiés de l'année** (règle de validation : choisir sur la première moitié, vérifier sur la seconde).
+- Win rate à 3R de 23 à 32 %, contre 47 % (US100) et 55 % (SP500).
+- Règles US100 : pire baisse **−17 260 $** (de janvier à mai, dont 10 pertes sur 10 en mars-avril), au-delà de l'alarme fixée pour l'US100 (−16R).
+- Le filtre « cassure nette » ne change presque rien sur le Dow (avec un stop de 6 pts, 5 % du risque est vite dépassé).
+
+**Conclusion : on n'ajoute pas l'US30.** La règle A ne tient pas sur cet indice.
+
 ## 5. Idées testées et rejetées
 
 | Idée | Effet |
