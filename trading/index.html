@@ -30,6 +30,7 @@
     <button role="tab" data-tab="compte" aria-selected="false">Mon compte</button>
     <button role="tab" data-tab="journal" aria-selected="false">Journal</button>
     <button role="tab" data-tab="suivi" aria-selected="false">Suivi du test</button>
+    <button role="tab" data-tab="simu" aria-selected="false">Simulateur</button>
     <button role="tab" data-tab="regles" aria-selected="false">Règles</button>
     <button role="tab" data-tab="reglages" aria-selected="false">Réglages</button>
   </nav>
@@ -77,6 +78,11 @@
       </h2>
       <div id="suiviBody"></div>
     </div>
+  </section>
+
+  <!-- ================= SIMULATEUR ================= -->
+  <section class="tab" id="tab-simu">
+    <div class="grid" id="simBody"></div>
   </section>
 
   <!-- ================= RÈGLES ================= -->
@@ -131,6 +137,7 @@
 </main>
 
 <footer>Desk US · outil d'aide à la décision, pas un conseil en investissement. Les résultats passés et simulés ne garantissent pas les résultats futurs.</footer>
+<script src="assets/sim.js"></script>
 <script src="assets/app.js"></script>
 </body>
 </html>

@@ -1,5 +1,6 @@
 /* Desk US · Règle A : suivi en direct (Desk Key), journal des setups, suivi du test et règles.
    1.09 : or (XAUUSD) avec second trade, feu rouge des indices (journal, aujourd'hui, mon compte, suivi).
+   Onglet Simulateur (assets/sim.js) : challenge FTMO à plusieurs comptes et compte propre, sur les 3 ans de résultats.
    Les actifs (profils) sont lus dans la base : ajouter un actif validé en backtest suffit pour qu'il apparaisse partout. */
 (function () {
   'use strict';
@@ -762,6 +763,7 @@
     if (active('suivi')) renderSuivi();
     if (active('regles')) renderRules();
     if (active('reglages')) renderMt5Settings();
+    if (active('simu') && window.DeskSim) window.DeskSim.show();
   }
 
   let rsz = 0; window.addEventListener('resize', () => { clearTimeout(rsz); rsz = setTimeout(() => { if (active('compte')) renderCompte(); }, 250); });
