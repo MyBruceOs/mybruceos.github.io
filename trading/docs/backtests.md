@@ -547,6 +547,36 @@ Robustesse (fenêtre de 6 à 20 setups, seuil −2, 0 ou +2 R) : toutes les vari
 
 Variantes moins bonnes : mi-risque au lieu de pause (2025 −14 à −16 R) ; un seul feu pour les deux indices (2025 −17 R).
 
+## 4 octodecies. Stratégie de comptes : challenge agressif, financé à un autre risque — 27/11/2026
+
+Parcours simulés de 12 ou 24 mois (même tirage par blocs de mois que 4 septdecies) : achat d'un challenge (540 $), phases 1 et 2 au risque « challenge », compte financé au risque « financé », versement chaque mois de 80 % des gains au-dessus du coussin laissé sur le compte (prix du challenge remboursé au premier versement). Compte perdu ou challenge échoué : nouveau challenge acheté. Gain net = versements − challenges payés. Compte de 100 k$. Page interactive (carte des 100 combinaisons) : https://claude.ai/artifact/7fiv2m6ytSdhsvFKCzFe5Q
+
+Gain net moyen sur 24 mois (milliers de $, coussin 0 %) :
+
+| Challenge \ financé | 1 % | 1,5 % | 2 % | 2,25 % | 2,5 % |
+|---|---|---|---|---|---|
+| 0,5 % | 67 | 85 | 91 | 95 | 25 |
+| 1 % | 82 | 113 | 130 | 140 | 42 |
+| 2 % | 89 | 128 | 157 | 171 | 58 |
+| 2,25 % | 90 | 130 | 159 | 174 | 59 |
+| 3 % | 89 | 128 | 158 | 172 | 53 |
+
+- Le risque en challenge compte jusqu'à environ 1,5 % (échouer ne coûte que le prix du challenge), puis plus rien. Le levier principal est le risque en financé.
+- 2,5 % en financé s'effondre : la pire journée vécue (−2,21 R) dépasse la perte du jour de 5 %. 2,25 % est la meilleure moyenne mais juste sous cette falaise, et au-dessus de 1,59 % une journée à 3 pertes pleines (jamais vue en 3 ans, absente de la simulation) ferait perdre le compte.
+- **Repère retenu : challenge 2 %, financé 1,5 %** : 128 k$ en moyenne sur 24 mois (1 parcours sur 10 sous 77 k$), contre 82 k$ pour 1 % / 1 %.
+
+Coussin laissé sur le compte à chaque versement (challenge 2 %) :
+
+| Financé | Coussin | Gain net moyen 24 mois | 1 sur 10, au pire | Challenges achetés | Comptes financés perdus (24 mois) |
+|---|---|---|---|---|---|
+| 1 % | 0 % · 5 % · 10 % | 90 · 87 · 83 k$ | 57 · 53 · 49 k$ | 2,4 · 1,8 · 1,6 | 40 · 16 · 7 % |
+| 1,5 % | 0 % · 5 % · 10 % | 129 · 129 · 127 k$ | 77 · 78 · 76 k$ | 3,9 · 2,6 · 2,0 | 66 · 44 · 27 % |
+| 2 % | 0 % · 5 % · 10 % | 159 · 165 · 167 k$ | 87 · 94 · 96 k$ | 5,4 · 3,8 · 2,8 | 79 · 65 · 49 % |
+
+- Le coussin ne change presque pas le gain total à 1,5 %, mais divise par 1,5 les comptes perdus et les challenges à racheter. Une fois constitué, il porte la marge avant la perte max de 10 % à 10 % + coussin ; **la perte du jour reste à 5 % du capital de départ**, donc les seuils de 1,59 % et 2,26 % ne bougent pas.
+- Le premier versement reste vers le mois 1 (médiane) jusqu'à 5 % de coussin, vers le mois 2 à 10 %.
+- **À vérifier chez FTMO** : la possibilité de laisser une partie des gains sur le compte au versement. Les sources consultées le 27/11 se contredisent (FAQ FTMO : pas possible sur le 1-Step ; sites tiers : possible sur le 2-Step) ; le site FTMO n'était pas lisible depuis l'environnement de travail.
+
 ## 4 septdecies. Monte-Carlo du challenge FTMO (phase 1 et phase 2) — 27/11/2026
 
 20 000 parcours, tirés par blocs de mois dans les 3 ans réels de la configuration retenue (feu rouge sur les indices tel qu'il s'est allumé, or avec second trade, frais 0,05 R par trade). Règles supposées : phase 1 +10 %, phase 2 +5 %, perte du jour 5 % et perte max 10 % du capital de départ, au moins 4 jours de trading, pas de limite de temps ; risque en % du capital de départ ; pertes d'une journée comptées avant ses gains (prudent). Durées en séances de bourse (5 par semaine, 21 par mois). Page interactive : https://claude.ai/artifact/7fiv2m6ytSdhsvFKCzFe5Q
