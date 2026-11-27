@@ -317,6 +317,32 @@ Par semestre, version A : 2024 −2,2 / +12,7 ; 2025 +1,6 / +10,2 ; 2026 −4,1 
 - **Ce qui n'aide pas** : l'entrée OTE 70,5 % (perdante hors échantillon), la divergence SMT, le Judas après 9:50, le premium / discount en M5.
 - **Bilan** : la version A est **positive chacune des 3 années**, mais son avantage (environ +8,6 R par an) est bien plus faible que celui de l'US100 et du SP500, avec des premiers semestres faibles. **Candidat, pas encore validé** : à suivre en observation (signaux sans ordres, ou risque réduit) avant de l'ajouter comme profil. À retester dans quelques mois avec les nouveaux mois (si la seconde moitié se confirme, le M5 avec le Daily serait le candidat).
 
+## 4 octies. XAUUSD (or) : Londres ou New York (27/11/2026)
+
+Données M1 FTMO `XAUUSD`, 22/12/2025 – 25/11/2026. Trois séances testées, chacune avec 4 jeux de règles (règles US100, règles SP500, et les deux sans leur filtre propre ; stop au Judas ± 0,5 ou 1 $) et 5 biais (aucun, H4, Daily, H4 + Daily, H1 + H4) :
+- **Londres** (modèle ICT de l'or) : liquidité = range asiatique (20:00–2:00 NY), Judas après 2:00 NY, entrée au 50 % entre 3:00 et 5:00 NY, sortie 8:00 NY ;
+- **New York comme les indices** : pré-marché 8:00–9:30, Judas après 9:30, entrée 10:00–11:00, sortie 13:00 NY ;
+- **NY killzone ICT** : liquidité = séance de Londres (2:00–7:00), entrée 7:30–9:00, sortie 11:00 NY.
+
+| Or, résultats 3R (1 R = risque d'un trade) | Trades | Gagnants | Total | 1re moitié | 2de moitié | Pire baisse |
+|---|---|---|---|---|---|---|
+| **New York, biais H4, sans FVG obligatoire** | 43 | **49 %** | **+23,5 R** | +16,6 R | +7,0 R | **−3,0 R** |
+| New York, biais H4, FVG (≈ identique : l'or a presque toujours un FVG) | 44 | 48 % | +22,8 R | +16,7 R | +6,1 R | −3,0 R |
+| New York, biais H1 + H4, sans FVG | 29 | 59 % | +23,2 R | +11,2 R | +12,0 R | −3,0 R |
+| New York, règles US100 complètes (cassure nette) | 44 | 45 % | +18,2 R | +13,7 R | +4,5 R | −4,0 R |
+| Londres, meilleure version (H4, sans FVG) | 26 | 38 % | +5,2 R | −0,8 R | +6,0 R | −5,3 R |
+| Londres sans filtre de tendance | 76–83 | 29–32 % | −10 à −17 R | négatif | négatif | jusqu'à −24 R |
+| NY killzone ICT, meilleure version | 85 | 34 % | +18,8 R | +9,7 R | +9,1 R | −7,3 R |
+| NY killzone ICT avec un biais (H4, Daily…) | 15–32 | 21–38 % | −7,5 à +5,8 R | | souvent négatif | jusqu'à −13,9 R |
+
+Par mois (New York, H4, sans FVG, 3R) : 9 mois positifs sur 12 ; pire mois −3 R (juin, 3 pertes). Stop moyen 7 à 18 $ selon la volatilité (49 $ en janvier).
+
+- **Choix sur la 1re moitié de l'année** : New York, biais H4 (+16,6 R) ; **vérification sur la 2de moitié : +7,0 R**. Validé selon la méthode habituelle.
+- **Londres ne marche pas** avec cette mécanique, malgré le modèle ICT classique de l'or : 26 à 83 trades, 29 à 38 % de gagnants.
+- Mêmes règles que les indices : biais H4, Judas sur le pré-marché, cassure M1, entrée au 50 % entre 10:00 et 11:00 NY, sortie 13:00 NY. Le FVG ne change rien sur l'or, la cassure nette (5 % du risque) enlève un peu de résultat.
+- Diversification : seuls 9 des 43 jours de trade de l'or sont aussi des jours de trade US100 ou SP500.
+- Résultat comparable au SP500 (31 trades, +24,4 R, pire baisse −3 R) sur la même année. **À confirmer sur 2024 et 2025** avec l'export M1 sur 3 ans avant d'en faire un profil Desk Key.
+
 ## 4 septies. Années précédentes (2024, 2025) : il faut du M1
 
 Pour juger l'US100 et le SP500 sur 2024 et 2025, on n'avait que du M5 (3 ans). Calibration : les mêmes règles calculées en M5 sur 2026, comparées au vrai résultat M1 de 2026.

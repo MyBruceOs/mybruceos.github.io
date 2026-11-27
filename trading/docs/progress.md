@@ -19,8 +19,8 @@
 
 ## En cours
 - ~~Backtest US30~~ : **fait le 27/11, rejeté** en M1 (win rate 23–32 %) **et en M5** (moteur v10 : structure M5, exécution M1 ; win rate 43–54 % mais toutes les versions perdent sur la première moitié de l'année). Recherche ICT / SMC (27/11) : **candidat trouvé**, règle A en **M5** avec biais H4, entrées 10:00–12:00 NY : positive chacune des 3 années (2024, 2025, 2026 ; +25,9 R en 3 ans, 41 trades par an), variante lissée avec draw on liquidity (10 trades par an, pire baisse −2R). Avantage plus faible que l'US100 / SP500 : à mettre en observation avant de l'ajouter. Entrées dès 9:30 NY testées aussi : ne changent rien au verdict et dégradent l'US100 (12 trades ajoutés, 17 % de gagnants). À retester dans quelques mois. Détails : backtests.md, section 4 sexies.
-- **Backtest XAUUSD** : séance de Londres (range asiatique, Judas après 2:00 NY, entrée 3:00–5:00 NY, sortie 8:00 NY) contre séance de New York.
-- Export : US100, US500 et US30 complets (doublons M5 nettoyés) ; XAUUSD en cours (environ 7 jours de M1 par minute). Backtests or lancés automatiquement vers 4:05 Paris.
+- ~~Backtest XAUUSD~~ : **fait le 27/11. New York gagne, Londres perd.** Même mécanique que les indices, biais H4, sans FVG obligatoire : 43 trades, 49 % de gagnants, +23,5 R, pire baisse −3 R, positif sur les deux moitiés de l'année (backtests.md 4 octies). À confirmer sur 2024–2025 (export M1 sur 3 ans en cours) avant d'ajouter un profil XAUUSD.
+- Export M1 sur 3 ans (US100, SP500, puis XAUUSD) en cours depuis le 27/11 à 4:20 Paris ; ensuite, test des règles exactes sur 2024 et 2025.
 
 - **US30 abandonné** (décision de l'utilisateur le 27/11, après la recherche ICT / SMC).
 - **Validation de l'US100 et du SP500 sur 2024 et 2025** : l'approximation M5 ne permet pas de juger la règle A (calibrée sur 2026, voir backtests.md 4 septies). En attente de l'export M1 sur 3 ans.
