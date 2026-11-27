@@ -380,6 +380,77 @@ Le pic est au même moment que l'US100 (10:00 NY), mais l'or reste plus actif ho
 - **Entrées avant 10:00 NY** : perdantes, comme sur l'US100.
 - La fréquence de l'or n'est pas plus élevée que celle des indices (un trade par jour au maximum, et il faut un Judas sur le pré-marché dans le sens du biais).
 
+## 4 nonies. Or : mélange H4 / H1, et portefeuille 3 actifs (27/11/2026)
+
+**Mélanges H4 / H1 testés** (or, séance New York, entrées 10:00–12:00 NY, TP 3R, sortie 13:00 NY). Définis avant de regarder les résultats ; comme le choix final regarde les deux moitiés de 2026, **la validation se fera sur 2024–2025**.
+
+| Règle de sens du jour | Trades | Gagnants | Total | 1re moitié | 2de moitié | Pire baisse |
+|---|---|---|---|---|---|---|
+| **H4 ou H1, sans conflit** (un des deux donne un sens, l'autre ne le contredit pas) | 53 | 55 % | +37,7 R | +23,2 | +14,5 | −4,5 R |
+| H1, sinon H4 si le H1 est neutre | 56 | 54 % | +38,2 R | +23,2 | +15,0 | −4,5 R |
+| H1 seul | 46 | 52 % | +30,9 R | +15,3 | +15,6 | −3,7 R |
+| H4, sinon H1 si le H4 est neutre | 62 | 50 % | +30,7 R | +21,2 | +9,6 | −4,5 R |
+| H4 seul | 53 | 53 % | +30,4 R | +21,8 | +8,6 | −3,0 R |
+| H1 et H4 d'accord | 34 | 59 % | +30,1 R | +16,0 | +14,1 | −3,0 R |
+
+Retenu : **« H4 ou H1, sans conflit »** (pas de trade quand les deux unités de temps se contredisent).
+
+**Comparaison des actifs** (22/12/2025 – 25/11/2026, TP 3R, 1 R = risque d'un trade) :
+
+| | US100 | SP500 | Or (sans conflit) | Les 3 ensemble |
+|---|---|---|---|---|
+| Trades | 58 | 31 | 53 | 142 (113 jours) |
+| Gagnants | 47 % | 55 % | 55 % | 51 % |
+| Total | +30,8 R | +24,4 R | **+37,7 R** | +92,9 R |
+| Gain moyen par trade | 0,53 R | **0,79 R** | 0,71 R | 0,65 R |
+| Pire baisse | −4,0 R | −3,0 R | −4,5 R | −9,0 R |
+| Plus longue série de pertes | 4 | 3 | 4 | 9 |
+| Plus longue série de gains | 3 | 4 | 6 | 5 |
+| Mois positifs / négatifs | 9 / 2 | 10 / 2 | **11 / 0** | **12 / 0** |
+| 1re moitié / 2de moitié | +10,8 / +19,9 | +8,0 / +16,5 | +23,2 / +14,5 | +42,0 / +51,0 |
+| Pire journée | −1 R | −1 R | −1 R | −2 R |
+
+**Portefeuille 3 actifs, mois par mois (R)** :
+
+| Mois | US100 | SP500 | Or | Total |
+|---|---|---|---|---|
+| déc. 2025 | +1,2 | +1,0 | +1,3 | +3,5 |
+| janv. 2026 | +4,3 | +2,4 | +5,1 | +11,8 |
+| févr. | −1,0 | −2,0 | +8,9 | +5,9 |
+| mars | +0,7 | +1,0 | +1,4 | +3,0 |
+| avr. | 0,0 | −2,0 | +4,0 | +2,0 |
+| mai | +5,7 | +7,5 | +2,5 | +15,7 |
+| juin | +4,4 | +2,0 | 0,0 | +6,4 |
+| juil. | +2,0 | +2,0 | +7,6 | +11,6 |
+| août | +5,0 | +2,0 | +3,3 | +10,3 |
+| sept. | +7,0 | +5,0 | +0,3 | +12,3 |
+| oct. | −1,0 | +1,0 | +2,4 | +2,4 |
+| nov. | +2,6 | +4,5 | +1,0 | +8,1 |
+
+**Variance (Monte Carlo, 10 000 années, tirage de journées, 0,05 R de frais par trade)** :
+
+| | Résultat médian | 1 année sur 10 au pire | Creux médian | Creux 1 année sur 10 | Creux 1 année sur 100 | Séries de pertes (médiane / 9 sur 10 / 99 sur 100) |
+|---|---|---|---|---|---|---|
+| US100 | +27,8 R | +10,4 R | −6,3 R | −10,7 R | −16,3 R | 5 / 8 / 12 |
+| SP500 | +22,6 R | +9,7 R | −4,2 R | −6,9 R | −10,5 R | 4 / 6 / 9 |
+| Or | +34,8 R | +18,4 R | −5,2 R | −8,1 R | −11,9 R | 4 / 6 / 9 |
+| **3 actifs** | **+85,3 R** | **+56,1 R** | −7,7 R | −11,6 R | −16,8 R | 6 / 9 / 13 |
+
+L'or ajoute environ +35 R par an au portefeuille sans augmenter le creux : les creux des trois actifs tombent rarement en même temps.
+
+**Money management sur un seul compte (3 actifs)** — perte max 10 %, perte du jour 5 % :
+
+| Risque par trade | Gain médian sur un an | Risque de toucher −10 % dans l'année | Challenge (+10 % avant −10 %) : réussite, durée médiane (9 fois sur 10) |
+|---|---|---|---|
+| 0,5 % | +43 % | 0,3 % | 100 %, 54 séances (102) |
+| 0,75 % | +64 % | 4,9 % | 99,8 %, 36 séances (76) |
+| 1 % | +85 % | 20 % | 99,1 %, 26 séances (61) |
+| 1,5 % | +128 % | 68 % | 96 %, 17 séances (42) |
+
+Pire journée possible : les 3 actifs perdants le même jour = −3 R (−3 % à 1 %, −4,5 % à 1,5 %) ; limite du jour de 5 % dépassée seulement au-delà de 1,67 % par trade. Sans l'or (US100 + SP500 seuls), le challenge prend environ 1,7 fois plus de temps au même risque.
+
+Ces chiffres supposent que l'avantage de 2026 se maintient : **à confirmer sur 2024–2025** (export M1 sur 3 ans en cours).
+
 ## 4 septies. Années précédentes (2024, 2025) : il faut du M1
 
 Pour juger l'US100 et le SP500 sur 2024 et 2025, on n'avait que du M5 (3 ans). Calibration : les mêmes règles calculées en M5 sur 2026, comparées au vrai résultat M1 de 2026.
