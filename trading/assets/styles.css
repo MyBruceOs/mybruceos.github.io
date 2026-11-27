@@ -233,3 +233,5 @@ tr.jdetail td{background:rgba(255,255,255,.02)}
 #simBody h3{color:var(--muted);font-weight:600}
 @media (max-width:600px){.sm-tbl table{min-width:560px}#simBody .seg button{padding:5px 8px}}
 #simBody details.card > summary{cursor:pointer;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.rp-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:8px;font-size:12px;color:var(--muted)}
+.rp-legend i{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle}
