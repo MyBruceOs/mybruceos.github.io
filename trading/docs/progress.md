@@ -22,12 +22,16 @@
 - **Backtest XAUUSD** : séance de Londres (range asiatique, Judas après 2:00 NY, entrée 3:00–5:00 NY, sortie 8:00 NY) contre séance de New York.
 - Export : US100, US500 et US30 complets (doublons M5 nettoyés) ; XAUUSD en cours (environ 7 jours de M1 par minute). Backtests or lancés automatiquement vers 4:05 Paris.
 
+- **US30 abandonné** (décision de l'utilisateur le 27/11, après la recherche ICT / SMC).
+- **Validation de l'US100 et du SP500 sur 2024 et 2025** : l'approximation M5 ne permet pas de juger la règle A (calibrée sur 2026, voir backtests.md 4 septies). En attente de l'export M1 sur 3 ans.
+
 ## À faire par l'utilisateur
 - [x] Installer Desk Key 1.07 sur les deux graphiques (vu en ligne le 27/11 à 2:01 Paris).
 - [x] DeskUS_Bridge 1.06 remis sur son propre graphique (US30.cash M5) : en ligne depuis le 27/11 à 2:15 Paris, export en cours.
 - [x] Notifications sur le téléphone (application MT5) : fonctionnent.
 - [x] Desk Key 1.08 installé ; notifications Telegram OK (27/11, 2:36 Paris), par le relais du serveur Desk US car MT5 renvoie l'erreur 1009 / 5203 vers api.telegram.org.
 
+- [ ] Bridge → F7 → Paramètres : « Profondeur de l'export M1 » = **1095** et « Symboles à exporter seulement » = **XAUUSD** (retirer US30.cash), puis laisser MT5 ouvert environ 2 h.
 - [ ] Quand l'export est terminé (« export terminé » dans l'onglet Experts) : Bridge → F7 → « Exporter l'historique » = false.
 
 ## Plus tard

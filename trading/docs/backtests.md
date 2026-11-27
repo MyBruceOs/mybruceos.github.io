@@ -317,6 +317,17 @@ Par semestre, version A : 2024 −2,2 / +12,7 ; 2025 +1,6 / +10,2 ; 2026 −4,1 
 - **Ce qui n'aide pas** : l'entrée OTE 70,5 % (perdante hors échantillon), la divergence SMT, le Judas après 9:50, le premium / discount en M5.
 - **Bilan** : la version A est **positive chacune des 3 années**, mais son avantage (environ +8,6 R par an) est bien plus faible que celui de l'US100 et du SP500, avec des premiers semestres faibles. **Candidat, pas encore validé** : à suivre en observation (signaux sans ordres, ou risque réduit) avant de l'ajouter comme profil. À retester dans quelques mois avec les nouveaux mois (si la seconde moitié se confirme, le M5 avec le Daily serait le candidat).
 
+## 4 septies. Années précédentes (2024, 2025) : il faut du M1
+
+Pour juger l'US100 et le SP500 sur 2024 et 2025, on n'avait que du M5 (3 ans). Calibration : les mêmes règles calculées en M5 sur 2026, comparées au vrai résultat M1 de 2026.
+
+| 2026 | Vrai M1 (référence A) | Approximation M5 |
+|---|---|---|
+| US100 | 58 trades, +30,8 R | 19 trades, +0,8 R |
+| SP500 | 31 trades, +24,4 R | 9 trades, +12,0 R |
+
+L'approximation M5 ne retrouve pas les mêmes setups (FVG M1, cassure nette M1, pivots M1) : **elle ne permet pas de juger la règle A**. Pour un vrai test des années précédentes, il faut exporter 3 ans de M1 (réglage « Profondeur de l'export M1 » du Bridge à 1 095 jours).
+
 ## 5. Idées testées et rejetées
 
 | Idée | Effet |
