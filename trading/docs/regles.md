@@ -1,6 +1,6 @@
 # Règles de trading Desk US — référence A
 
-*Version du 27 novembre 2026 (Desk Key 1.07, nouvelle application). Règles validées par le backtest M1 FTMO (décembre 2025 – novembre 2026). Les chiffres détaillés sont dans [backtests.md](backtests.md).*
+*Version du 27 novembre 2026 (Desk Key 1.08, nouvelle application). Règles validées par le backtest M1 FTMO (décembre 2025 – novembre 2026). Les chiffres détaillés sont dans [backtests.md](backtests.md).*
 
 > **Un indice = un profil = un graphique.** On ne mélange jamais les règles de l'US100 et du SP500.
 
@@ -122,7 +122,9 @@ Canaux, à choisir dans les paramètres de Desk Key (onglet Paramètres, groupe 
    - dans WhatsApp, donner une sonnerie personnalisée à ce contact.
 4. **Ordinateur** : fenêtre d'alerte et son de MT5 pour les messages importants.
 
-Le bouton **TESTER LES NOTIFS** du panneau envoie un message de test sur tous les canaux activés. Une erreur éventuelle (adresse non autorisée, ID manquant) s'affiche dans l'onglet **Experts** de MT5.
+Le bouton **TESTER LES NOTIFS** du panneau envoie un message de test sur tous les canaux activés et affiche le résultat dans le panneau quelques secondes après (« Telegram : OK », ou la raison du refus : jeton faux, identifiant faux, /start pas envoyé au bot).
+
+**Relais** : si MT5 n'arrive pas à joindre Telegram ou CallMeBot (erreur 1009 ou 5203 de certaines versions de MT5, adresse non autorisée…), Desk Key passe automatiquement par le serveur Desk US (Supabase), qu'il joint déjà pour les setups. Le jeton et le message transitent alors par ce serveur. Les jetons et identifiants collés sont nettoyés (espaces, retours à la ligne).
 
 ### Envoi vers l'application
 - Desk Key envoie chaque setup (pré-marché, Judas, cassure, entrée, SL, TP 2R / 2,5R / 3R, lot, état, résultat simulé) à l'application Desk US : le jour même en direct, les jours de la période au démarrage, et toute la période à chaque changement avec le bouton PÉRIODE (envoi par paquets de 25 jours). Le Journal de l'application peut ainsi remonter jusqu'à un an.
