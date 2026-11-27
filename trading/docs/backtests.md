@@ -560,6 +560,11 @@ Variantes moins bonnes : mi-risque au lieu de pause (2025 −14 à −16 R) ; un
 | 1,25 % | 92 % | 93 % | 86 % | 45 séances (2,1 mois) | 12 · 93 · 319 | 9 % | +80 % |
 | 1,5 % | 90 % | 91 % | 82 % | 37 séances (1,8 mois) | 11 · 76 · 210 | 12 % | +97 % |
 | 2 % | 82 % | 86 % | 71 % | 29 séances (1,4 mois) | 11 · 55 · 155 | 21 % | +131 % |
+| 2,5 % | 61 % | 65 % | 39 % | 21 séances (1 mois) | 10 · 33 · 82 | 100 % | — |
+| 3 % | 61 % | 63 % | 39 % | 19 séances | 9 · 30 · 57 | 100 % | — |
+| 4 % | 49 % | 54 % | 27 % | 18 séances | 9 · 25 · 45 | 100 % | — |
+
+- **Falaise à 2,26 %** : 28 journées des 3 ans font −2 R ou pire. Au-dessus de 2,26 %, la pire dépasse la perte du jour de 5 % ; à 2,5 %, chacune fait échouer : les deux phases passent de 71 % (2 %) à 39 % (2,5 %), dont environ un tiers d'échecs par la perte du jour dès la phase 1, et un compte financé ne tient jamais l'année. Contrôle sur le vrai chemin (phase 1) : 2 % → 74 % ; 3 % → 54 % ; 4 % → 48 %.
 
 - Contrôle sur le vrai chemin (phase 1 commencée à chacune des 755 séances) : 0,5 % → 100 % réussis ; 0,75 % → 99 % ; 1 % → 96 % ; 1,5 % → 81 %.
 - Perte du jour : la pire journée des 3 ans fait −2,21 R ; elle ne déclenche la limite de 5 % qu'au-delà de 2,26 % de risque. Trois pertes pleines le même jour (−3,15 R, jamais vu en 3 ans) la déclencheraient au-delà de 1,59 %.
