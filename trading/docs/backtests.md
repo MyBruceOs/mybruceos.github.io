@@ -547,6 +547,20 @@ Robustesse (fenêtre de 6 à 20 setups, seuil −2, 0 ou +2 R) : toutes les vari
 
 Variantes moins bonnes : mi-risque au lieu de pause (2025 −14 à −16 R) ; un seul feu pour les deux indices (2025 −17 R).
 
+## 4 trevicies. Rythme des versements FTMO — 28/11/2026
+
+Le simulateur supposait un versement tous les 14 jours. Rythme FTMO indiqué par l'utilisateur : premier versement 14 jours après le passage en compte financé, puis un par mois. Moteur corrigé : versement dès que la date est passée et que le compte est au-dessus du coussin ; le suivant un cycle plus tard.
+
+Stratégie proposée (1 × 50k + réserve, réinvestir en 100k, challenge 1,5 %, financé 2,15 %, coussin 5 %, 3 000 parcours) :
+
+| Versements | 12 mois : moyenne · médiane | 24 mois : moyenne · médiane | Comptes financés perdus (24 mois) |
+|---|---|---|---|
+| tous les 14 jours | 148 k€ · 133 k€ | 440 k€ · 451 k€ | 72 % |
+| **14 jours, puis mensuels (FTMO)** | 140 k€ · 123 k€ | 441 k€ · 456 k€ | 66 % |
+| tous les mois | 133 k€ · 113 k€ | 437 k€ · 450 k€ | 65 % |
+
+Effet faible : un peu moins sur 12 mois, autant sur 24. Les gains laissés plus longtemps sur le compte l'éloignent de la perte max (moins de comptes perdus). Stratégie de financement sur 36 mois (docs/strategie-financement.md) : 712 k€ touchés et 189 k€ de compte propre (au lieu de 693 k€ et 192 k€).
+
 ## 4 duovicies. Et si l'avantage réel n'est que de 75 % ou 50 % du backtest ? — 28/11/2026
 
 Les règles ont été choisies sur ces 3 ans : en réel, une partie de l'avantage peut disparaître. Scénario prudent (simulateur, réglage « Avantage gardé en réel ») : les gains des jours gagnants sont réduits pour que le total des 35 mois passe de 188 R à 141 R (75 %) ou 94 R (50 %) ; les pertes restent les mêmes (211 R).

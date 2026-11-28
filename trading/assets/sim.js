@@ -35,7 +35,8 @@
     budget: 1200,   // € disponibles pour acheter des challenges
     fx: 1.15,       // 1 € = fx $ (versements en $, challenges en €)
     split: 0.8,     // part des gains versée
-    cycle: 10,      // séances entre deux versements (14 jours)
+    cycle1: 10,     // premier versement : 10 séances (14 jours) après le passage en compte financé
+    cycle: 21,      // versements suivants : 21 séances (un mois) après le précédent
     d1: 1, d2: 2,   // séances d'attente FTMO après la phase 1, après la phase 2
     cushion: 0,     // % laissé sur le compte financé à chaque versement
     slip: 0,        // pertes plus grosses qu'en backtest (0,05 = +5 %)
@@ -51,7 +52,8 @@
   function run(P, k, T, o, rec) {
     const A = o.accounts, M = A.length, S = [], DNx = dnFor(o.edge);
     for (let i = 0; i < M; i++) S.push({ ph: 0, eq: 0, days: 0, wait: 0, next: 0, fT: 0, start: 0, refunded: true, funded: false, bought: false, lostAt: -1 });
-    let wallet = o.budget, fees = 0, paid = 0, bought = 0, fundedN = 0, lost = 0, firstPay = -1, noFund = 0, payMonth = 0, monthsNoPay = 0, gaps = 0;
+    let wallet = o.budget, fees = 0, paid = 0, bought = 0, fundedN = 0, lost = 0, firstPay = -1, noFund = 0, payMonth = 0, monthsNoPay = 0, gaps = 0, mi = 0;
+    const ev = o.trace ? (t, type, i, x) => o.trace.push({ t, type, i, x }) : null;   // journal des événements (rejeu de l'histoire)
     const passT = [], relaunchT = [];
     for (let t = 0; t < T; t++) {
       // 1. achats (début de séance)
@@ -68,6 +70,7 @@
         if (wallet < pr || used + a.size > o.cap) continue;
         wallet -= pr; fees += pr; bought++; used += a.size;
         s.ph = 1; s.eq = 0; s.days = 0; s.start = t; s.bought = true;
+        if (ev) ev(t, 'buy', i, pr);
       }
       // 2. la séance
       const d = P[k * T + t];
@@ -76,25 +79,30 @@
       for (let i = 0; i < M; i++) {
         const s = S[i], a = A[i];
         if (s.ph === 0) continue;
-        if (s.ph === -1) { if (--s.wait <= 0) { s.ph = s.next; s.eq = 0; s.days = 0; if (s.ph === 3) { s.fT = t; s.refunded = false; s.funded = true; fundedN++; passT.push(t - s.start); if (s.lostAt >= 0) { relaunchT.push(t - s.lostAt); s.lostAt = -1; } } } else continue; }
+        if (s.ph === -1) { if (--s.wait <= 0) { s.ph = s.next; s.eq = 0; s.days = 0; if (s.ph === 3) { s.fT = t; s.nextPay = t + (o.cycle1 || o.cycle) - 1; s.refunded = false; s.funded = true; fundedN++; passT.push(t - s.start); if (ev) ev(t, 'fund', i); if (s.lostAt >= 0) { relaunchT.push(t - s.lostAt); s.lostAt = -1; } } } else continue; }
         const r = s.ph === 3 ? a.rf : a.rc, g = DG[d] * (1 + o.slip) * r, n = (DNx[d] + DG[d] * o.slip) * r;
-        if (g <= -5 || s.eq + g <= -10) { if (s.ph === 3) { lost++; s.lostAt = t; } s.ph = 0; continue; }
+        if (g <= -5 || s.eq + g <= -10) { if (s.ph === 3) { lost++; s.lostAt = t; } if (ev) ev(t, s.ph === 3 ? 'lost' : 'fail', i, { ph: s.ph, why: g <= -5 ? 'jour' : 'max' }); s.ph = 0; continue; }
         s.eq += n; s.days += DT[d];
-        if (s.ph === 1 && s.eq >= 10 && s.days >= 4) { s.ph = -1; s.next = 2; s.wait = o.d1; }
-        else if (s.ph === 2 && s.eq >= 5 && s.days >= 4) { s.ph = -1; s.next = 3; s.wait = o.d2; if (o.d2 <= 0) { s.ph = 3; s.fT = t; s.refunded = false; s.funded = true; fundedN++; passT.push(t - s.start); } }
+        if (s.ph === 1 && s.eq >= 10 && s.days >= 4) { s.ph = -1; s.next = 2; s.wait = o.d1; if (ev) ev(t, 'p1', i); }
+        else if (s.ph === 2 && s.eq >= 5 && s.days >= 4) { s.ph = -1; s.next = 3; s.wait = o.d2; if (ev) ev(t, 'p2', i); if (o.d2 <= 0) { s.ph = 3; s.fT = t; s.nextPay = t + (o.cycle1 || o.cycle) - 1; s.refunded = false; s.funded = true; fundedN++; passT.push(t - s.start); if (ev) ev(t, 'fund', i); } }
         else if (s.ph === 3) {
           nf++;
-          if ((t - s.fT) % o.cycle === o.cycle - 1 && s.eq > o.cushion) {
+          // versement dès que la date est passée et que le compte est au-dessus du coussin ; le suivant, un cycle plus tard
+          if (t >= s.nextPay && s.eq > o.cushion) {
+            s.nextPay = t + o.cycle;
             let p = (s.eq - o.cushion) * a.size / 100 * o.split / o.fx;
-            if (!s.refunded) { p += a.price || priceOf(a.size); s.refunded = true; }
+            const rb = !s.refunded ? (a.price || priceOf(a.size)) : 0;
+            if (!s.refunded) { p += rb; s.refunded = true; }
             wallet += p; paid += p; payMonth += p; s.eq = o.cushion; if (firstPay < 0) firstPay = t;
+            if (ev) ev(t, 'pay', i, { p, rb });
           }
         }
       }
       if (!nf) noFund++;
       // 3. fin de mois
-      if (t % 21 === 20) {
-        if (o.onMonth) { const take = o.onMonth((t + 1) / 21, wallet); if (take > 0) wallet -= Math.min(take, wallet); }   // répartition des versements
+      if (o.monthEnd ? o.monthEnd[t] : t % 21 === 20) {   // fin de mois (vrais mois du calendrier pour le rejeu)
+        mi++;
+        if (o.onMonth) { const take = o.onMonth(mi, wallet); if (take > 0) wallet -= Math.min(take, wallet); }   // répartition des versements
         if (payMonth <= 0) { monthsNoPay++; if (firstPay >= 0) gaps++; }
         if (rec) rec.push(wallet - o.budget, nf);
         payMonth = 0;
@@ -165,7 +173,17 @@
     return { o, H, finMed: q(f, .5), totMed: q(tot, .5), totP10: q(tot, .1), totP90: q(tot, .9), wdMed: q(wd.slice().sort((a, b) => a - b), .5), ddMed: q(D, .5), ddP10: q(D, .1), dd20: dd.filter(x => x <= -0.2).length / N, loss: tot.filter(x => x < 0).length / N, curve: { med, lo, hi } };
   }
 
-  const ENGINE = { MONTHS, SIZES, priceOf, WORST, DEF, paths, run, sim, challenge, own, dnFor };
+  // Rejeu : les vrais mois dans l'ordre, à partir du mois `start` (0 = janvier 2024) ; après novembre 2026, retour en janvier 2024
+  const MONTH0 = [2024, 1];
+  function monthLabel(i) { const m = (MONTH0[1] - 1 + i) % 12, y = MONTH0[0] + Math.floor((MONTH0[1] - 1 + i) / 12); return ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'][m] + ' ' + String(y).slice(2); }
+  function pathFrom(start, H) {
+    const months = [], ends = []; let T = 0;
+    for (let j = 0; j < H; j++) { const mo = (start + j) % MS.length; months.push(mo); T += MS[mo][1]; }
+    const P = new Int32Array(T), monthEnd = new Uint8Array(T), first = new Int32Array(H); let t = 0;
+    months.forEach((mo, j) => { const [s0, len] = MS[mo]; first[j] = t; for (let i = 0; i < len; i++) P[t++] = s0 + i; monthEnd[t - 1] = 1; });
+    return { P, T, monthEnd, months, first };
+  }
+  const ENGINE = { MONTHS, SIZES, priceOf, WORST, DEF, paths, run, sim, challenge, own, dnFor, pathFrom, monthLabel };
   if (typeof module !== 'undefined' && module.exports) module.exports = ENGINE;
   else root.DeskSimEngine = ENGINE;
 })(typeof window !== 'undefined' ? window : this);
@@ -180,16 +198,19 @@
   const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || 'null') || {}; } catch (e) { return {}; } };
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(ST)); } catch (e) { /* stockage indisponible */ } };
   // réglages par défaut : la stratégie proposée le 27/11/2026
-  const DEF = { mode: 'ftmo', budget: 1200, size0: 50000, n0: 1, stagger: 0, reinvest: 100000, cap: 400, relaunch: 1, rc: 1.5, rc2: '', rf: 2.15, cushion: 5, H: 12, cycle: 10, split: 80, fx: 1.15, slip: 0, edge: 1, d1: 1, d2: 2,
-    own: { capital: 10000, risk: 1, compound: 1, withdraw: 0, H: 12, slip: 0, edge: 1 } };
+  const DEF = { mode: 'ftmo', budget: 1200, size0: 50000, n0: 1, stagger: 0, reinvest: 100000, cap: 400, relaunch: 1, rc: 1.5, rc2: '', rf: 2.15, cushion: 5, H: 12, cycle: 'ftmo', split: 80, fx: 1.15, slip: 0, edge: 1, d1: 1, d2: 2,
+    own: { capital: 10000, risk: 1, compound: 1, withdraw: 0, H: 12, slip: 0, edge: 1 },
+    rp: { start: 0, reserve: 10000, own: 70, target: 100000, ownRisk: 1, ownWd: 50 } };
   const saved = load();
-  const ST = Object.assign({}, DEF, saved); ST.own = Object.assign({}, DEF.own, saved.own || {});
+  const ST = Object.assign({}, DEF, saved); ST.own = Object.assign({}, DEF.own, saved.own || {}); ST.rp = Object.assign({}, DEF.rp, saved.rp || {});
+  if (!saved.v || saved.v < 2) { ST.cycle = 'ftmo'; ST.v = 2; }   // 28/11 : rythme FTMO (1er versement à 14 jours, puis mensuel)
 
   const nf = (v, d = 0) => isFinite(v) ? Number(v).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—';
   const eur = v => isFinite(v) ? (v < 0 ? '−' : '') + nf(Math.abs(v)) + ' €' : '—';
   const pc = v => isFinite(v) ? nf(v * 100) + ' %' : '—';
   const mo = s => isFinite(s) ? nf(s / 21, 1) + ' mois' : '—';
   const k = v => (v / 1000) + 'k';
+  const k$ = v => Math.abs(v) >= 1000 ? nf(v / 1000, Math.abs(v) < 10000 ? 1 : 0) + ' k€' : nf(v) + ' €';
   const nice = v => { const p = Math.pow(10, Math.floor(Math.log10(Math.max(v, 1e-9)))), n = v / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p; };
   const kpi = (label, val, sub, cls) => `<div class="kpi"><small>${label}</small><b class="${cls || ''}">${val}</b>${sub ? `<div class="hint" style="margin-top:2px">${sub}</div>` : ''}</div>`;
 
@@ -219,7 +240,7 @@
     }
     return acc;
   }
-  const optOf = s => ({ budget: s.budget, fx: s.fx, split: s.split / 100, cycle: +s.cycle, d1: +s.d1, d2: +s.d2, cushion: +s.cushion, slip: +s.slip, edge: +s.edge, cap: s.cap * 1000, relaunch: !!+s.relaunch, stagger: !!+s.stagger, n0: +s.n0, accounts: accountsOf(s) });
+  const optOf = s => ({ budget: s.budget, fx: s.fx, split: s.split / 100, cycle1: s.cycle === 'ftmo' ? 10 : +s.cycle, cycle: s.cycle === 'ftmo' ? 21 : +s.cycle, d1: +s.d1, d2: +s.d2, cushion: +s.cushion, slip: +s.slip, edge: +s.edge, cap: s.cap * 1000, relaunch: !!+s.relaunch, stagger: !!+s.stagger, n0: +s.n0, accounts: accountsOf(s) });
 
   // ---------- gabarit ----------
   const sizeOpts = E.SIZES.map(([s, p]) => `<option value="${s}">${k(s)} (${p} €)</option>`).join('');
@@ -237,8 +258,8 @@
     <div><b>3 · Compte propre</b> : chaque fin de mois, ce qui dépasse 10 000 € : 70 % sur le compte propre, 30 % pour toi, jusqu'à 100 000 € sur le compte propre. Ensuite, tout l'excédent FTMO est pour toi.</div>
     <div><b>4 · Retraits du compte propre</b> : risque 1 % du solde par trade (jamais 2,15 % : c'est ton argent). Le 1er du mois : si le compte est au-dessus de son plus haut, retirer 50 % de ce qui dépasse ; sinon ne rien retirer. Ne jamais toucher au capital déposé. Mettre de côté une part pour les impôts.</div>
     <div class="tbl-wrap sm-tbl"><table><thead><tr><th>Sur 3 ans</th><th>Avantage du backtest</th><th>Avantage réduit de moitié</th></tr></thead><tbody>
-      <tr><td>Argent touché par toi</td><td class="mono">≈ 693 k€</td><td class="mono">≈ 183 k€</td></tr>
-      <tr><td>Compte propre à la fin</td><td class="mono">≈ 192 k€</td><td class="mono">≈ 89 k€</td></tr>
+      <tr><td>Argent touché par toi</td><td class="mono">≈ 712 k€</td><td class="mono">≈ 185 k€</td></tr>
+      <tr><td>Compte propre à la fin</td><td class="mono">≈ 189 k€</td><td class="mono">≈ 87 k€</td></tr>
       <tr><td>Mois sans revenu, 3e année</td><td class="mono">≈ 4 sur 12</td><td class="mono">≈ 7 sur 12</td></tr>
     </tbody></table></div>
     <div class="row"><button class="btn small primary" id="smPlanLoad">Charger ces réglages dans le simulateur</button><a href="docs/strategie-financement.md" target="_blank" rel="noopener" style="font-size:13px">document complet</a></div>
@@ -270,7 +291,7 @@
     <h3>Hypothèses</h3>
     <div class="fgrid">
       <label class="f">Durée<select id="smH"><option value="12">12 mois</option><option value="24">24 mois</option></select></label>
-      <label class="f">Versements<select id="smCycle"><option value="10">tous les 14 jours</option><option value="21">tous les mois</option></select></label>
+      <label class="f">Versements<select id="smCycle"><option value="ftmo">1er à 14 jours, puis tous les mois (FTMO)</option><option value="10">tous les 14 jours</option><option value="21">tous les mois</option></select></label>
       <label class="f">Part des gains versée (%)<input type="number" id="smSplit" min="10" max="100" step="5"></label>
       <label class="f">1 € = … $<input type="number" id="smFx" min="0.5" max="2" step="0.01"></label>
       <label class="f">Pertes plus grosses qu'en backtest<select id="smSlip"><option value="0">non</option><option value="0.02">+2 %</option><option value="0.05">+5 %</option></select></label>
@@ -279,7 +300,7 @@
       <label class="f">Attente FTMO avant le compte financé (séances)<input type="number" id="smD2" min="0" max="20" step="1"></label>
     </div>
     <div id="smWarn" class="stack" style="margin-top:12px"></div>
-    <p class="hint">« Avantage gardé en réel » : les gains des jours gagnants sont réduits pour que le total des 3 ans soit multiplié par 75 % ou 50 % ; les pertes restent les mêmes (scénario prudent : en réel, une règle réglée sur le passé rapporte souvent moins). Prix FTMO 2-Step (en €) ; versement des gains en $, converti en €. Le prix du challenge est remboursé avec le premier versement de chaque compte financé. Un challenge n'est racheté que si la caisse (budget + versements reçus) le permet. Avec « réinvestir », de nouveaux challenges sont achetés dès le premier versement reçu, tant que la caisse et le plafond le permettent.</p>
+    <p class="hint">« Avantage gardé en réel » : les gains des jours gagnants sont réduits pour que le total des 3 ans soit multiplié par 75 % ou 50 % ; les pertes restent les mêmes (scénario prudent : en réel, une règle réglée sur le passé rapporte souvent moins). Prix FTMO 2-Step (en €) ; versement des gains en $, converti en €. Rythme FTMO : premier versement 14 jours après le passage en compte financé, puis un par mois (versé dès que la date est passée et que le compte est au-dessus du coussin). Le prix du challenge est remboursé avec le premier versement de chaque compte financé. Un challenge n'est racheté que si la caisse (budget + versements reçus) le permet. Avec « réinvestir », de nouveaux challenges sont achetés dès le premier versement reçu, tant que la caisse et le plafond le permettent.</p>
   </div>
   <div class="card c7">
     <h2>Résultat<span class="spacer"></span><span class="hint" id="smInfo" style="margin:0;text-transform:none;letter-spacing:0"></span></h2>
@@ -290,6 +311,22 @@
     <p class="hint" style="margin-top:2px">Ligne : parcours médian · zone : de 1 parcours sur 10 à 9 sur 10.</p>
     <h3>Comptes financés en même temps (moyenne)</h3>
     <div id="smChart2"></div>
+  </div>
+  <div class="card c12" id="smRp">
+    <h2>Rejouer l'histoire : départ à un vrai mois du passé<span class="spacer"></span><select id="rpStart" class="mini">${Array.from({ length: E.MONTHS.length }, (_, i) => `<option value="${i}">départ ${E.monthLabel(i)}</option>`).join('')}</select><button class="btn small" id="rpRand">Mois au hasard</button></h2>
+    <p class="muted" style="margin:0 0 10px;font-size:14px">Ta stratégie (réglages ci-dessus) rejouée sur les vrais mois, dans l'ordre, à partir du mois choisi, sur la durée des hypothèses. Chaque fin de mois, ce qui dépasse la caisse challenges est partagé entre le compte propre et toi.</p>
+    <div class="fgrid" style="margin-bottom:12px">
+      <label class="f">Caisse challenges gardée (€)<input type="number" id="rpRes" min="0" step="500"></label>
+      <label class="f">Vers le compte propre (% de l'excédent)<input type="number" id="rpOwn" min="0" max="100" step="10"></label>
+      <label class="f">Compte propre visé (€, ensuite tout pour toi)<input type="number" id="rpTarget" min="0" step="10000"></label>
+      <label class="f">Risque du compte propre (% du solde)<input type="number" id="rpRisk" min="0.1" max="5" step="0.25"></label>
+      <label class="f">Retrait des gains du compte propre (% au-dessus du plus haut)<input type="number" id="rpWd" min="0" max="100" step="10"></label>
+    </div>
+    <div class="verdict" id="rpSum" style="margin-top:0"></div>
+    <div class="res" id="rpKpi"></div>
+    <div id="rpTl" style="margin-top:16px"></div>
+    <div class="rp-legend"><span><i style="background:rgba(228,162,74,.75)"></i>challenge</span><span><i style="background:var(--bull)"></i>compte financé</span><span><i style="background:#fff;width:2px"></i>versement</span><span><b style="color:var(--bear)">✕</b> challenge raté / compte perdu</span><span><i style="background:var(--info)"></i>compte propre</span><span><i style="background:var(--range)"></i>caisse challenges</span></div>
+    <details style="margin-top:12px"><summary class="hint" style="cursor:pointer;margin:0">Mois par mois : événements et où va l'argent</summary><div class="tbl-wrap sm-tbl" style="margin-top:8px"><table id="rpTab"></table></div></details>
   </div>
   <div class="card c12">
     <h2>Comparer des stratégies<span class="spacer"></span><button class="btn small primary" id="smCmp">Comparer</button></h2>
@@ -331,14 +368,18 @@
   // ---------- liens formulaire <-> réglages ----------
   const F = { smBudget: 'budget', smSize0: 'size0', smN0: 'n0', smStag: 'stagger', smRe: 'reinvest', smCap: 'cap', smRel: 'relaunch', smRc: 'rc', smRc2: 'rc2', smRf: 'rf', smCush: 'cushion', smH: 'H', smCycle: 'cycle', smSplit: 'split', smFx: 'fx', smSlip: 'slip', smEdge: 'edge', smD1: 'd1', smD2: 'd2' };
   const FO = { soCap: 'capital', soRisk: 'risk', soComp: 'compound', soWd: 'withdraw', soH: 'H', soSlip: 'slip', soEdge: 'edge' };
+  const RPF = { rpStart: 'start', rpRes: 'reserve', rpOwn: 'own', rpTarget: 'target', rpRisk: 'ownRisk', rpWd: 'ownWd' };
+  function fillRp() { for (const [id, key] of Object.entries(RPF)) $('#' + id).value = ST.rp[key]; }
+  function readRp() { for (const [id, key] of Object.entries(RPF)) { const n = parseFloat(String($('#' + id).value).replace(',', '.')); if (isFinite(n)) ST.rp[key] = n; } ST.rp.start = Math.max(0, Math.min(E.MONTHS.length - 1, ST.rp.start | 0)); save(); }
   function fill() {
     for (const [id, key] of Object.entries(F)) $('#' + id).value = ST[key];
     for (const [id, key] of Object.entries(FO)) $('#' + id).value = ST.own[key];
+    fillRp();
     document.querySelectorAll('#smMode button').forEach(b => b.classList.toggle('on', b.dataset.m === ST.mode));
     $('#smFtmo').hidden = ST.mode !== 'ftmo'; $('#smOwn').hidden = ST.mode !== 'own';
   }
   function read() {
-    const v = id => { const x = $('#' + id).value; if (id === 'smRc2') return x; const n = parseFloat(String(x).replace(',', '.')); return isFinite(n) ? n : null; };
+    const v = id => { const x = $('#' + id).value; if (id === 'smRc2' || id === 'smCycle') return x; const n = parseFloat(String(x).replace(',', '.')); return isFinite(n) ? n : null; };
     for (const [id, key] of Object.entries(F)) { const x = v(id); if (x !== null) ST[key] = x; }
     for (const [id, key] of Object.entries(FO)) { const x = v(id); if (x !== null) ST.own[key] = x; }
     ST.n0 = Math.max(1, Math.min(4, ST.n0 | 0)); ST.rc = Math.max(0.1, ST.rc); ST.rf = Math.max(0.1, ST.rf); ST.cushion = Math.max(0, ST.cushion); ST.cap = Math.max(10, ST.cap);
@@ -349,6 +390,8 @@
     document.querySelectorAll('#smMode button').forEach(b => b.onclick = () => { ST.mode = b.dataset.m; save(); fill(); compute(); });
     document.querySelectorAll('#smFtmo input, #smFtmo select, #smOwn input, #smOwn select').forEach(el => el.addEventListener('change', () => { read(); clearTimeout(tm); tm = setTimeout(compute, 120); }));
     $('#smCmp').onclick = compare;
+    $('#rpRand').onclick = () => { let n; do { n = Math.floor(Math.random() * E.MONTHS.length); } while (n === +ST.rp.start && E.MONTHS.length > 1); ST.rp.start = n; save(); fillRp(); replay(); };
+    document.querySelectorAll('#smRp input, #smRp select').forEach(el => el.addEventListener('change', () => { readRp(); replay(); }));
     $('#smPlanLoad').onclick = () => { Object.assign(ST, { mode: 'ftmo', budget: 1200, size0: 50000, n0: 1, stagger: 0, reinvest: 100000, cap: 400, relaunch: 1, rc: 1.5, rc2: '', rf: 2.15, cushion: 5 }); save(); fill(); compute(); $('#smFtmo').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
     $('#smCmpT').addEventListener('click', ev => { const tr = ev.target.closest('tr[data-i]'); if (!tr || !LAST_CMP) return; Object.assign(ST, LAST_CMP[+tr.dataset.i].set); save(); fill(); compute(); $('#simBody').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
   }
@@ -388,6 +431,7 @@
     chart($('#smChart'), H, z.concat(cv.med), z.concat(cv.lo), z.concat(cv.hi), v => (Math.abs(v) >= 1000 ? nf(v / 1000) + ' k' : nf(v)) + ' €', m => `Mois ${m} : médiane ${eur(cv.med[m - 1])} · 1 sur 10 ${eur(cv.lo[m - 1])} · 9 sur 10 ${eur(cv.hi[m - 1])}`);
     chart($('#smChart2'), H, z.concat(cv.fund), null, null, v => nf(v, 1), m => `Mois ${m} : ${nf(cv.fund[m - 1], 2)} compte(s) financé(s) en moyenne`);
     challengeTable(o);
+    replay();
   }
   let CT_KEY = '';
   function challengeTable(o) {
@@ -395,6 +439,122 @@
     const risks = [1, 1.2, 1.4, 1.5, 1.6, 1.8, 2, 2.2, 2.5]; if (!risks.includes(+ST.rc)) { risks.push(+ST.rc); risks.sort((a, b) => a - b); }
     const rows = risks.map(rc => { const c = E.challenge(rc, 5000, 11, { slip: o.slip, d1: o.d1, d2: o.d2, edge: o.edge }); return `<tr${rc === +ST.rc ? ' style="background:rgba(228,162,74,.12)"' : ''}><td class="mono">${nf(rc, 2)} %</td><td class="mono">${pc(c.p1)}</td><td class="mono">${pc(c.p2)}</td><td class="mono"><b>${pc(c.both)}</b></td><td class="mono">${mo(c.med)}</td><td class="mono">${mo(c.p90)}</td><td class="mono">${pc(c.both ? c.in2m / c.both : NaN)}</td></tr>`; }).join('');
     $('#smChT').innerHTML = `<thead><tr><th>Risque</th><th>Phase 1</th><th>Phase 2</th><th>Les deux</th><th>Durée médiane</th><th>9 sur 10 avant</th><th>En 2 mois</th></tr></thead><tbody>${rows}</tbody>`;
+  }
+
+  // ---------- rejeu de l'histoire ----------
+  function replay() {
+    const H = +ST.H, rp = ST.rp, pf = E.pathFrom(+rp.start, H), trace = [], M = [];
+    const own = { bal: 0, hwm: 0 };
+    const o = Object.assign({}, E.DEF, optOf(ST), { trace, monthEnd: pf.monthEnd });
+    o.onDay = dn => { if (own.bal > 0) own.bal = Math.max(0, own.bal * (1 + dn * rp.ownRisk / 100)); };
+    o.onMonth = (m, wallet) => {
+      let toOwn = 0, toMe = 0, wd = 0;
+      const ex = wallet - rp.reserve;
+      if (ex > 0) { const full = rp.target > 0 && own.bal >= rp.target; toOwn = full ? 0 : ex * rp.own / 100; toMe = ex - toOwn; own.bal += toOwn; own.hwm += toOwn; }
+      if (own.bal > own.hwm) { wd = (own.bal - own.hwm) * rp.ownWd / 100; own.bal -= wd; own.hwm = own.bal; }
+      M.push({ cash: wallet - toOwn - toMe, toOwn, toMe, wd, own: own.bal });
+      return toOwn + toMe;
+    };
+    const res = E.run(pf.P, 0, pf.T, o, null);
+    const monthOf = t => { let j = 0; while (j + 1 < H && pf.first[j + 1] <= t) j++; return j; };
+    const acc = o.accounts, lab = i => `C${i + 1} · ${k(acc[i].size)}`;
+    // par mois : versements et événements
+    // par mois : versements et événements, regroupés par type (une ligne chacun)
+    const pays = new Array(H).fill(0), G = Array.from({ length: H }, () => ({ buy: [], p1: [], p2: [], fund: [], pay: new Map(), fail: [], lost: [] }));
+    for (const e of trace) {
+      const j = monthOf(e.t), n = `C${e.i + 1}`, gj = G[j];
+      if (e.type === 'pay') { pays[j] += e.x.p; const c = gj.pay.get(n) || { p: 0, rb: 0 }; c.p += e.x.p; c.rb += e.x.rb; gj.pay.set(n, c); }
+      else if (e.type === 'buy') gj.buy.push(`${n} ${k(acc[e.i].size)} (${eur(e.x)})`);
+      else if (e.type === 'fail') gj.fail.push(`${n} (${e.x.why === 'jour' ? 'perte du jour' : 'perte max'}, phase ${e.x.ph})`);
+      else if (e.type === 'lost') gj.lost.push(`${n} (${e.x.why === 'jour' ? 'perte du jour' : 'perte max'})`);
+      else gj[e.type].push(n);
+    }
+    const evs = G.map(gj => [
+      gj.buy.length ? `<b>Achat</b> : ${gj.buy.join(', ')}` : '',
+      gj.p1.length ? `Phase 1 réussie : ${gj.p1.join(', ')}` : '',
+      gj.p2.length ? `Phase 2 réussie : ${gj.p2.join(', ')}` : '',
+      gj.fund.length ? `<b style="color:var(--bull)">Financé</b> : ${gj.fund.join(', ')}` : '',
+      gj.pay.size ? `Versements : ${[...gj.pay].map(([n, c]) => `${n} ${eur(c.p)}${c.rb ? ` (dont remb. ${eur(c.rb)})` : ''}`).join(', ')}` : '',
+      gj.fail.length ? `<b style="color:var(--bear)">Challenge raté</b> : ${gj.fail.join(', ')}` : '',
+      gj.lost.length ? `<b style="color:var(--bear)">Compte perdu</b> : ${gj.lost.join(', ')}` : ''
+    ].filter(Boolean));
+    const fundE = trace.find(e => e.type === 'fund'), payE = trace.find(e => e.type === 'pay');
+    const totMe = M.reduce((a, x) => a + x.toMe + x.wd, 0), last = M[M.length - 1] || { cash: 0, own: 0 };
+    const nBuy = trace.filter(e => e.type === 'buy').length, nFund = trace.filter(e => e.type === 'fund').length, nLost = trace.filter(e => e.type === 'lost').length;
+    const L = j => E.monthLabel(pf.months[j]);
+    $('#rpSum').innerHTML = `Départ en <b>${E.monthLabel(+rp.start)}</b>, sur ${H} mois : `
+      + (fundE ? `1er compte financé en <b>${L(monthOf(fundE.t))}</b>, 1er versement en <b>${payE ? L(monthOf(payE.t)) : '—'}</b>. ` : '<b>aucun challenge réussi</b> sur la période. ')
+      + `<b class="${totMe > 0 ? 'bull' : ''}">${eur(totMe)}</b> pour toi, compte propre ${eur(last.own)}, caisse challenges ${eur(last.cash)}. ${nBuy} challenge(s) acheté(s), ${nFund} compte(s) financé(s), ${nLost} perdu(s).`
+      + (pf.months.some((mo, j) => j > 0 && mo === 0) ? ' <span class="muted">(après nov. 26, retour en janv. 24 : repère ↺)</span>' : '');
+    $('#rpKpi').innerHTML = [
+      kpi('Pour toi', eur(totMe), 'FTMO + retraits du compte propre', totMe > 0 ? 'bull' : ''),
+      kpi('Compte propre', eur(last.own), 'à la fin'),
+      kpi('Caisse challenges', eur(last.cash), 'à la fin'),
+      kpi('Challenges achetés', String(nBuy), `${nFund} financés · ${nLost} perdus`),
+      kpi('1er versement', payE ? L(monthOf(payE.t)) : 'aucun', fundE ? '1er financé : ' + L(monthOf(fundE.t)) : ''),
+      kpi('Mois sans rien pour toi', String(M.filter(x => x.toMe + x.wd <= 0).length) + ' / ' + H, '')
+    ].join('');
+    drawTimeline(pf, H, trace, acc, lab, pays, M, monthOf);
+    $('#rpTab').innerHTML = `<thead><tr><th>Mois</th><th>Événements</th><th>Versements FTMO</th><th>Pour toi</th><th>Vers compte propre</th><th>Retrait compte propre</th><th>Caisse</th><th>Compte propre</th></tr></thead><tbody>`
+      + M.map((x, j) => `<tr><td class="mono">${L(j)}</td><td style="min-width:260px;font-size:13px">${evs[j].join('<br>') || '<span class="muted">—</span>'}</td><td class="mono">${pays[j] ? eur(pays[j]) : '—'}</td><td class="mono ${x.toMe > 0 ? 'r-pos' : ''}">${x.toMe ? eur(x.toMe) : '—'}</td><td class="mono">${x.toOwn ? eur(x.toOwn) : '—'}</td><td class="mono ${x.wd > 0 ? 'r-pos' : ''}">${x.wd ? eur(x.wd) : '—'}</td><td class="mono">${eur(x.cash)}</td><td class="mono">${eur(x.own)}</td></tr>`).join('') + '</tbody>';
+  }
+  function drawTimeline(pf, H, trace, acc, lab, pays, M, monthOf) {
+    const box = $('#rpTl'), W = Math.max(320, box.clientWidth || 800), narrow = W < 560, lw = narrow ? 64 : 112, rw = 8;
+    const colW = (W - lw - rw) / H, xm = j => lw + j * colW;
+    const xt = t => { const j = monthOf(t), len = (j + 1 < H ? pf.first[j + 1] : pf.T) - pf.first[j]; return xm(j) + colW * (t - pf.first[j]) / len; };
+    const used = [...new Set(trace.filter(e => e.type === 'buy').map(e => e.i))].sort((a, b) => a - b);
+    const laneH = 20, gap = 6, top = 22, moneyH = 46;
+    let y = top, g = '';
+    // colonnes des mois
+    for (let j = 0; j < H; j++) {
+      if (j % 2 === 0) g += `<rect x="${xm(j)}" y="${top - 4}" width="${colW}" height="9999" fill="rgba(255,255,255,.025)"/>`;
+      const stepL = narrow ? (H <= 12 ? 3 : 6) : (H <= 12 ? 1 : 2);
+      if (j % stepL === 0) g += `<text x="${xm(j) + colW / 2}" y="12" text-anchor="middle" font-size="${narrow ? 9 : 10}" fill="var(--faint)" font-family="var(--mono)">${E.monthLabel(pf.months[j])}</text>`;
+      if (j > 0 && pf.months[j] === 0) g += `<line x1="${xm(j)}" x2="${xm(j)}" y1="${top - 6}" y2="9999" stroke="var(--accent)" stroke-dasharray="3 3"/><text x="${xm(j) + 3}" y="${top - 8}" font-size="10" fill="var(--accent)">↺</text>`;
+    }
+    // une ligne par compte
+    for (const i of used) {
+      g += `<text x="4" y="${y + 14}" font-size="${narrow ? 10 : 12}" fill="var(--muted)">${lab(i)}</text>`;
+      g += `<rect x="${lw}" y="${y}" width="${W - lw - rw}" height="${laneH}" rx="3" fill="rgba(255,255,255,.03)"/>`;
+      let st = null, t0 = 0;
+      const seg = (a, b, kind, tip) => { const x0 = xt(a), x1 = Math.max(x0 + 2, b >= pf.T ? W - rw : xt(b)); g += `<rect x="${x0}" y="${y + 2}" width="${x1 - x0}" height="${laneH - 4}" rx="3" fill="${kind === 'f' ? 'var(--bull)' : 'rgba(228,162,74,.75)'}"><title>${tip}</title></rect>`; };
+      for (const e of trace.filter(e => e.i === i)) {
+        if (e.type === 'buy') { st = 'c'; t0 = e.t; }
+        else if (e.type === 'fund') { if (st === 'c') seg(t0, e.t, 'c', `${lab(i)} : challenge du ${E.monthLabel(pf.months[monthOf(t0)])} au ${E.monthLabel(pf.months[monthOf(e.t)])}`); st = 'f'; t0 = e.t; }
+        else if (e.type === 'fail' || e.type === 'lost') {
+          seg(t0, e.t, st === 'f' ? 'f' : 'c', `${lab(i)} : ${st === 'f' ? 'compte financé' : 'challenge'} jusqu'en ${E.monthLabel(pf.months[monthOf(e.t)])}`);
+          g += `<text x="${xt(e.t)}" y="${y + 15}" text-anchor="middle" font-size="14" font-weight="700" fill="var(--bear)">✕<title>${lab(i)} : ${e.type === 'lost' ? 'compte perdu' : 'challenge raté'} en ${E.monthLabel(pf.months[monthOf(e.t)])}</title></text>`;
+          st = null;
+        }
+      }
+      if (st) seg(t0, pf.T, st === 'f' ? 'f' : 'c', `${lab(i)} : ${st === 'f' ? 'compte financé' : 'challenge en cours'} à la fin`);
+      for (const e of trace.filter(e => e.i === i && e.type === 'pay')) g += `<rect x="${xt(e.t) - 1}" y="${y + 3}" width="2" height="${laneH - 6}" fill="#fff"><title>${lab(i)} : versement ${eur(e.x.p)} (${E.monthLabel(pf.months[monthOf(e.t)])})</title></rect>`;
+      y += laneH + gap;
+    }
+    if (!used.length) { g += `<text x="${lw}" y="${y + 14}" font-size="12" fill="var(--muted)">aucun compte</text>`; y += laneH + gap; }
+    // lignes d'argent
+    const bars = (vals, color, name, tipf) => {
+      const mx = Math.max(1, ...vals); y += 8;
+      g += `<text x="4" y="${y + 14}" font-size="${narrow ? 10 : 12}" fill="var(--muted)">${name}</text><text x="4" y="${y + 28}" font-size="10" fill="var(--faint)" font-family="var(--mono)">max ${k$(mx)}</text>`;
+      vals.forEach((v, j) => { if (v <= 0) return; const h = Math.max(2, (moneyH - 4) * v / mx); g += `<rect x="${xm(j) + colW * 0.15}" y="${y + moneyH - h}" width="${colW * 0.7}" height="${h}" rx="2" fill="${color}"><title>${tipf(j, v)}</title></rect>`; });
+      g += `<line x1="${lw}" x2="${W - rw}" y1="${y + moneyH}" y2="${y + moneyH}" stroke="var(--line)"/>`;
+      y += moneyH;
+    };
+    const line = (vals, color, name, tipf) => {
+      const mx = Math.max(1, ...vals); y += 8;
+      g += `<text x="4" y="${y + 14}" font-size="${narrow ? 10 : 12}" fill="var(--muted)">${name}</text><text x="4" y="${y + 28}" font-size="10" fill="var(--faint)" font-family="var(--mono)">max ${k$(mx)}</text>`;
+      const pts = vals.map((v, j) => [xm(j) + colW, y + moneyH - (moneyH - 4) * Math.max(0, v) / mx]);
+      g += `<path d="M${lw},${y + moneyH} L${pts.map(p => p.join(',')).join(' L')}" fill="none" stroke="${color}" stroke-width="2"/>`;
+      pts.forEach((p, j) => { g += `<circle cx="${p[0]}" cy="${p[1]}" r="2.5" fill="${color}"><title>${tipf(j, vals[j])}</title></circle>`; });
+      g += `<line x1="${lw}" x2="${W - rw}" y1="${y + moneyH}" y2="${y + moneyH}" stroke="var(--line)"/>`;
+      y += moneyH;
+    };
+    const L = j => E.monthLabel(pf.months[j]);
+    bars(pays, 'rgba(228,162,74,.85)', narrow ? 'Versem.' : 'Versements FTMO', (j, v) => `${L(j)} : ${eur(v)} versés par FTMO`);
+    bars(M.map(x => x.toMe + x.wd), 'var(--bull)', narrow ? 'Pour toi' : 'Pour toi', (j, v) => `${L(j)} : ${eur(v)} pour toi (FTMO ${eur(M[j].toMe)}, compte propre ${eur(M[j].wd)})`);
+    line(M.map(x => x.cash), 'var(--range)', narrow ? 'Caisse' : 'Caisse challenges', (j, v) => `${L(j)} : caisse challenges ${eur(v)}`);
+    line(M.map(x => x.own), 'var(--info)', narrow ? 'Cpte propre' : 'Compte propre', (j, v) => `${L(j)} : compte propre ${eur(v)}`);
+    box.innerHTML = `<svg viewBox="0 0 ${W} ${y + 6}" width="100%" style="display:block" role="img" aria-label="Frise du rejeu">${g.replace(/9999/g, String(y))}</svg>`;
   }
 
   // ---------- comparaison ----------
