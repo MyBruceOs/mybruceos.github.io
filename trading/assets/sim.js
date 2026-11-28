@@ -35,7 +35,8 @@
     budget: 1200,   // € disponibles pour acheter des challenges
     fx: 1.15,       // 1 € = fx $ (versements en $, challenges en €)
     split: 0.8,     // part des gains versée
-    cycle: 10,      // séances entre deux versements (14 jours)
+    cycle1: 10,     // premier versement : 10 séances (14 jours) après le passage en compte financé
+    cycle: 21,      // versements suivants : 21 séances (un mois) après le précédent
     d1: 1, d2: 2,   // séances d'attente FTMO après la phase 1, après la phase 2
     cushion: 0,     // % laissé sur le compte financé à chaque versement
     slip: 0,        // pertes plus grosses qu'en backtest (0,05 = +5 %)
@@ -78,15 +79,17 @@
       for (let i = 0; i < M; i++) {
         const s = S[i], a = A[i];
         if (s.ph === 0) continue;
-        if (s.ph === -1) { if (--s.wait <= 0) { s.ph = s.next; s.eq = 0; s.days = 0; if (s.ph === 3) { s.fT = t; s.refunded = false; s.funded = true; fundedN++; passT.push(t - s.start); if (ev) ev(t, 'fund', i); if (s.lostAt >= 0) { relaunchT.push(t - s.lostAt); s.lostAt = -1; } } } else continue; }
+        if (s.ph === -1) { if (--s.wait <= 0) { s.ph = s.next; s.eq = 0; s.days = 0; if (s.ph === 3) { s.fT = t; s.nextPay = t + (o.cycle1 || o.cycle) - 1; s.refunded = false; s.funded = true; fundedN++; passT.push(t - s.start); if (ev) ev(t, 'fund', i); if (s.lostAt >= 0) { relaunchT.push(t - s.lostAt); s.lostAt = -1; } } } else continue; }
         const r = s.ph === 3 ? a.rf : a.rc, g = DG[d] * (1 + o.slip) * r, n = (DNx[d] + DG[d] * o.slip) * r;
         if (g <= -5 || s.eq + g <= -10) { if (s.ph === 3) { lost++; s.lostAt = t; } if (ev) ev(t, s.ph === 3 ? 'lost' : 'fail', i, { ph: s.ph, why: g <= -5 ? 'jour' : 'max' }); s.ph = 0; continue; }
         s.eq += n; s.days += DT[d];
         if (s.ph === 1 && s.eq >= 10 && s.days >= 4) { s.ph = -1; s.next = 2; s.wait = o.d1; if (ev) ev(t, 'p1', i); }
-        else if (s.ph === 2 && s.eq >= 5 && s.days >= 4) { s.ph = -1; s.next = 3; s.wait = o.d2; if (ev) ev(t, 'p2', i); if (o.d2 <= 0) { s.ph = 3; s.fT = t; s.refunded = false; s.funded = true; fundedN++; passT.push(t - s.start); if (ev) ev(t, 'fund', i); } }
+        else if (s.ph === 2 && s.eq >= 5 && s.days >= 4) { s.ph = -1; s.next = 3; s.wait = o.d2; if (ev) ev(t, 'p2', i); if (o.d2 <= 0) { s.ph = 3; s.fT = t; s.nextPay = t + (o.cycle1 || o.cycle) - 1; s.refunded = false; s.funded = true; fundedN++; passT.push(t - s.start); if (ev) ev(t, 'fund', i); } }
         else if (s.ph === 3) {
           nf++;
-          if ((t - s.fT) % o.cycle === o.cycle - 1 && s.eq > o.cushion) {
+          // versement dès que la date est passée et que le compte est au-dessus du coussin ; le suivant, un cycle plus tard
+          if (t >= s.nextPay && s.eq > o.cushion) {
+            s.nextPay = t + o.cycle;
             let p = (s.eq - o.cushion) * a.size / 100 * o.split / o.fx;
             const rb = !s.refunded ? (a.price || priceOf(a.size)) : 0;
             if (!s.refunded) { p += rb; s.refunded = true; }
@@ -195,11 +198,12 @@
   const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || 'null') || {}; } catch (e) { return {}; } };
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(ST)); } catch (e) { /* stockage indisponible */ } };
   // réglages par défaut : la stratégie proposée le 27/11/2026
-  const DEF = { mode: 'ftmo', budget: 1200, size0: 50000, n0: 1, stagger: 0, reinvest: 100000, cap: 400, relaunch: 1, rc: 1.5, rc2: '', rf: 2.15, cushion: 5, H: 12, cycle: 10, split: 80, fx: 1.15, slip: 0, edge: 1, d1: 1, d2: 2,
+  const DEF = { mode: 'ftmo', budget: 1200, size0: 50000, n0: 1, stagger: 0, reinvest: 100000, cap: 400, relaunch: 1, rc: 1.5, rc2: '', rf: 2.15, cushion: 5, H: 12, cycle: 'ftmo', split: 80, fx: 1.15, slip: 0, edge: 1, d1: 1, d2: 2,
     own: { capital: 10000, risk: 1, compound: 1, withdraw: 0, H: 12, slip: 0, edge: 1 },
     rp: { start: 0, reserve: 10000, own: 70, target: 100000, ownRisk: 1, ownWd: 50 } };
   const saved = load();
   const ST = Object.assign({}, DEF, saved); ST.own = Object.assign({}, DEF.own, saved.own || {}); ST.rp = Object.assign({}, DEF.rp, saved.rp || {});
+  if (!saved.v || saved.v < 2) { ST.cycle = 'ftmo'; ST.v = 2; }   // 28/11 : rythme FTMO (1er versement à 14 jours, puis mensuel)
 
   const nf = (v, d = 0) => isFinite(v) ? Number(v).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—';
   const eur = v => isFinite(v) ? (v < 0 ? '−' : '') + nf(Math.abs(v)) + ' €' : '—';
@@ -236,7 +240,7 @@
     }
     return acc;
   }
-  const optOf = s => ({ budget: s.budget, fx: s.fx, split: s.split / 100, cycle: +s.cycle, d1: +s.d1, d2: +s.d2, cushion: +s.cushion, slip: +s.slip, edge: +s.edge, cap: s.cap * 1000, relaunch: !!+s.relaunch, stagger: !!+s.stagger, n0: +s.n0, accounts: accountsOf(s) });
+  const optOf = s => ({ budget: s.budget, fx: s.fx, split: s.split / 100, cycle1: s.cycle === 'ftmo' ? 10 : +s.cycle, cycle: s.cycle === 'ftmo' ? 21 : +s.cycle, d1: +s.d1, d2: +s.d2, cushion: +s.cushion, slip: +s.slip, edge: +s.edge, cap: s.cap * 1000, relaunch: !!+s.relaunch, stagger: !!+s.stagger, n0: +s.n0, accounts: accountsOf(s) });
 
   // ---------- gabarit ----------
   const sizeOpts = E.SIZES.map(([s, p]) => `<option value="${s}">${k(s)} (${p} €)</option>`).join('');
@@ -254,8 +258,8 @@
     <div><b>3 · Compte propre</b> : chaque fin de mois, ce qui dépasse 10 000 € : 70 % sur le compte propre, 30 % pour toi, jusqu'à 100 000 € sur le compte propre. Ensuite, tout l'excédent FTMO est pour toi.</div>
     <div><b>4 · Retraits du compte propre</b> : risque 1 % du solde par trade (jamais 2,15 % : c'est ton argent). Le 1er du mois : si le compte est au-dessus de son plus haut, retirer 50 % de ce qui dépasse ; sinon ne rien retirer. Ne jamais toucher au capital déposé. Mettre de côté une part pour les impôts.</div>
     <div class="tbl-wrap sm-tbl"><table><thead><tr><th>Sur 3 ans</th><th>Avantage du backtest</th><th>Avantage réduit de moitié</th></tr></thead><tbody>
-      <tr><td>Argent touché par toi</td><td class="mono">≈ 693 k€</td><td class="mono">≈ 183 k€</td></tr>
-      <tr><td>Compte propre à la fin</td><td class="mono">≈ 192 k€</td><td class="mono">≈ 89 k€</td></tr>
+      <tr><td>Argent touché par toi</td><td class="mono">≈ 712 k€</td><td class="mono">≈ 185 k€</td></tr>
+      <tr><td>Compte propre à la fin</td><td class="mono">≈ 189 k€</td><td class="mono">≈ 87 k€</td></tr>
       <tr><td>Mois sans revenu, 3e année</td><td class="mono">≈ 4 sur 12</td><td class="mono">≈ 7 sur 12</td></tr>
     </tbody></table></div>
     <div class="row"><button class="btn small primary" id="smPlanLoad">Charger ces réglages dans le simulateur</button><a href="docs/strategie-financement.md" target="_blank" rel="noopener" style="font-size:13px">document complet</a></div>
@@ -287,7 +291,7 @@
     <h3>Hypothèses</h3>
     <div class="fgrid">
       <label class="f">Durée<select id="smH"><option value="12">12 mois</option><option value="24">24 mois</option></select></label>
-      <label class="f">Versements<select id="smCycle"><option value="10">tous les 14 jours</option><option value="21">tous les mois</option></select></label>
+      <label class="f">Versements<select id="smCycle"><option value="ftmo">1er à 14 jours, puis tous les mois (FTMO)</option><option value="10">tous les 14 jours</option><option value="21">tous les mois</option></select></label>
       <label class="f">Part des gains versée (%)<input type="number" id="smSplit" min="10" max="100" step="5"></label>
       <label class="f">1 € = … $<input type="number" id="smFx" min="0.5" max="2" step="0.01"></label>
       <label class="f">Pertes plus grosses qu'en backtest<select id="smSlip"><option value="0">non</option><option value="0.02">+2 %</option><option value="0.05">+5 %</option></select></label>
@@ -296,7 +300,7 @@
       <label class="f">Attente FTMO avant le compte financé (séances)<input type="number" id="smD2" min="0" max="20" step="1"></label>
     </div>
     <div id="smWarn" class="stack" style="margin-top:12px"></div>
-    <p class="hint">« Avantage gardé en réel » : les gains des jours gagnants sont réduits pour que le total des 3 ans soit multiplié par 75 % ou 50 % ; les pertes restent les mêmes (scénario prudent : en réel, une règle réglée sur le passé rapporte souvent moins). Prix FTMO 2-Step (en €) ; versement des gains en $, converti en €. Le prix du challenge est remboursé avec le premier versement de chaque compte financé. Un challenge n'est racheté que si la caisse (budget + versements reçus) le permet. Avec « réinvestir », de nouveaux challenges sont achetés dès le premier versement reçu, tant que la caisse et le plafond le permettent.</p>
+    <p class="hint">« Avantage gardé en réel » : les gains des jours gagnants sont réduits pour que le total des 3 ans soit multiplié par 75 % ou 50 % ; les pertes restent les mêmes (scénario prudent : en réel, une règle réglée sur le passé rapporte souvent moins). Prix FTMO 2-Step (en €) ; versement des gains en $, converti en €. Rythme FTMO : premier versement 14 jours après le passage en compte financé, puis un par mois (versé dès que la date est passée et que le compte est au-dessus du coussin). Le prix du challenge est remboursé avec le premier versement de chaque compte financé. Un challenge n'est racheté que si la caisse (budget + versements reçus) le permet. Avec « réinvestir », de nouveaux challenges sont achetés dès le premier versement reçu, tant que la caisse et le plafond le permettent.</p>
   </div>
   <div class="card c7">
     <h2>Résultat<span class="spacer"></span><span class="hint" id="smInfo" style="margin:0;text-transform:none;letter-spacing:0"></span></h2>
@@ -375,7 +379,7 @@
     $('#smFtmo').hidden = ST.mode !== 'ftmo'; $('#smOwn').hidden = ST.mode !== 'own';
   }
   function read() {
-    const v = id => { const x = $('#' + id).value; if (id === 'smRc2') return x; const n = parseFloat(String(x).replace(',', '.')); return isFinite(n) ? n : null; };
+    const v = id => { const x = $('#' + id).value; if (id === 'smRc2' || id === 'smCycle') return x; const n = parseFloat(String(x).replace(',', '.')); return isFinite(n) ? n : null; };
     for (const [id, key] of Object.entries(F)) { const x = v(id); if (x !== null) ST[key] = x; }
     for (const [id, key] of Object.entries(FO)) { const x = v(id); if (x !== null) ST.own[key] = x; }
     ST.n0 = Math.max(1, Math.min(4, ST.n0 | 0)); ST.rc = Math.max(0.1, ST.rc); ST.rf = Math.max(0.1, ST.rf); ST.cushion = Math.max(0, ST.cushion); ST.cap = Math.max(10, ST.cap);
